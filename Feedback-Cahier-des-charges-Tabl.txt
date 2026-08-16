@@ -1,0 +1,238 @@
+========================================================================
+FEEDBACK DEVELOPPEUR - CAHIER DES CHARGES "TABL."
+Retour sur les points a clarifier / detailler avant developpement
+========================================================================
+
+Objectif de ce document : identifier ce qui n'est pas assez clair, pas
+assez detaille, ou manquant dans le cahier des charges, afin d'etre sur
+de ce qui doit etre developpe avant de commencer.
+Les choix techniques (architecture, base de donnees, technos) ne sont PAS
+traites ici : ils relevent de la partie developpement et seront faits une
+fois les points ci-dessous clarifies.
+
+
+------------------------------------------------------------------------
+A. CONTRADICTIONS INTERNES A LEVER (les plus importantes)
+------------------------------------------------------------------------
+
+Points ou le document se contredit lui-meme. Impossible de coder tant
+que ce n'est pas tranche.
+
+1. NOTE CHIFFREE OU EMOTION ? (coeur du produit, ambigu)
+   - §4.1 et §4.2 : "attribuer une note", "une simple note de 1 a 5 doit
+     suffire", "noter un restaurant".
+   - §3.3, §6.3, §5.1 (ecran 7) : le parcours reel ne parle que d'une
+     "emotion parmi 5" (ravi, enthousiaste, surpris...).
+   => Est-ce une note 1-5 ET une emotion, ou l'emotion REMPLACE la note ?
+      C'est la donnee fondamentale de chaque review. A trancher.
+
+2. ON NOTE LE RESTAURANT, LE PLAT, OU LE MOMENT ?
+   Le doc dit les trois selon les endroits ("noter un restaurant",
+   "note au plat", "noter le restaurant ou le plat").
+   => Change la structure de donnees et l'UI. Un seul modele clair requis.
+
+3. DETECTION "EN ARRIERE-PLAN PENDANT LE REPAS" VS "GEOLOC APP OUVERTE"
+   - §3.3 etapes 2-3 : "l'app prepare le restaurant... pendant que
+     l'utilisateur profite de son repas", "aucune action pendant le repas".
+   - §6.4 + §11.3 : geoloc "uniquement lorsque l'application est ouverte".
+   => Techniquement incompatibles : si l'app est fermee pendant le repas,
+      elle ne peut rien preparer. Clarifier le vrai scenario (l'app capte
+      la position a l'ouverture au moment de la photo, puis prepare tout
+      quand l'utilisateur revient plus tard). C'est "l'effet magique" n°1 :
+      il doit etre decrit de facon realiste.
+
+4. RESEAU SYMETRIQUE (AMIS) VS ASYMETRIQUE (ABONNES)
+   - Modele V1 = cercle d'amis avec acceptation mutuelle (§6.2, §8.4).
+   - Mais §1.5 et benchmark BeReal evoquent "suivre des personnalites" et
+     "distinguer le cercle des abonnes".
+   => Confirmer qu'en V1 c'est STRICTEMENT de l'amitie mutuelle, sans
+      logique d'abonnes/followers.
+
+5. REACTIONS : QUEL MODELE EXACT ?
+   - §4.1 : "commentaire, emoji ou kudo".
+   - §4.2 : "5 emojis".
+   - §6.7 : "emotion ou commentaire".
+   => C'est 5 emojis + commentaires ? Le "kudo" (facon Strava) est-il un
+      element en plus ? Les commentaires sont-ils des fils avec reponses ?
+
+
+------------------------------------------------------------------------
+B. FLOUS / MANQUE DE DETAIL, FONCTIONNALITE PAR FONCTIONNALITE
+------------------------------------------------------------------------
+
+LE "MOMENT" (objet central) - le plus sous-specifie
+   - Liste EXHAUSTIVE des champs d'un moment et lesquels sont obligatoires.
+     L'emotion est-elle le SEUL champ requis ?
+   - Un moment = un plat, ou un repas entier ? Peut-on mettre plusieurs
+     photos / plusieurs plats / plusieurs boissons dans un meme moment ?
+   - Peut-on creer un moment a posteriori (resto d'hier), ou uniquement
+     sur place ?
+   - Apres publication, peut-on changer la visibilite (prive <-> public) ?
+
+FEED (accueil)
+   - Que montre-t-on quand l'utilisateur a 0 ami ou que personne n'a rien
+     publie ? (ecran vide = point faible n°1, voir section D)
+   - Le feed inclut-il MES propres moments ou seulement ceux des amis ?
+   - Pagination / jusqu'ou on remonte.
+
+RESTAURANT / BASE DE DONNEES DE LIEUX
+   - La "large base de restaurants" vient d'ou ? Google Places a la volee,
+     ou une base pre-remplie maison ? (Impact enorme sur couts/faisabilite.)
+   - Que fait-on d'un lieu absent de Places (petit resto, food truck,
+     chef a domicile) ? Creation manuelle citee (§CU4) mais non detaillee :
+     quels champs ?
+   - Dedoublonnage : si deux utilisateurs creent "Chez Bon Bon"
+     manuellement, on gere les doublons comment ? (Sinon la fonction
+     "mes amis sont venus ici" se casse.)
+   - Un ami "est venu ici" = il a publie un moment PUBLIC ici. Un moment
+     PRIVE compte-t-il ? (Suppose non, a confirmer.)
+
+AMIS / CERCLE
+   - Y a-t-il une taille max du cercle ? Le positionnement insiste sur
+     "restreint" mais aucune regle.
+   - Identifier un ami dans un moment : s'il n'est pas dans mon cercle,
+     voit-il le moment ? Recoit-il une notif ? Et si je tague quelqu'un
+     qui n'a pas de compte ?
+   - Import de contacts : correspondance sur quoi (numero de tel ? email ?),
+     et avec quel ecran de consentement (RGPD) ?
+
+BADGES (§5.1 ecran 13)
+   - Exemples donnes mais AUCUNE regle : conditions de deblocage, seuils,
+     liste reelle. => Soit vous les definissez, soit vous les reportez
+     explicitement apres le MVP. En l'etat, non codable.
+
+STATISTIQUES / "WRAPPED"
+   - Mis en avant comme argument fort (§1.4) et feature Premium.
+     Dans le MVP ou pas ? §5.1 ne le liste pas clairement. Ambigu.
+
+SCAN DE MENU
+   - Resultat stocke sous quelle forme (plats + prix structures ?) ?
+   - Qui peut corriger un menu errone ? Un menu change -> versioning ?
+   - Plusieurs scans du meme resto -> on garde lequel ?
+
+ONBOARDING "SANS COMPTE" (§6.1 / §7.1)
+   - "Decouvrir librement l'app sans compte" / "parcourir librement
+     certaines parties" - MAIS tout est prive/amis-only. Concretement,
+     que peut voir un visiteur non connecte et sans amis ? Il n'y a AUCUN
+     contenu public dans cette app. A clarifier : est-ce juste des ecrans
+     de presentation ? Le mot "parcourir librement l'app" est trompeur.
+
+
+------------------------------------------------------------------------
+C. CAS D'USAGE A APPROFONDIR & CAS LIMITES NON TRAITES
+------------------------------------------------------------------------
+
+Les 4 cas d'usage (§3.3) sont bien ecrits pour le chemin heureux, mais il
+manque les cas d'echec / limites, qui representent ~50% du developpement :
+
+   - Geoloc echoue ou l'utilisateur refuse la localisation -> parcours de
+     secours ? (Recherche manuelle citee pour livraison, pas pour un refus
+     general de geoloc.)
+   - Plusieurs restos a la meme adresse (centre commercial, immeuble) ->
+     risque technique n°1 admis (§15.2), mais aucun parcours UX decrit pour
+     lever l'ambiguite (liste de choix ? recherche ?).
+   - Mauvaise reconnaissance -> comment l'utilisateur corrige ?
+     ("Changer de lieu" cite mais pas detaille.)
+   - Pas de reseau au moment de creer le moment -> le moment est mis en
+     file d'attente / brouillon et publie plus tard ? (Un resto = souvent
+     mauvais reseau. Cas frequent, pas traite.)
+   - L'utilisateur ferme l'app en pleine creation -> on garde un brouillon ?
+   - Suppression de compte -> que deviennent mes moments, mes tags dans les
+     moments des autres, les restos que "j'ai decouverts en premier" ?
+     (RGPD, obligatoire.)
+   - Premier utilisateur d'un resto puis un ami arrive -> le doc decrit
+     "tu es le premier", mais pas la mecanique inverse (notif "ton ami X a
+     teste un resto de ta wishlist" suppose une publication publique).
+
+Reco : ajouter, pour chaque cas d'usage prioritaire, une petite section
+"que se passe-t-il si...".
+
+
+------------------------------------------------------------------------
+D. MANQUES TRANSVERSES (importants)
+------------------------------------------------------------------------
+
+1. L'EXPERIENCE A FROID (COLD START) - le plus gros trou UX
+   L'app est 100% privee : sans amis et sans contenu, elle est vide. Le doc
+   reconnait lui-meme (§15.4) que l'utilisateur doit percevoir de la valeur
+   "meme si peu d'amis utilisent Tabl." - mais ne decrit JAMAIS ce que voit
+   ce nouvel utilisateur seul. C'est LA question produit a resoudre avant de
+   coder le feed/l'accueil. (Piste : la valeur "journal perso" fonctionne en
+   solo ; a assumer clairement.)
+
+2. AUCUNE MAQUETTE (§14.1 vide)
+   Pour les 5 ecrans prioritaires, besoin de wireframes / maquettes (meme
+   basse fidelite) avant de developper. Livrable design manquant le plus
+   bloquant. Un texte, aussi bon soit-il, ne suffit pas pour construire une
+   UI "premium".
+
+3. RGPD / CONSENTEMENTS - cadre a poser des le MVP (produit/legal)
+   Geoloc, photos, import de contacts, et surtout exploitation des donnees
+   pour du B2B. A decider : les moments PRIVES alimentent-ils quand meme les
+   stats anonymisees B2B ? Doit etre ecrit dans les CGU AVANT la mise en
+   ligne.
+
+4. CRITERES D'ACCEPTATION
+   Chaque besoin est en prose. Pour etre sur de ce qui est developpe,
+   ideal = une ligne de critere testable par fonctionnalite ("un moment est
+   publie quand...", "un resto est reconnu si..."). A co-construire, mais a
+   prevoir.
+
+5. PRIORISATION MVP REELLE (§13 roadmap vide)
+   La liste "V1" est trop large pour un premier jet. Besoin qu'ils classent
+   chaque fonctionnalite en : indispensable / important / bonus
+   (la trame §13.6 existe, a remplir).
+
+
+------------------------------------------------------------------------
+E. CE QU'IL ME FAUT D'EUX AVANT DE COMMENCER (inputs bloquants)
+------------------------------------------------------------------------
+
+3 inputs qui dependent d'eux (pas de moi) :
+
+   1. Trancher les 5 contradictions de la section A
+      (surtout note vs emotion).
+   2. Les maquettes des 5 ecrans prioritaires (§14.1).
+   3. La priorisation MVP (§13.6 remplie) - ce qui est vraiment
+      dans le premier lot.
+
+Le reste (architecture, base de donnees, choix techno) est de mon ressort
+et sera fait une fois ces 3 points cales.
+
+
+------------------------------------------------------------------------
+F. LISTE DE QUESTIONS (a repondre par l'equipe produit)
+------------------------------------------------------------------------
+
+ 1. Une review, c'est une note 1-5, une emotion, ou les deux ? Et on note
+    le resto, le plat, ou le moment ?
+ 2. Un moment peut-il contenir plusieurs photos / plats / boissons ?
+    Peut-on creer un moment pour une visite passee ?
+ 3. Quel(s) champ(s) sont obligatoires pour publier un moment ?
+ 4. Que voit un utilisateur sans amis et sans historique en ouvrant l'app
+    (ecran d'accueil vide) ?
+ 5. La base de restaurants : Google Places a la volee ou une base maison ?
+    Que fait-on d'un lieu absent (chef a domicile, food truck) ?
+ 6. Reseau strictement amis mutuels en V1, ou deja une notion d'abonnes ?
+    Taille max du cercle ?
+ 7. Modele de reactions exact : 5 emojis ? commentaires avec reponses ?
+    un "kudo" separe ?
+ 8. Badges : definis pour le MVP (avec regles) ou reportes ?
+ 9. Les stats "Wrapped" sont-elles dans le MVP ?
+10. Que se passe-t-il quand la geoloc echoue / est refusee, ou quand
+    plusieurs restos sont au meme endroit ?
+11. Comportement hors-ligne (moment cree sans reseau) : brouillon +
+    publication differee ?
+12. Les moments prives comptent-ils dans les stats anonymisees B2B ?
+    (impact CGU/RGPD)
+13. Peut-on livrer des maquettes pour les 5 ecrans prioritaires ?
+14. Peut-on prioriser chaque fonctionnalite en indispensable / important /
+    bonus ?
+
+
+========================================================================
+Note : le document est un tres bon cahier des charges produit/marketing
+(vision, benchmark, parcours, business model solides et clairs). Les points
+ci-dessus ne remettent pas cela en cause : ils visent uniquement a lever les
+ambiguites necessaires au developpement.
+========================================================================

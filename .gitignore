@@ -1,0 +1,57 @@
+# --- Flutter / Dart ---
+# Artefacts de build : regénérés à chaque compilation, jamais versionnés.
+# (Ce sont eux qui font ramer OneDrive — des dizaines de milliers de fichiers.)
+build/
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+*.dart_tool/
+
+# Fichier de versions résolues : versionné pour l'app, ignoré pour les packages
+packages/*/pubspec.lock
+
+# Code généré (freezed, json_serializable, drift...)
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# --- Android ---
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/local.properties
+**/android/key.properties
+*.jks
+*.keystore
+
+# --- iOS / macOS ---
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/App.framework
+**/ios/Flutter/ephemeral/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Runner.xcworkspace/xcshareddata/
+**/Podfile.lock
+.DS_Store
+
+# --- IDE ---
+.idea/
+*.iml
+*.iws
+.vscode/
+!.vscode/settings.json
+
+# --- Secrets ---
+# Clés API, mots de passe, URL de projet Supabase.
+# JAMAIS dans Git : un dépôt public expose tout, et l'historique garde tout.
+.env
+.env.*
+!.env.example
+**/supabase/.env
+**/supabase/.temp/
+
+# --- Divers ---
+*.log

@@ -1,0 +1,543 @@
+========================================================================
+CAS D'USAGE DETAILLES - "TABL."
+Version dev-ready a completer / valider par l'equipe produit
+========================================================================
+
+But de ce document :
+Reprendre chaque cas d'usage du cahier des charges et le formaliser au
+niveau de detail necessaire au developpement. Le cahier actuel decrit
+surtout le "chemin heureux" en prose ; ici on ajoute les scenarios
+alternatifs, les cas d'erreur, les postconditions et les donnees precises.
+
+Legende :
+  [?]  = decision produit manquante -> a trancher par l'equipe
+  (OK) = deja confirme par le cahier des charges
+
+Structure de chaque cas d'usage :
+  Acteur / Preconditions / Declencheur / Scenario nominal /
+  Scenarios alternatifs / Cas d'erreur / Postconditions /
+  Donnees / Regles de gestion
+
+
+========================================================================
+CU-01 - ONBOARDING & CREATION DE COMPTE
+========================================================================
+
+Acteur : nouveau visiteur
+Preconditions : app installee, aucun compte
+Declencheur : premiere ouverture de l'app
+
+Scenario nominal :
+  1. Ecrans d'introduction presentant le concept (OK §7.1)
+  2. Le visiteur parcourt librement "certaines parties" de l'app  [?]
+     -> QUOI exactement ? L'app est 100% privee, il n'y a aucun
+        contenu public a montrer. Preciser ce qui est visible sans
+        compte (uniquement ecrans marketing ? demo ?).
+  3. Des qu'il veut interagir (creer un moment, ajouter un ami,
+     commenter...) -> inscription/connexion demandee (OK §6.1)
+  4. Choix de la methode d'inscription  [?]
+     -> email/mot de passe ? Apple Sign-in ? Google ? tel ?
+        (Rappel : Apple Sign-in obligatoire sur iOS si d'autres
+        logins sociaux sont proposes.)
+  5. Completer le profil : photo, pseudo, bio (OK §7.1)
+  6. Import des contacts / ajout d'amis (OK §5.1 ecran 1)
+
+Scenarios alternatifs :
+  A1. L'utilisateur refuse l'import de contacts -> parcours ?  [?]
+  A2. Pseudo deja pris -> regle d'unicite du pseudo ?  [?]
+
+Cas d'erreur :
+  E1. Email deja utilise -> message / recuperation de compte ?  [?]
+  E2. Verification email/tel obligatoire ?  [?]
+
+Postconditions :
+  - compte cree, profil minimal renseigne
+  - cercle d'amis vide (voir probleme "cold start", section finale)
+
+Donnees : photo profil, prenom, nom, pseudo (unique ?[?]),
+          localisation, bio, methode d'auth
+Regles de gestion :
+  - RG : inscription obligatoire uniquement pour interagir (OK §6.1)
+  - RG : unicite du pseudo  [?]
+
+
+========================================================================
+CU-02 - AJOUTER UN AMI
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : compte cree
+Declencheur : recherche d'une personne / bouton dedie
+
+Scenario nominal :
+  1. Recherche par pseudo, prenom ou nom (OK §6.2)
+  2. Envoi d'une demande d'amitie (OK §8.4)
+  3. Le destinataire recoit une notif dans son espace dedie (OK §8.4)
+  4. Il accepte / refuse / ignore (OK §8.4)
+  5. Si accepte -> les deux voient leurs publications respectives (OK)
+
+Scenarios alternatifs :
+  A1. Ajout via import de contacts (correspondance sur quoi ? tel ?
+      email ?[?]) et ecran de consentement RGPD  [?]
+  A2. Demande deja envoyee / deja amis -> etat du bouton  [?]
+  A3. Taille max du cercle atteinte ?  [?] (positionnement "restreint"
+      mais aucune limite chiffree)
+
+Cas d'erreur :
+  E1. Personne introuvable -> inviter par lien/SMS ?  [?]
+
+Postconditions :
+  - relation dans un etat : demande_envoyee / acceptee / refusee
+  - tant que non acceptee : profils prives, rien de partage (OK §7.2)
+
+Donnees : demandeur, destinataire, etat, date
+Regles de gestion :
+  - RG : reseau symetrique, acceptation mutuelle obligatoire (OK)
+  - RG : confirmer qu'il n'y a PAS d'abonnes/followers en V1  [?]
+  - RG : friends-of-friends invisibles (a confirmer)  [?]
+
+
+========================================================================
+CU-03 - DETECTION AUTOMATIQUE DU RESTAURANT  (PRIORITAIRE)
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : permission geoloc accordee
+Declencheur : ouverture de l'app / debut de creation d'un moment
+
+Scenario nominal :
+  1. L'app recupere la position GPS (uniquement app ouverte) (OK §6.4)
+  2. Interrogation du service de cartographie  [?]
+     -> Google Places ? Apple Maps ? base maison ? (impact cout majeur)
+  3. Identification du resto le plus probable
+  4. Affichage "On dirait que tu es chez X" + [Oui] / [Changer] (OK §5.1)
+
+Scenarios alternatifs :
+  A1. Plusieurs restos proches (meme immeuble/centre co) ->
+      ecran de choix  [?] (liste ? tri par distance ? -> risque n°1
+      identifie §15.2, aucun parcours UX decrit)
+  A2. "Changer de lieu" -> recherche manuelle  [?] (a detailler)
+  A3. Resto absent -> creation manuelle  [?] (champs ? dedoublonnage ?)
+
+Cas d'erreur :
+  E1. Geoloc refusee -> parcours de secours (recherche manuelle ?)  [?]
+  E2. Geoloc imprecise / aucun resto trouve -> ?  [?]
+  E3. Pas de reseau -> detection impossible -> ?  [?]
+
+Postconditions :
+  - un restaurant est identifie (ou saisi) et rattachable a un moment
+
+Donnees : GPS, rayon de recherche[?], resto retenu, alternatives
+Regles de gestion :
+  - RG : clarifier "detection en arriere-plan pendant le repas" vs
+    "geoloc seulement app ouverte" (contradiction §3.3 / §6.4)  [?]
+  - RG : precision minimale acceptable pour valider une detection  [?]
+  - RG : quota / cout API par ouverture -> modele economique a verifier
+
+
+========================================================================
+CU-04 - PAGE RESTAURANT  (PRIORITAIRE)
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : un restaurant identifie
+Declencheur : resto detecte, ou ouverture d'une fiche resto
+
+Scenario nominal (3 cas, OK §5.1 ecran 4) :
+  Cas 1 - des amis sont deja venus :
+     -> recommandations du cercle, plats preferes, derniers moments,
+        nombre d'amis venus
+  Cas 2 - aucun ami venu :
+     -> "Premiere decouverte pour ton cercle" + [Scanner le menu]
+        + [Creer le premier moment]
+  Cas 3 - l'utilisateur est deja venu :
+     -> ses derniers souvenirs, ses plats preferes, changements du lieu
+
+Scenarios alternatifs :
+  A1. Resto sans menu scanne -> affichage ?  [?]
+  A2. Beaucoup de moments -> pagination / tri  [?]
+
+Cas d'erreur :
+  E1. Donnees resto incompletes (nom/adresse manquants depuis l'API)  [?]
+
+Postconditions : aucune (ecran de consultation)
+
+Donnees affichees : infos resto, plats preferes du cercle, moments
+     publics des amis, compteur "amis venus", menus
+Regles de gestion :
+  - RG : "un ami est venu ici" = il a publie un moment PUBLIC ici ;
+    les moments PRIVES ne comptent pas (a confirmer)  [?]
+  - RG : quels moments sont visibles ici -> uniquement ceux du cercle
+
+
+========================================================================
+CU-05 - CREER UN MOMENT  (PRIORITAIRE)
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : permission camera [?], permission geoloc [?]
+Declencheur : appui sur le bouton "+"
+
+Scenario nominal :
+  1. Ouverture directe de la camera (OK §6.3)
+  2. Photo du plat/verre (facultative - OK §3.3)
+  3. Capture GPS + date + heure
+  4. Detection du resto (voir CU-03)
+  5. (L'utilisateur retourne a son repas, app en pause)
+  6. Reouverture -> ecran "moment pret"
+  7. Si 1 seul resto probable -> propose d'office (OK §3.3)
+  8. Confirmation du resto
+  9. Choix d'une emotion parmi 5 (OK)
+ 10. Optionnel : description, amis tagues, boisson/vin (OK)
+ 11. Choix "Publier au cercle" / "Garder pour moi" (OK)
+ 12. Animation premium de confirmation (OK)
+ 13. Enregistrement + apparition dans le feed si publie
+
+Scenarios alternatifs :
+  A1. Plusieurs restos proches -> ecran de choix (voir CU-03)  [?]
+  A2. Sans photo -> on continue (OK)
+  A3. Plusieurs photos / plusieurs plats / plusieurs boissons dans
+      un meme moment ? OU un moment = un seul plat ?  [?]
+  A4. Moment cree a posteriori (resto d'hier) -> autorise ?  [?]
+  A5. Livraison / emporter / chef a domicile : pas de geoloc ->
+      selection manuelle du resto/chef (OK §CU4)  [?] a detailler
+
+Cas d'erreur :
+  E1. Geoloc refusee/indisponible -> saisie manuelle ?  [?]
+  E2. Pas de reseau (etape 4 ou 8) -> brouillon + publication
+      differee ?  [?]
+  E3. App fermee en pleine creation (etape 5-6) -> brouillon conserve ?
+      combien de temps ?  [?]
+  E4. Aucun resto trouve -> saisie 100% manuelle ?  [?]
+
+Postconditions :
+  - 1 moment persistant lie a (user, resto, date/heure)
+  - si public : visible du cercle, +1 au compteur "amis venus ici"
+  - si prive : visible du seul auteur
+    -> compte-t-il quand meme dans les stats anonymisees B2B ?  [?]
+
+Donnees du moment (A FIGER) :
+  photo(s)[?], resto, note ET/OU emotion [?], description, amis tagues,
+  boisson/vin, date/heure, GPS[?], visibilite (public/prive)
+Regles de gestion :
+  - RG : champ(s) obligatoire(s) ? (l'emotion seule ?)  [?]
+  - RG : note 1-5 OU emotion OU les deux ? (contradiction §4.1 / §3.3) [?]
+  - RG : on note le resto, le plat, ou le moment ?  [?]
+  - RG : objectif "moins de 5 secondes" (OK)
+
+
+========================================================================
+CU-06 - SCANNER UN MENU
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : un restaurant identifie
+Declencheur : bouton "Scanner le menu" (facultatif)
+
+Scenario nominal :
+  1. Photo du menu (OK §5.1 ecran 5)
+  2. L'IA extrait plats / desserts / boissons  [?] (quelle techno,
+     quelle qualite attendue ?)
+  3. Le menu est sauvegarde et rattache au resto
+
+Scenarios alternatifs :
+  A1. Menu deja existant pour ce resto -> mise a jour / versioning ?  [?]
+  A2. Plusieurs pages de menu -> multi-photos ?  [?]
+  A3. Correction manuelle du resultat de l'IA -> par qui ?  [?]
+
+Cas d'erreur :
+  E1. OCR/IA echoue ou resultat incoherent -> saisie manuelle ?  [?]
+
+Postconditions : un menu structure associe au resto  [?] (forme exacte ?)
+
+Donnees : plats, desserts, boissons, prix[?], resto, auteur, date
+Regles de gestion :
+  - RG : qui fait autorite si deux utilisateurs scannent le meme menu ? [?]
+  - RG : un menu errone/perime -> comment gere ?  [?]
+
+
+========================================================================
+CU-07 - VOIR LE FEED (ACCUEIL)
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : au moins un ami / des moments publies
+Declencheur : ouverture de l'onglet accueil
+
+Scenario nominal :
+  1. Feed chronologique des moments du cercle (OK §5.1 ecran 2)
+  2. Chaque carte : photo, resto, emotion, date, description,
+     nb de personnes presentes (OK)
+  3. Acces au profil du resto et de l'ami (OK)
+  4. Aucun like public, aucune story (OK)
+
+Scenarios alternatifs :
+  A1. Le feed inclut-il MES propres moments ou seulement les amis ?  [?]
+  A2. Pagination / chargement progressif / jusqu'ou on remonte  [?]
+
+Cas d'erreur / cas limite :
+  E1. 0 ami OU aucun moment publie -> ecran vide : QUE MONTRE-T-ON ? [?]
+      (point faible n°1 : voir "cold start" en section finale)
+
+Postconditions : aucune (consultation)
+
+Donnees : liste de moments publics du cercle, triee par date
+Regles de gestion :
+  - RG : pas d'algorithme de tri, chronologique strict (OK §7.4)
+
+
+========================================================================
+CU-08 - REAGIR / COMMENTER UN MOMENT
+========================================================================
+
+Acteur : utilisateur connecte (ami de l'auteur)
+Preconditions : le moment est publie et visible du cercle
+Declencheur : ouverture d'un moment du feed
+
+Scenario nominal :
+  1. Choix d'une reaction (emoji) OU ajout d'un commentaire (OK §6.7)
+
+Scenarios alternatifs :
+  A1. Modele exact des reactions ?  [?]
+      -> 5 emojis (§4.2) ? + commentaires ? + un "kudo" separe (§4.1) ?
+  A2. Repondre a un commentaire (fils de discussion) ?  [?]
+  A3. Modifier / supprimer sa propre reaction ou son commentaire ?  [?]
+
+Cas d'erreur :
+  E1. Auteur bloque / plus ami entre-temps -> reaction impossible  [?]
+
+Postconditions :
+  - reaction/commentaire attache au moment, notif a l'auteur  [?]
+
+Donnees : moment, auteur reaction, type (emoji/commentaire/kudo?[?]),
+          contenu, date
+Regles de gestion :
+  - RG : aucun compteur de likes public (OK §6.7)
+
+
+========================================================================
+CU-09 - CONSULTER SON JOURNAL / HISTORIQUE
+========================================================================
+
+Acteur : utilisateur connecte
+Preconditions : au moins un moment enregistre
+Declencheur : ouverture du profil / onglet Journal
+
+Scenario nominal :
+  1. Historique de tous les moments (publics ET prives) (OK §6.9)
+  2. Classement par date, resto, ville, pays (OK §14 / §6.9)
+  3. Acces : Souvenirs, Restaurants, Wishlist, Plats preferes, Carte
+     (OK §5.1 ecran 9)
+
+Scenarios alternatifs :
+  A1. Statistiques personnelles / "Wrapped" -> dans le MVP ou pas ?  [?]
+  A2. Carte interactive des restos visites -> V1 ?  [?]
+
+Postconditions : aucune (consultation)
+
+Donnees : tous les moments de l'utilisateur, restos, favoris, wishlist
+Regles de gestion :
+  - RG : les moments prives n'apparaissent que dans SON journal (OK)
+
+
+========================================================================
+CU-10 - WISHLIST
+========================================================================
+
+Acteur : utilisateur connecte
+Declencheur : ajout d'un resto a la wishlist
+
+Scenario nominal :
+  1. Ajout d'un resto pour le retrouver plus tard (OK §5.1 ecran 12)
+  2. Notif UNIQUEMENT si un ami publie un moment dans ce resto (OK)
+
+Scenarios alternatifs :
+  A1. Retirer un resto de la wishlist  [?]
+  A2. Un ami publie en PRIVE dans ce resto -> pas de notif (a confirmer) [?]
+
+Postconditions : resto dans la wishlist, notifs conditionnelles activees
+Donnees : user, resto, date d'ajout
+Regles de gestion :
+  - RG : la notif wishlist suppose une publication PUBLIQUE de l'ami  [?]
+
+
+========================================================================
+CU-11 - SIGNALER / BLOQUER
+========================================================================
+
+Acteur : utilisateur connecte
+Declencheur : signalement d'un compte/contenu, ou blocage
+
+Scenario nominal - Signaler (OK §8.6) :
+  1. Formulaire de motif
+  2. Envoi -> examine par la moderation
+
+Scenario nominal - Bloquer (OK §8.6) :
+  1. Blocage d'un utilisateur
+  2. Suppression auto de la relation d'amitie
+  3. Fin des interactions + contenus mutuellement inaccessibles
+  4. Deblocage possible depuis la liste des bloques
+
+Scenarios alternatifs / a preciser :
+  A1. Moderation "en grande partie automatisee" (§11.7) -> avec quoi ? [?]
+      (Sur un reseau 100% prive/amis, quelle est la surface d'abus ?)
+  A2. Que devient un moment ou j'etais tague par la personne bloquee ? [?]
+
+Postconditions :
+  - signalement enregistre pour la moderation
+  - blocage : relation supprimee, acces coupe des deux cotes
+Donnees : signaleur, cible, motif / bloqueur, bloque, date
+Regles de gestion :
+  - RG : interface d'admin pour supprimer un contenu (OK §8.3)
+
+
+========================================================================
+CU-12 - MODIFIER / SUPPRIMER UN MOMENT OU SON COMPTE
+========================================================================
+
+Acteur : utilisateur connecte (auteur)
+Declencheur : edition/suppression d'un moment, ou suppression de compte
+
+Scenario nominal - Moment (OK §8.3) :
+  1. L'auteur modifie le contenu d'un moment, ou le supprime
+
+Scenarios alternatifs :
+  A1. Changer la visibilite apres publication (prive <-> public) ?  [?]
+  A2. Modifier le resto associe apres coup ?  [?]
+
+Scenario - Suppression de compte (RGPD, obligatoire) :
+  1. L'utilisateur demande la suppression de son compte  [?]
+  2. Que deviennent :
+     - ses moments  [?]
+     - ses tags dans les moments des autres  [?]
+     - les restos qu'il a "decouverts en premier"  [?]
+     - ses donnees dans les stats anonymisees  [?]
+
+Postconditions :
+  - moment modifie/supprime, ou compte + donnees traites selon RGPD
+Regles de gestion :
+  - RG : droit a l'effacement (RGPD) a definir precisement  [?]
+  - RG : consentements (geoloc, photos, contacts, exploitation B2B)  [?]
+
+
+========================================================================
+POINT TRANSVERSE CRITIQUE - EXPERIENCE A FROID (COLD START)
+========================================================================
+
+L'app est 100% privee : un nouvel utilisateur SANS amis et SANS contenu
+se retrouve devant une app vide (feed vide, page resto sans recommandation).
+Le cahier reconnait ce risque (§15.4) mais ne decrit jamais ce que voit
+cet utilisateur seul.
+=> C'EST LA question produit a resoudre avant de coder l'accueil.
+   Piste : assumer la valeur "journal personnel" qui fonctionne en solo,
+   et concevoir des ecrans vides utiles (call-to-action, invitation
+   d'amis, premier moment).  [?]
+
+
+========================================================================
+RECAPITULATIF DES DECISIONS A TRANCHER (tous les [?])
+========================================================================
+
+MODELE DE DONNEES / REVIEW
+  - Note 1-5, emotion, ou les deux ?
+  - On note le resto, le plat, ou le moment ?
+  - Champs obligatoires d'un moment ?
+  - Un moment = un plat ou un repas (plusieurs photos/plats/boissons) ?
+  - Moment a posteriori autorise ?
+  - Changement de visibilite apres publication ?
+
+RESEAU SOCIAL
+  - Strictement amis mutuels en V1 (pas d'abonnes) ?
+  - Taille max du cercle ?
+  - Amis d'amis invisibles ?
+  - Tag d'une personne hors cercle / sans compte ?
+
+RESTAURANTS / DETECTION
+  - Google Places a la volee vs base maison ?
+  - Lieu absent -> creation manuelle (champs, dedoublonnage) ?
+  - Parcours "plusieurs restos proches" (risque n°1) ?
+  - Geoloc refusee / hors-ligne -> secours ?
+  - "Ami venu ici" compte les moments prives ou non ?
+
+FEED / COLD START
+  - Ecran vide (0 ami / 0 moment) : que montrer ?
+  - Le feed inclut mes propres moments ?
+
+REACTIONS
+  - Modele exact : emojis + commentaires + kudo ? fils de reponses ?
+
+FONCTIONNALITES A CADRER / DATER
+  - Badges (regles) : MVP ou plus tard ?
+  - Stats "Wrapped" : MVP ou plus tard ?
+  - Scan menu : forme du resultat, versioning, autorite ?
+
+LEGAL / RGPD
+  - Consentements (geoloc, photos, contacts, B2B) ?
+  - Suppression de compte : que deviennent les donnees ?
+  - Moments prives -> comptent dans les stats B2B anonymisees ?
+
+AUTH
+  - Methodes d'inscription (email, Apple, Google, tel) ?
+  - Unicite / verification du pseudo et de l'email ?
+
+
+========================================================================
+========================================================================
+   POINTS A ABORDER PENDANT LA REUNION TEAMS
+========================================================================
+========================================================================
+
+1. CADRE POSITIF (a dire en ouverture)
+   - Le cahier des charges est solide cote produit/marketing : vision,
+     benchmark, parcours et business model sont clairs et bien construits.
+   - Mon retour ne remet rien en cause : il vise juste a lever les
+     ambiguites necessaires pour developper la bonne chose du premier coup.
+
+2. LES 3 CHOSES QUI ME BLOQUENT (a marteler)
+   a) Trancher les contradictions du modele de review :
+      note 1-5 vs emotion, et on note quoi (resto/plat/moment) ?
+      -> c'est la donnee centrale de toute l'app, rien ne peut se coder
+         proprement avant.
+   b) Il me faut des MAQUETTES pour les 5 ecrans prioritaires
+      (aucune maquette dans le doc, §14.1 vide). Un texte ne suffit pas
+      pour construire une UI "premium".
+   c) Il me faut la PRIORISATION du MVP (§13.6 a remplir) :
+      classer chaque fonctionnalite en indispensable / important / bonus.
+      La liste "V1" actuelle est trop large pour un premier lot a 3.
+
+3. LE RISQUE TECHNIQUE N°1 (a mettre sur la table)
+   - La detection automatique du restaurant est "l'effet magique" du
+     produit MAIS c'est le point le plus risque (plusieurs restos au meme
+     endroit, cout des API a l'appel, geoloc app-ouverte-seulement).
+   - Proposition : je fais un test technique (spike) sur cette detection
+     TOT, avant de m'engager sur le reste. Si ca ne marche pas bien, tout
+     le parcours "moment" doit etre repense.
+
+4. LE TROU UX A COMBLER ENSEMBLE (a soulever)
+   - L'app est 100% privee : un nouvel utilisateur seul voit une app vide.
+   - Il faut decider ce qu'on lui montre (le "cold start"). C'est une
+     decision produit, pas technique -> j'ai besoin d'eux dessus.
+
+5. METHODE PROPOSEE (a proposer en conclusion)
+   - Je leur transmets 2 documents : le feedback + les cas d'usage
+     detailles avec tous les points [?] a trancher.
+   - Ils completent les cas d'usage (ils portent l'intention produit),
+     je valide la faisabilite.
+   - Une fois les [?] leves + maquettes + priorisation MVP :
+     je produis la note d'architecture et le schema de base de donnees,
+     puis on demarre le developpement.
+
+6. RAPPEL LEGAL (a ne pas oublier)
+   - Geoloc + photos + import de contacts + exploitation B2B des donnees
+     => CGU, politique de confidentialite et gestion du consentement
+     sont obligatoires DES le MVP, avant toute mise sur les stores.
+   - Comptes developpeur a prevoir : Apple (99$/an), Google Play (25$).
+
+7. QUESTION DE FOND A LEUR POSER (pour cadrer mes choix)
+   - On code a combien de personnes, sur quel budget mensuel infra/API ?
+   - iOS d'abord, ou iOS + Android en meme temps ?
+   - Quel objectif d'utilisateurs a 6 mois (dimensionnement) ?
+
+========================================================================
+FIN DU DOCUMENT
+========================================================================
