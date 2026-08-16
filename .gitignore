@@ -44,6 +44,10 @@ packages/*/pubspec.lock
 .vscode/
 !.vscode/settings.json
 
+# Claude Code : fichiers de session locaux (pas les skills, versionnés eux).
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 # --- Secrets ---
 # Clés API, mots de passe, URL de projet Supabase.
 # JAMAIS dans Git : un dépôt public expose tout, et l'historique garde tout.
