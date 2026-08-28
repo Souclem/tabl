@@ -6,20 +6,23 @@ version: 0.1.0+1
 environment:
   sdk: ^3.12.2
 
-# app/ est le SEUL endroit où l'UI et le métier se rencontrent :
-# on récupère les données via tabl_core, on les passe à tabl_ui.
 dependencies:
   flutter:
     sdk: flutter
-  tabl_ui:
-    path: ../packages/tabl_ui
-  tabl_core:
-    path: ../packages/tabl_core
+  supabase_flutter: ^2.17.1
+  shared_preferences: ^2.5.5
+  google_sign_in: ^7.0.0
+  sign_in_with_apple: ^6.1.0
+  crypto: ^3.0.3
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
+  image_picker_platform_interface: ^2.11.1
 
 flutter:
   uses-material-design: true

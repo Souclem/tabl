@@ -59,3 +59,8 @@ packages/*/pubspec.lock
 
 # --- Divers ---
 *.log
+logs/
+
+# Matériel de référence design (exports, docx, pptx, captures) : volumineux,
+# pas du code applicatif, jamais versionné.
+instruction/

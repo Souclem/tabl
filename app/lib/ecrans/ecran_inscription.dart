@@ -1,12 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:tabl_core/tabl_core.dart';
-import 'package:tabl_ui/tabl_ui.dart';
+import 'package:app/services/services.dart';
+import 'package:app/widgets/widgets.dart';
+
+import '../navigation/connexion_oauth.dart';
+import '../navigation/transitions.dart';
+import 'ecran_accueil.dart';
+import 'ecran_attente_confirmation.dart';
+import 'ecran_choix_pseudo.dart';
+import 'ecran_connexion.dart';
+import 'ecran_principal.dart';
 
 /// Écran de création de compte.
 class EcranInscription extends StatefulWidget {
-  const EcranInscription({super.key, required this.authService});
+  const EcranInscription({
+    super.key,
+    required this.authService,
+    required this.abonnementService,
+    required this.souvenirService,
+  });
 
   final AuthService authService;
+  final AbonnementService abonnementService;
+  final SouvenirService souvenirService;
 
   @override
   State<EcranInscription> createState() => _EcranInscriptionState();
@@ -16,7 +31,7 @@ class _EcranInscriptionState extends State<EcranInscription> {
   final _pseudo = TextEditingController();
   final _email = TextEditingController();
   final _motDePasse = TextEditingController();
-  final _confirmation = TextEditingController();
+  final _confirmationMotDePasse = TextEditingController();
 
   String? _erreurPseudo;
   String? _erreurEmail;
@@ -30,7 +45,7 @@ class _EcranInscriptionState extends State<EcranInscription> {
     _pseudo.dispose();
     _email.dispose();
     _motDePasse.dispose();
-    _confirmation.dispose();
+    _confirmationMotDePasse.dispose();
     super.dispose();
   }
 
@@ -40,7 +55,7 @@ class _EcranInscriptionState extends State<EcranInscription> {
     final erreurMotDePasse = Validation.motDePasse(_motDePasse.text);
     final erreurConfirmation = Validation.confirmationMotDePasse(
       _motDePasse.text,
-      _confirmation.text,
+      _confirmationMotDePasse.text,
     );
 
     setState(() {
@@ -50,7 +65,8 @@ class _EcranInscriptionState extends State<EcranInscription> {
       _erreurConfirmation = erreurConfirmation;
     });
 
-    final valide = erreurPseudo == null &&
+    final valide =
+        erreurPseudo == null &&
         erreurEmail == null &&
         erreurMotDePasse == null &&
         erreurConfirmation == null;
@@ -58,23 +74,106 @@ class _EcranInscriptionState extends State<EcranInscription> {
 
     setState(() => _enCours = true);
     try {
-      await widget.authService.inscription(
-        email: _email.text.trim(),
-        motDePasse: _motDePasse.text,
+      final email = _email.text.trim();
+      final motDePasse = _motDePasse.text;
+      final resultat = await widget.authService.inscription(
+        email: email,
+        motDePasse: motDePasse,
         pseudo: _pseudo.text.trim(),
       );
       if (!mounted) return;
-      _afficherMessage('Compte créé.');
+      switch (resultat) {
+        case InscriptionReussie(:final utilisateur):
+          Navigator.of(context).pushReplacement(
+            EcranPrincipal.route(
+              authService: widget.authService,
+              abonnementService: widget.abonnementService,
+              souvenirService: widget.souvenirService,
+              utilisateur: utilisateur,
+            ),
+          );
+        case InscriptionEnAttenteConfirmation():
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute<void>(
+              builder: (_) => EcranAttenteConfirmation(
+                authService: widget.authService,
+                abonnementService: widget.abonnementService,
+                souvenirService: widget.souvenirService,
+                email: email,
+                motDePasse: motDePasse,
+              ),
+            ),
+          );
+      }
     } on ErreurAuth catch (e) {
       if (!mounted) return;
-      _afficherMessage(e.message);
+      afficherMessage(context, e.message);
+    } catch (_) {
+      // Réseau, serveur... : pas une ErreurAuth, mais l'utilisateur doit
+      // quand même être prévenu plutôt que de voir le bouton s'arrêter
+      // sans explication.
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
     } finally {
       if (mounted) setState(() => _enCours = false);
     }
   }
 
-  void _afficherMessage(String texte) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  /// Sign in with Apple demande l'Apple Developer Program (payant) : pas
+  /// encore actif sur ce projet. Le bouton reste honnête plutôt que de
+  /// planter sur une capability absente — voir AuthServiceSupabase.
+  /// connexionApple, déjà implémentée, prête à être branchée le jour où
+  /// le compte payant est actif.
+  void _afficherAppleBientotDisponible() {
+    afficherMessage(context, 'Bientôt disponible.');
+  }
+
+  Future<void> _connexionGoogle() =>
+      _connexionOAuth(widget.authService.connexionGoogle);
+
+  Future<void> _connexionOAuth(
+    Future<ResultatConnexionOAuth?> Function() connexion,
+  ) async {
+    setState(() => _enCours = true);
+    final resultat = await tenterConnexionOAuth(context, connexion);
+    if (mounted) setState(() => _enCours = false);
+    if (!mounted || resultat == null) return;
+
+    switch (resultat) {
+      case ConnexionOAuthReussie(:final utilisateur):
+        Navigator.of(context).pushReplacement(
+          EcranPrincipal.route(
+            authService: widget.authService,
+            abonnementService: widget.abonnementService,
+            souvenirService: widget.souvenirService,
+            utilisateur: utilisateur,
+          ),
+        );
+      case ProfilAConfigurer(:final id, :final email):
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(
+            builder: (_) => EcranChoixPseudo(
+              authService: widget.authService,
+              abonnementService: widget.abonnementService,
+              souvenirService: widget.souvenirService,
+              id: id,
+              email: email,
+            ),
+          ),
+        );
+    }
+  }
+
+  void _allerVersConnexion() {
+    Navigator.of(context).pushReplacement(
+      remplacerFormulaire(
+        EcranConnexion(
+          authService: widget.authService,
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+        ),
+      ),
+    );
   }
 
   @override
@@ -82,9 +181,15 @@ class _EcranInscriptionState extends State<EcranInscription> {
     return EnveloppeFormulaire(
       titre: 'Créer un compte',
       sousTitre: 'Tabl est privé : seuls tes amis voient ce que tu publies.',
+      onRetour: () => revenirVersAccueilOuSecours(
+        context,
+        widget.authService,
+        widget.abonnementService,
+        widget.souvenirService,
+      ),
       children: [
         TablChampTexte(
-          libelle: 'Pseudo',
+          libelle: "Nom d'utilisateur",
           controleur: _pseudo,
           indication: 'camille',
           erreur: _erreurPseudo,
@@ -110,26 +215,15 @@ class _EcranInscriptionState extends State<EcranInscription> {
           },
         ),
         const SizedBox(height: TablTokens.espaceL),
-        TablChampTexte(
+        TablChampMotDePasse(
           libelle: 'Mot de passe',
           controleur: _motDePasse,
           indication: '${Validation.longueurMinMotDePasse} caractères minimum',
           erreur: _erreurMotDePasse,
-          masque: !_motDePasseVisible,
-          actionClavier: TextInputAction.next,
-          iconePrefixe: Icons.lock_outline_rounded,
+          visible: _motDePasseVisible,
+          onToggleVisible: () =>
+              setState(() => _motDePasseVisible = !_motDePasseVisible),
           actif: !_enCours,
-          suffixe: IconButton(
-            icon: Icon(
-              _motDePasseVisible
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 20,
-              color: TablTokens.texteDoux,
-            ),
-            onPressed: () =>
-                setState(() => _motDePasseVisible = !_motDePasseVisible),
-          ),
           onChanged: (_) {
             if (_erreurMotDePasse != null) {
               setState(() => _erreurMotDePasse = null);
@@ -137,13 +231,13 @@ class _EcranInscriptionState extends State<EcranInscription> {
           },
         ),
         const SizedBox(height: TablTokens.espaceL),
-        TablChampTexte(
+        TablChampMotDePasse(
           libelle: 'Confirmer le mot de passe',
-          controleur: _confirmation,
+          controleur: _confirmationMotDePasse,
           erreur: _erreurConfirmation,
-          masque: !_motDePasseVisible,
-          actionClavier: TextInputAction.done,
-          iconePrefixe: Icons.lock_outline_rounded,
+          visible: _motDePasseVisible,
+          onToggleVisible: () =>
+              setState(() => _motDePasseVisible = !_motDePasseVisible),
           actif: !_enCours,
           onChanged: (_) {
             if (_erreurConfirmation != null) {
@@ -159,15 +253,24 @@ class _EcranInscriptionState extends State<EcranInscription> {
           onPresse: _sInscrire,
         ),
         const SizedBox(height: TablTokens.espaceL),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Déjà un compte ?', style: TablTokens.legende),
-            TablBoutonTexte(
-              libelle: 'Se connecter',
-              onPresse: _enCours ? null : () => Navigator.of(context).pop(),
-            ),
-          ],
+        const TablSeparateurTexte(texte: 'Ou'),
+        const SizedBox(height: TablTokens.espaceL),
+        TablBoutonsAuthTierce(
+          onPresseApple: _enCours ? null : _afficherAppleBientotDisponible,
+          onPresseGoogle: _enCours ? null : _connexionGoogle,
+        ),
+        const SizedBox(height: TablTokens.espaceL),
+        TablLienBasDePage(
+          question: 'Déjà un compte ?',
+          libelleAction: 'Se connecter',
+          onAction: _enCours ? null : _allerVersConnexion,
+        ),
+        const SizedBox(height: TablTokens.espaceM),
+        Text(
+          "En créant un compte, vous acceptez nos Conditions d'utilisation "
+          'et notre Politique de confidentialité.',
+          textAlign: TextAlign.center,
+          style: TablTokens.legende,
         ),
       ],
     );
