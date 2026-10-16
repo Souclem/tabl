@@ -26,6 +26,34 @@ class ControleurCarte {
     if (camera != null) carte.setCamera(camera);
   }
 
+  /// Déplace la carte (sans changer le zoom) pour amener ce point à
+  /// [hauteur] (fraction depuis le haut de la carte, 0,5 = au centre).
+  Future<void> amenerA(
+    double latitude,
+    double longitude, {
+    required double hauteur,
+  }) async {
+    final carte = _carte;
+    if (carte == null) return;
+    final camera = await carte.getCameraState();
+    final zone = await carte.coordinateBoundsForCamera(
+      CameraOptions(center: camera.center, zoom: camera.zoom),
+    );
+    final hauteurZone =
+        zone.northeast.coordinates.lat - zone.southwest.coordinates.lat;
+    await carte.easeTo(
+      CameraOptions(
+        center: Point(
+          coordinates: Position(
+            longitude,
+            latitude - hauteurZone * (0.5 - hauteur),
+          ),
+        ),
+      ),
+      MapAnimationOptions(duration: 400),
+    );
+  }
+
   Future<void> centrerSur(
     double latitude,
     double longitude, {
@@ -67,6 +95,7 @@ class TablCarteMapbox extends StatefulWidget {
     required this.zoomInitial,
     required this.onTapLieu,
     required this.onZoneVisible,
+    this.onTapCarte,
     this.controleur,
     this.margeBas = 0,
   });
@@ -88,6 +117,9 @@ class TablCarteMapbox extends StatefulWidget {
   onZoneVisible;
 
   final ControleurCarte? controleur;
+
+  /// Tap sur la carte, hors des lieux (ferme ce qui est ouvert).
+  final VoidCallback? onTapCarte;
 
   /// Hauteur occupée en bas par ce qui flotte au-dessus de la carte (la
   /// barre de navigation) : le logo et la mention « i » de Mapbox, qui
@@ -128,9 +160,22 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     1.0,
   ];
   static const List<Object> _echelleExpression = [
-    'coalesce',
-    ['get', 'echelle'],
-    1.0,
+    '*',
+    [
+      'coalesce',
+      ['get', 'echelle'],
+      1.0,
+    ],
+    // Le lieu dont la feuille est ouverte ressort.
+    [
+      'case',
+      [
+        'to-boolean',
+        ['get', 'choisi'],
+      ],
+      1.35,
+      1.0,
+    ],
   ];
 
   /// Les lieux actuellement à l'écran, par identifiant d'affichage.
@@ -261,6 +306,9 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         iconOpacityExpression: _opaciteExpression,
         iconSizeExpression: _echelleExpression,
       ),
+    );
+    carte.addInteraction(
+      TapInteraction.onMap((_) => widget.onTapCarte?.call()),
     );
     for (final couche in [_couche, _coucheBulles]) {
       carte.addInteraction(

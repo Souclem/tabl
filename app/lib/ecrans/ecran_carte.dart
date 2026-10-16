@@ -100,6 +100,7 @@ class _EcranCarteState extends State<EcranCarte> {
   @override
   void dispose() {
     _feuille.dispose();
+    _fermetureEnAttente?.cancel();
     super.dispose();
   }
 
@@ -215,6 +216,20 @@ class _EcranCarteState extends State<EcranCarte> {
     ];
   }
 
+  /// Ce que dit la règle de pertinence pour la zone, plus le lieu dont la
+  /// feuille est ouverte, toujours visible même si la règle l'écartait.
+  List<LieuCarte> get _lieuxAffiches {
+    final affiches = lieuxAAfficher([
+      ..._reseau,
+      ..._annuaireFiltre,
+    ], _zone, zoom: _zoom);
+    final selection = _selection;
+    if (selection != null && !affiches.any((l) => l.cle == selection.cle)) {
+      affiches.add(selection);
+    }
+    return affiches;
+  }
+
   double? _distance(LieuCarte lieu) {
     final position = _position;
     if (position == null) return null;
@@ -237,12 +252,32 @@ class _EcranCarteState extends State<EcranCarte> {
     return lieux;
   }
 
+  /// Un tap sur la carte ferme la feuille, mais un court instant plus
+  /// tard : si ce tap était en fait sur un lieu, son ouverture l'annule.
+  Timer? _fermetureEnAttente;
+
+  void _tapCarte() {
+    _fermetureEnAttente?.cancel();
+    _fermetureEnAttente = Timer(const Duration(milliseconds: 80), () {
+      if (mounted && _selection != null) setState(() => _selection = null);
+    });
+  }
+
   void _tapLieu(String cle) {
+    _fermetureEnAttente?.cancel();
     final lieu = [
       ..._reseau,
       ..._annuaire,
     ].where((l) => l.cle == cle).firstOrNull;
-    if (lieu != null) setState(() => _selection = lieu);
+    if (lieu == null) return;
+    setState(() => _selection = lieu);
+    // La feuille réduite couvre le bas de la carte : si le lieu se
+    // retrouve dessous, on remonte la carte pour qu'il reste visible.
+    final zone = _zone;
+    final hauteur = (zone.nord - lieu.latitude) / (zone.nord - zone.sud);
+    if (hauteur > 0.5) {
+      _controleur.amenerA(lieu.latitude, lieu.longitude, hauteur: 0.3);
+    }
   }
 
   /// Depuis la liste : la page du restaurant en feuille par-dessus ; à
@@ -577,11 +612,8 @@ class _EcranCarteState extends State<EcranCarte> {
                   // Toujours la même règle : ce que disent les filtres, et
                   // parmi ça les plus pertinents pour la zone visible.
                   geojsonLieux: geojsonLieux(
-                    lieuxAAfficher(
-                      [..._reseau, ..._annuaireFiltre],
-                      _zone,
-                      zoom: _zoom,
-                    ),
+                    _lieuxAffiches,
+                    cleChoisie: _selection?.cle,
                   ),
                   // Belgique, avant de connaître la position.
                   latitudeInitiale: 50.5,
@@ -591,6 +623,7 @@ class _EcranCarteState extends State<EcranCarte> {
                   controleur: _controleur,
                   onTapLieu: _tapLieu,
                   onZoneVisible: _zoneVisible,
+                  onTapCarte: _tapCarte,
                 )
               : const ColoredBox(color: TablTokens.surface),
         ),
