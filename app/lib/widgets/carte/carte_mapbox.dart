@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -12,12 +13,31 @@ import '../../theme/tokens.dart';
 class ControleurCarte {
   MapboxMap? _carte;
 
+  /// Centrage demandé avant que la carte soit prête (la position arrive
+  /// souvent avant elle) : appliqué dès sa création.
+  CameraOptions? _enAttente;
+
+  void _attacher(MapboxMap carte) {
+    _carte = carte;
+    final camera = _enAttente;
+    _enAttente = null;
+    if (camera != null) carte.setCamera(camera);
+  }
+
   Future<void> centrerSur(
     double latitude,
     double longitude, {
     double zoom = 14,
   }) async {
-    await _carte?.flyTo(
+    final carte = _carte;
+    if (carte == null) {
+      _enAttente = CameraOptions(
+        center: Point(coordinates: Position(longitude, latitude)),
+        zoom: zoom,
+      );
+      return;
+    }
+    await carte.flyTo(
       CameraOptions(
         center: Point(coordinates: Position(longitude, latitude)),
         zoom: zoom,
@@ -87,10 +107,26 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
 
   MapboxMap? _carte;
   bool _styleCharge = false;
+  Timer? _attenteCamera;
+
+  @override
+  void dispose() {
+    _attenteCamera?.cancel();
+    super.dispose();
+  }
+
+  /// La zone visible est signalée après chaque mouvement de caméra, une
+  /// fois la carte immobile depuis un court instant. Pas l'événement
+  /// "idle" de Mapbox : le halo animé de ma position fait redessiner la
+  /// carte en continu, elle n'est alors jamais considérée comme au repos.
+  void _cameraBouge() {
+    _attenteCamera?.cancel();
+    _attenteCamera = Timer(const Duration(milliseconds: 300), _signalerZone);
+  }
 
   Future<void> _creee(MapboxMap carte) async {
     _carte = carte;
-    widget.controleur?._carte = carte;
+    widget.controleur?._attacher(carte);
     await carte.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
     // Boussole toujours visible, sous le bouton "ma position" : un tap
     // remet le nord en haut.
@@ -349,7 +385,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
       onMapCreated: _creee,
       onStyleLoadedListener: _styleChargeListener,
-      onMapIdleListener: (_) => _signalerZone(),
+      onCameraChangeListener: (_) => _cameraBouge(),
     );
   }
 }
