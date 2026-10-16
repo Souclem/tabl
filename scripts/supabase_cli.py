@@ -1,5 +1,7 @@
 """Accès à la base Supabase distante via la CLI (`supabase db query
 --linked`), partagé par les scripts de ce dossier."""
+from __future__ import annotations
+
 import json
 import os
 import subprocess

@@ -7,6 +7,7 @@ import '../restaurants/envies_restaurants.dart';
 import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
+import '../social/photo_profil.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
 import 'souvenir_feed.dart';
@@ -251,7 +252,8 @@ class SouvenirServiceSupabase implements SouvenirService {
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, '
-          'restaurants(nom, ville), profils!souvenirs_auteur_id_fkey(pseudo)',
+          'restaurants(nom, ville), '
+          'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)',
         )
         .eq('statut', 'publie');
     if (auteurId != null) {
@@ -305,6 +307,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         audienceRestreinte:
             l['auteur_id'] == _monId && l['visibilite'] != 'tout_le_monde',
         restaurantId: l['restaurant_id'] as String?,
+        auteurPhotoUrl: urlPhotoProfil(_client, auteur?['photo_url'] as String?),
         estEnvie: envies.contains(l['restaurant_id']),
       );
     }).toList();

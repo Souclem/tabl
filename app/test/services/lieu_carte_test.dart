@@ -84,6 +84,26 @@ void main() {
       'type': 'Point',
       'coordinates': [5.5802, 50.6471],
     });
-    expect(point['properties'], {'cle': 'r1', 'visites': 1, 'envie': false});
+    expect(point['properties'], {
+      'cle': 'r1',
+      'visites': 1,
+      'envie': false,
+      'autres': 0,
+    });
+  });
+
+  test('ami en avant : le plus fidèle, et le nombre des autres', () {
+    final lieu = _lieu(
+      visites: [
+        _visite('a', 'Emma'),
+        _visite('b', 'Thomas'),
+        _visite('b', 'Thomas'),
+        _visite('c', 'Lucas'),
+        _visite('moi', 'clem', estMoi: true),
+      ],
+    );
+    expect(lieu.amiEnAvant?.pseudo, 'Thomas');
+    expect(lieu.amiEnAvant?.autres, 2);
+    expect(_lieu(visites: [_visite('moi', 'clem', estMoi: true)]).amiEnAvant, isNull);
   });
 }

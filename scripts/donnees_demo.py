@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Remplit la base avec un grand jeu de données FICTIVES, pour tester la
+"""
+from __future__ import annotations
+Remplit la base avec un grand jeu de données FICTIVES, pour tester la
 carte, les filtres et le Feed en conditions réelles — ou l'efface.
 
 Ce qui est créé (toujours le même jeu : graine aléatoire fixe) :
@@ -20,6 +22,7 @@ appartient à `clem` par un horodatage repère (2001-01-01).
 
 Usage (depuis la racine du dépôt) :
   scripts/.venv/bin/python scripts/donnees_demo.py            # créer
+  scripts/.venv/bin/python scripts/donnees_demo.py --photos   # + photos CC0
   scripts/.venv/bin/python scripts/donnees_demo.py --effacer  # tout effacer
 """
 import argparse
@@ -30,6 +33,7 @@ import uuid
 from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import photos_demo  # noqa: E402
 from supabase_cli import executer, lignes, tableau, texte  # noqa: E402
 
 DOMAINE = "demo.tabl.invalid"
@@ -134,12 +138,15 @@ def effacer() -> None:
       delete from auth.users where email like '%@{DOMAINE}';
       -- Restaurants entrés dans Tabl uniquement pour la démo, plus
       -- utilisés par personne.
+      update public.profils set photo_url = null
+        where photo_url like '{photos_demo.DOSSIER_STOCKAGE}/%';
       delete from public.restaurants r
       where r.cree_par is null and r.fsq_place_id is not null
         and not exists (select 1 from public.souvenirs s where s.restaurant_id = r.id)
         and not exists (select 1 from public.restaurants_sauvegardes e where e.restaurant_id = r.id)
         and not exists (select 1 from public.table_propositions p where p.restaurant_id = r.id);
     """)
+    photos_demo.effacer_stockage()
     print("Fait.")
 
 
@@ -333,10 +340,69 @@ def creer() -> None:
           f"{len(restaurants)} restaurants, {len(tables)} Tables, {len(envies)} envies.")
 
 
+def photos() -> None:
+    """Ajoute une photo à chaque profil fictif et à chaque moment de
+    démonstration (portraits et plats CC0, partagés entre plusieurs)."""
+    # Les photos du cache, déjà triées à la main (photos_demo.rejeter) ;
+    # téléchargées seulement si le cache est vide.
+    portraits = photos_demo.photos_en_cache("portrait") or photos_demo.collecter(
+        "portrait", photos_demo.RECHERCHES_PORTRAITS, 120, (320, 320)
+    )
+    plats = photos_demo.photos_en_cache("plat") or photos_demo.collecter(
+        "plat", photos_demo.RECHERCHES_PLATS, 150, (1080, 1146)
+    )
+    if not portraits or not plats:
+        sys.exit("Aucune photo récupérée (Openverse indisponible ?).")
+    print("Téléversement…")
+    photos_demo.televerser("portrait", "avatars")
+    photos_demo.televerser("plat", "souvenirs")
+    dossier = photos_demo.DOSSIER_STOCKAGE
+
+    def tableau_sql(noms: list[str]) -> str:
+        return "array[" + ",".join(texte(f"{dossier}/{n}") for n in noms) + "]"
+
+    # Répartition stable : chaque profil et chaque moment tire toujours la
+    # même photo (dérivée de son identifiant).
+    executer(f"""
+      -- Les personnes que suit le compte principal d'abord, chacune avec
+      -- un portrait différent : jamais deux fois le même visage sur sa
+      -- carte. Les autres se partagent ensuite les portraits.
+      with suivis as (
+        select a.suivi_id as id, row_number() over (order by a.suivi_id) as n
+        from public.abonnements a
+        join public.profils moi on moi.id = a.suiveur_id
+          and moi.pseudo = {texte(PSEUDO_PRINCIPAL)}
+        where a.statut = 'accepte'
+          and a.suivi_id in (select id from auth.users where email like '%@{DOMAINE}')
+      )
+      update public.profils p set photo_url = (
+        {tableau_sql(portraits)}
+      )[1 + (s.n - 1) % {len(portraits)}]
+      from suivis s where p.id = s.id;
+      update public.profils p set photo_url = (
+        {tableau_sql(portraits)}
+      )[1 + abs(hashtext(p.id::text)) % {len(portraits)}]
+      where p.photo_url is null
+        and p.id in (select id from auth.users where email like '%@{DOMAINE}');
+      update public.souvenirs s set photo_url = (
+        {tableau_sql(plats)}
+      )[1 + abs(hashtext(s.id::text)) % {len(plats)}]
+      where s.photo_url is null and (
+        s.cree_le = '{REPERE}'
+        or s.auteur_id in (select id from auth.users where email like '%@{DOMAINE}')
+      );
+    """)
+    print(f"Terminé : {len(portraits)} portraits, {len(plats)} plats.")
+
+
 if __name__ == "__main__":
     options = argparse.ArgumentParser()
     options.add_argument("--effacer", action="store_true")
-    if options.parse_args().effacer:
+    options.add_argument("--photos", action="store_true")
+    arguments = options.parse_args()
+    if arguments.effacer:
         effacer()
+    elif arguments.photos:
+        photos()
     else:
         creer()

@@ -30,6 +30,7 @@ export 'restaurants/recherche_lieu_service_supabase.dart';
 export 'restaurants/registre_restaurants.dart';
 export 'social/abonnement_service.dart';
 export 'social/abonnement_service_supabase.dart';
+export 'social/photo_profil.dart';
 export 'social/profil_public.dart';
 export 'souvenirs/audience_souvenir.dart';
 export 'souvenirs/commentaire.dart';

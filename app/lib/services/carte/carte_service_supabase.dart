@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../restaurants/envies_restaurants.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/registre_restaurants.dart';
+import '../social/photo_profil.dart';
 import '../souvenirs/emotion.dart';
 import '../souvenirs/filtre_reseau.dart';
 import 'carte_service.dart';
@@ -31,7 +32,7 @@ class CarteServiceSupabase implements CarteService {
           .from('souvenirs')
           .select(
             'id, auteur_id, emotion, moment, date_visite, '
-            'profils!souvenirs_auteur_id_fkey(pseudo), '
+            'profils!souvenirs_auteur_id_fkey(pseudo, photo_url), '
             'restaurants!inner($_colonnesRestaurant), '
             // Les Tables de chaque souvenir viennent avec lui : une liste
             // d'identifiants à part serait trop longue pour l'API avec un
@@ -65,6 +66,10 @@ class CarteServiceSupabase implements CarteService {
               souvenirId: s['id'] as String,
               auteurId: s['auteur_id'] as String,
               auteurPseudo: auteur?['pseudo'] as String? ?? '',
+          auteurPhotoUrl: urlPhotoProfil(
+            _client,
+            auteur?['photo_url'] as String?,
+          ),
               estMoi: s['auteur_id'] == _monId,
               moment: s['moment'] as String? ?? '',
               date: DateTime.parse(s['date_visite'] as String),

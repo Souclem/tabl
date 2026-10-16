@@ -110,6 +110,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     return TablPublication(
       contexte: contexte,
       auteurPseudo: souvenir.auteurPseudo,
+      auteurPhotoUrl: souvenir.auteurPhotoUrl,
       dateLisible: dateLisibleSouvenir(souvenir.dateVisite),
       photoUrl: souvenir.photoUrl,
       restaurantNom: souvenir.restaurantNom,

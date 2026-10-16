@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config_oauth.dart';
+import '../social/photo_profil.dart';
 import 'auth_service.dart';
 import 'utilisateur.dart';
 
@@ -214,7 +215,11 @@ class AuthServiceSupabase implements AuthService {
 
   /// Ligne `profils` d'un compte, ou `null` si elle n'existe pas encore.
   Future<Map<String, dynamic>?> _ligneProfil(String id) {
-    return _client.from('profils').select('pseudo').eq('id', id).maybeSingle();
+    return _client
+        .from('profils')
+        .select('pseudo, photo_url')
+        .eq('id', id)
+        .maybeSingle();
   }
 
   /// Récupère le profil associé à un compte.
@@ -230,6 +235,7 @@ class AuthServiceSupabase implements AuthService {
         id: compte.id,
         email: compte.email ?? '',
         pseudo: ligne['pseudo'] as String,
+        photoUrl: urlPhotoProfil(_client, ligne['photo_url'] as String?),
       );
     }
 
@@ -269,6 +275,7 @@ class AuthServiceSupabase implements AuthService {
         id: compte.id,
         email: compte.email ?? '',
         pseudo: ligne['pseudo'] as String,
+        photoUrl: urlPhotoProfil(_client, ligne['photo_url'] as String?),
       ),
     );
   }

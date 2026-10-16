@@ -519,17 +519,24 @@ class _EcranCarteState extends State<EcranCarte> {
                 )
               : const ColoredBox(color: TablTokens.surface),
         ),
-        if (_position != null)
+        // Toujours là : recentre sur moi, ou redemande ma position si
+        // elle n'est pas encore connue (autorisation refusée puis
+        // accordée, signal GPS revenu...).
+        if (widget.positionService != null)
           Positioned(
             right: TablTokens.espaceM,
             top: TablTokens.espaceM,
             child: _BoutonRond(
               icone: Icons.my_location_rounded,
-              libelle: 'Ma position',
-              onPresse: () => _controleur.centrerSur(
-                _position!.latitude,
-                _position!.longitude,
-              ),
+              libelle: 'Me recentrer',
+              onPresse: () {
+                final position = _position;
+                if (position == null) {
+                  _localiser();
+                } else {
+                  _controleur.centrerSur(position.latitude, position.longitude);
+                }
+              },
             ),
           ),
         if (selection != null)

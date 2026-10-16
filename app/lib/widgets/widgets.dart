@@ -3,6 +3,7 @@ library;
 
 export '../theme/tabl_theme.dart';
 export '../theme/tokens.dart';
+export 'avatar.dart';
 export 'barre_navigation.dart';
 export 'bouton_reaction.dart';
 export 'bouton_retour.dart';

@@ -14,11 +14,13 @@ class VisiteCarte {
     required this.date,
     this.emotion,
     this.tableIds = const {},
+    this.auteurPhotoUrl,
   });
 
   final String souvenirId;
   final String auteurId;
   final String auteurPseudo;
+  final String? auteurPhotoUrl;
   final bool estMoi;
 
   /// `'midi'` ou `'soir'`.
@@ -70,6 +72,29 @@ class LieuCarte {
   bool get duReseau => visites.isNotEmpty || estEnvie;
 
   bool get visiteParMoi => visites.any((v) => v.estMoi);
+
+  /// L'ami mis en avant sur le marqueur (sa photo), et le nombre d'autres
+  /// amis qui y sont allés (le « +2 ») : celui qui y est allé le plus
+  /// souvent, le plus récemment à égalité. `null` si aucun ami n'y est
+  /// allé (seulement moi, ou un lieu de l'annuaire).
+  ({String pseudo, String? photoUrl, int autres})? get amiEnAvant {
+    final parAmi = <String, List<VisiteCarte>>{};
+    for (final v in visites) {
+      if (!v.estMoi) parAmi.putIfAbsent(v.auteurId, () => []).add(v);
+    }
+    if (parAmi.isEmpty) return null;
+    DateTime derniere(List<VisiteCarte> l) =>
+        l.map((v) => v.date).reduce((a, b) => a.isAfter(b) ? a : b);
+    final meilleur = parAmi.values.reduce((a, b) {
+      if (a.length != b.length) return a.length > b.length ? a : b;
+      return derniere(a).isAfter(derniere(b)) ? a : b;
+    }).first;
+    return (
+      pseudo: meilleur.auteurPseudo,
+      photoUrl: meilleur.auteurPhotoUrl,
+      autres: parAmi.length - 1,
+    );
+  }
 
   /// "Italien · Rue du Pont 16, Liège".
   String get description {

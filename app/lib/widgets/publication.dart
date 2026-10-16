@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'avatar.dart';
 import 'bouton_reaction.dart';
 import 'instants/bouton_ajouter_instant.dart';
 import 'instants/signal_instants_post.dart';
@@ -36,6 +37,7 @@ class TablPublication extends StatelessWidget {
     required this.auteurPseudo,
     required this.dateLisible,
     required this.photoUrl,
+    this.auteurPhotoUrl,
     required this.restaurantNom,
     required this.ville,
     required this.jaiReagi,
@@ -62,6 +64,9 @@ class TablPublication extends StatelessWidget {
 
   final ContextePublication contexte;
   final String auteurPseudo;
+
+  /// Photo de profil de l'auteur (Feed seulement).
+  final String? auteurPhotoUrl;
   final String dateLisible;
   final String? photoUrl;
   final String restaurantNom;
@@ -117,6 +122,7 @@ class TablPublication extends StatelessWidget {
         children: [
           _EnTete(
             auteurPseudo: _afficheAuteur ? auteurPseudo : null,
+            auteurPhotoUrl: auteurPhotoUrl,
             dateLisible: dateLisible,
             audienceRestreinte: audienceRestreinte,
             onOptions: _afficheOptions ? onOptions : null,
@@ -219,6 +225,7 @@ class TablPublication extends StatelessWidget {
 class _EnTete extends StatelessWidget {
   const _EnTete({
     required this.auteurPseudo,
+    required this.auteurPhotoUrl,
     required this.dateLisible,
     required this.audienceRestreinte,
     required this.onOptions,
@@ -226,6 +233,7 @@ class _EnTete extends StatelessWidget {
 
   /// `null` : auteur masqué.
   final String? auteurPseudo;
+  final String? auteurPhotoUrl;
   final String dateLisible;
   final bool audienceRestreinte;
   final VoidCallback? onOptions;
@@ -260,7 +268,7 @@ class _EnTete extends StatelessWidget {
         child: Row(
           children: [
             if (auteurPseudo != null) ...[
-              _Avatar(pseudo: auteurPseudo!),
+              TablAvatar(pseudo: auteurPseudo!, photoUrl: auteurPhotoUrl),
               const SizedBox(width: TablTokens.espaceS),
               Expanded(
                 child: Text(
@@ -510,29 +518,6 @@ class _ActionTexte extends StatelessWidget {
         style: TextStyle(
           fontSize: 12.5,
           fontWeight: actif ? FontWeight.w600 : FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.pseudo});
-
-  final String pseudo;
-
-  @override
-  Widget build(BuildContext context) {
-    final initiale = pseudo.isEmpty ? '?' : pseudo[0].toUpperCase();
-    return CircleAvatar(
-      radius: 12,
-      backgroundColor: TablTokens.primaire.withValues(alpha: 0.85),
-      child: Text(
-        initiale,
-        style: TablTokens.legende.copyWith(
-          fontSize: 11,
-          color: TablTokens.texteSurPrimaire,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

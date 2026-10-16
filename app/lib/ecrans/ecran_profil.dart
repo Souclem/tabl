@@ -347,20 +347,10 @@ class _EnTeteProfil extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: 90,
-            height: 90,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              color: TablTokens.surface,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              utilisateur.pseudo.isNotEmpty
-                  ? utilisateur.pseudo[0].toUpperCase()
-                  : '?',
-              style: TablTokens.grandTitre,
-            ),
+          TablAvatar(
+            pseudo: utilisateur.pseudo,
+            photoUrl: utilisateur.photoUrl,
+            rayon: 45,
           ),
           const SizedBox(height: TablTokens.espaceM),
           Text(

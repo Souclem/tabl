@@ -24,6 +24,7 @@ class SouvenirFeed {
     this.audienceRestreinte = false,
     this.restaurantId,
     this.estEnvie = false,
+    this.auteurPhotoUrl,
   });
 
   final String id;
@@ -76,6 +77,9 @@ class SouvenirFeed {
 
   final String? restaurantId;
 
+  /// Photo de profil de l'auteur, `null` s'il n'en a pas.
+  final String? auteurPhotoUrl;
+
   /// Le restaurant est dans mes envies ("Enregistrer").
   final bool estEnvie;
 
@@ -109,6 +113,7 @@ class SouvenirFeed {
       audienceRestreinte: audienceRestreinte,
       restaurantId: restaurantId,
       estEnvie: estEnvie ?? this.estEnvie,
+      auteurPhotoUrl: auteurPhotoUrl,
     );
   }
 }
