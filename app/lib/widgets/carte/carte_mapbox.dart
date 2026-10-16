@@ -13,11 +13,13 @@ import '../../theme/tokens.dart';
 class ControleurCarte {
   MapboxMap? _carte;
 
-  /// Centrage demandé avant que la carte soit prête (la position arrive
-  /// souvent avant elle) : appliqué dès sa création.
+  /// Centrage demandé avant que la carte soit prête — la position arrive
+  /// souvent avant elle, ou avant que son style soit chargé (un
+  /// déplacement fait trop tôt est annulé par la mise en place de la vue
+  /// initiale) : appliqué dès qu'elle l'est.
   CameraOptions? _enAttente;
 
-  void _attacher(MapboxMap carte) {
+  void _carteChargee(MapboxMap carte) {
     _carte = carte;
     final camera = _enAttente;
     _enAttente = null;
@@ -169,7 +171,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
 
   Future<void> _creee(MapboxMap carte) async {
     _carte = carte;
-    widget.controleur?._attacher(carte);
+
     await carte.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
     // Boussole toujours visible, sous le bouton "ma position" : un tap
     // remet le nord en haut.
@@ -270,6 +272,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     }
 
     _styleCharge = true;
+    widget.controleur?._carteChargee(carte);
     _mettreAJour(_source, widget.geojsonLieux);
     _signalerZone();
   }

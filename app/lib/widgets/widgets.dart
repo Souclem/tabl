@@ -9,7 +9,6 @@ export 'bouton_reaction.dart';
 export 'bouton_retour.dart';
 export 'boutons.dart';
 export 'boutons_auth_tierce.dart';
-export 'carte/apercu_lieu.dart';
 export 'carte/carte_mapbox.dart';
 export 'carte/ligne_lieu.dart';
 export 'carte/puce_filtre.dart';

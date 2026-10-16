@@ -133,6 +133,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                   ? EcranTables(
                       tableService: _tableService,
                       abonnementService: widget.abonnementService,
+                      souvenirService: widget.souvenirService,
                       estOnglet: true,
                     )
                   : const SizedBox.shrink(),

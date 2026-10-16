@@ -4,7 +4,7 @@ import 'package:network_image_mock/network_image_mock.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'package:app/ecrans/ecran_restaurant.dart';
+import 'package:app/ecrans/feuille_restaurant.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   _FauxSouvenirService(this.avis);
@@ -50,16 +50,26 @@ Future<void> _ouvrir(
   String? restaurantId = 'r1',
   Future<String> Function()? entrerDansTabl,
 }) async {
+  // Assez large pour la police des tests (plus large que la vraie), et
+  // assez haut pour tout voir.
+  tester.view.physicalSize = const Size(1000, 2400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetDevicePixelRatio);
+  addTearDown(tester.view.resetPhysicalSize);
   await mockNetworkImagesFor(() async {
     await tester.pumpWidget(
       MaterialApp(
         theme: TablTheme.sombre(),
-        home: EcranRestaurant(
-          nom: 'Como en Casa',
-          sousTitre: 'Végétarien · Rue Hors-Château 76, Liège',
-          restaurantId: restaurantId,
-          souvenirService: service,
-          entrerDansTabl: entrerDansTabl,
+        home: Scaffold(
+          body: FeuilleRestaurant(
+            nom: 'Como en Casa',
+            sousTitre: 'Végétarien · Rue Hors-Château 76, Liège',
+            resume: 'Emma et 1 autre y sont allés',
+            restaurantId: restaurantId,
+            souvenirService: service,
+            entrerDansTabl: entrerDansTabl,
+            defilement: ScrollController(),
+          ),
         ),
       ),
     );
@@ -77,31 +87,38 @@ void main() {
 
     expect(service.restaurantsDemandes, ['r1']);
     expect(find.text('Como en Casa'), findsOneWidget);
-    expect(find.text('Végétarien · Rue Hors-Château 76, Liège'), findsOneWidget);
+    expect(find.text('Emma et 1 autre y sont allés'), findsOneWidget);
     expect(find.text('2 avis de votre réseau'), findsOneWidget);
-    expect(find.text('Emma'), findsOneWidget);
-    expect(find.text('3 octobre'), findsOneWidget);
-    expect(find.text('On y retourne !'), findsOneWidget);
-    // Dans l'ordre reçu : du plus récent au plus ancien.
+    expect(find.byType(TablLigneAvis), findsNWidgets(2));
     expect(
       tester.getTopLeft(find.text('Emma')).dy,
       lessThan(tester.getTopLeft(find.text('Thomas')).dy),
     );
   });
 
-  testWidgets('un tap ouvre l\'avis en entier, comme dans le Feed', (tester) async {
+  testWidgets('un avis s\'agrandit sur place, puis se réduit', (tester) async {
     await _ouvrir(
       tester,
-      _FauxSouvenirService([_avis('1', 'Emma', DateTime(2026, 10, 3))]),
+      _FauxSouvenirService([
+        _avis('1', 'Emma', DateTime(2026, 10, 3)),
+        _avis('2', 'Thomas', DateTime(2026, 9, 12)),
+      ]),
     );
 
     await mockNetworkImagesFor(() async {
       await tester.tap(find.text('Emma'));
       await tester.pumpAndSettle();
     });
-
+    // Même écran : l'avis d'Emma est devenu une publication complète,
+    // celui de Thomas reste compact.
     expect(find.byType(TablPublication), findsOneWidget);
+    expect(find.byType(TablLigneAvis), findsOneWidget);
     expect(find.text('Commenter'), findsOneWidget);
+
+    await tester.tap(find.text('Réduire'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablPublication), findsNothing);
+    expect(find.byType(TablLigneAvis), findsNWidgets(2));
   });
 
   testWidgets('lieu de l\'annuaire : aucun avis, envie qui le fait entrer', (

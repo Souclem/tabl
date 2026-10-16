@@ -15,9 +15,13 @@ const List<String> _moisAnnee = [
   'décembre',
 ];
 
-/// Date d'un souvenir telle qu'affichée sur une publication ("12 mars").
-String dateLisibleSouvenir(DateTime date) {
-  return '${date.day} ${_moisAnnee[date.month - 1]}';
+/// Date d'un souvenir telle qu'affichée sur une publication : "12 mars"
+/// cette année, "3 novembre 2025" sinon (sans l'année, une liste du plus
+/// récent au plus ancien semblerait en désordre).
+String dateLisibleSouvenir(DateTime date, {DateTime? maintenant}) {
+  final jour = '${date.day} ${_moisAnnee[date.month - 1]}';
+  final annee = (maintenant ?? DateTime.now()).year;
+  return date.year == annee ? jour : '$jour ${date.year}';
 }
 
 /// Reprend l'algorithme `proofText` du prototype : jamais un chiffre brut

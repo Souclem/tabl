@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'ecran_restaurant.dart';
+import 'feuille_restaurant.dart';
 
 /// Onglet Carte. En haut : le titre, la bascule Carte / Liste et la
 /// rangée de filtres. En bas : la carte (lieux de mon réseau en doré,
@@ -90,13 +90,18 @@ class _EcranCarteState extends State<EcranCarte> {
   List<ResumeTable> _tables = const [];
   List<ProfilPublic> _personnes = const [];
   LieuCarte? _selection;
-  bool _envieEnCours = false;
   bool _chargement = false;
   Coordonnees? _position;
 
   /// Numéro de la dernière recherche lancée : une réponse plus ancienne,
   /// arrivée après une plus récente, est ignorée.
   int _recherche = 0;
+
+  @override
+  void dispose() {
+    _feuille.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -240,55 +245,71 @@ class _EcranCarteState extends State<EcranCarte> {
     if (lieu != null) setState(() => _selection = lieu);
   }
 
-  /// La page du restaurant ; au retour, la zone est rechargée (une envie
-  /// a pu changer).
+  /// Depuis la liste : la page du restaurant en feuille par-dessus ; à
+  /// sa fermeture, la zone est rechargée (une envie a pu changer).
   Future<void> _ouvrirRestaurant(LieuCarte lieu) async {
     final souvenirs = widget.souvenirService;
     if (souvenirs == null) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranRestaurant(
+    await ouvrirFeuilleRestaurant(
+      context,
+      nom: lieu.nom,
+      sousTitre: lieu.description,
+      resume: lieu.duReseau ? lieu.resumeVisites : null,
+      restaurantId: lieu.restaurantId,
+      estEnvie: lieu.estEnvie,
+      souvenirService: souvenirs,
+      entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
+    );
+    if (mounted) _charger();
+  }
+
+  /// Feuille du lieu touché sur la carte : réduite d'abord (l'en-tête),
+  /// agrandie d'un tap ou en la tirant vers le haut ; tirée jusqu'en bas,
+  /// elle se ferme.
+  final _feuille = DraggableScrollableController();
+
+  void _agrandirFeuille() {
+    if (!_feuille.isAttached) return;
+    _feuille.animateTo(
+      tailleFeuilleOuverte,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Widget _feuilleDuLieu(LieuCarte lieu, SouvenirService souvenirs) {
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (notification) {
+        if (notification.extent <= 0.02) {
+          setState(() => _selection = null);
+        }
+        return false;
+      },
+      child: DraggableScrollableSheet(
+        // Un autre lieu touché : nouvelle feuille, repart réduite.
+        key: ValueKey(lieu.cle),
+        controller: _feuille,
+        initialChildSize: tailleFeuilleReduite,
+        minChildSize: 0,
+        maxChildSize: tailleFeuilleOuverte,
+        snap: true,
+        snapSizes: const [tailleFeuilleReduite],
+        builder: (_, defilement) => FeuilleRestaurant(
+          key: ValueKey('feuille-${lieu.cle}'),
           nom: lieu.nom,
           sousTitre: lieu.description,
+          resume: lieu.duReseau ? lieu.resumeVisites : null,
           restaurantId: lieu.restaurantId,
           estEnvie: lieu.estEnvie,
           souvenirService: souvenirs,
           entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
+          defilement: defilement,
+          onFermer: () => setState(() => _selection = null),
+          onToucherEntete: _agrandirFeuille,
+          onEnvieChangee: (_) => _charger(),
         ),
       ),
     );
-    if (!mounted) return;
-    setState(() => _selection = null);
-    _charger();
-  }
-
-  Future<void> _basculerEnvie() async {
-    final lieu = _selection;
-    if (lieu == null) return;
-    setState(() => _envieEnCours = true);
-    try {
-      final restaurantId = await widget.carteService.idRestaurant(lieu);
-      final envie = !lieu.estEnvie;
-      await widget.carteService.basculerEnvie(restaurantId, envie: envie);
-      final misAJour = lieu.copierAvec(
-        restaurantId: restaurantId,
-        estEnvie: envie,
-      );
-      if (!mounted) return;
-      setState(() {
-        _selection = misAJour;
-        _reseau = [
-          for (final l in _reseau)
-            if (l.cle != lieu.cle && l.cle != misAJour.cle) l,
-          if (misAJour.duReseau) misAJour,
-        ];
-      });
-    } catch (e) {
-      debugPrint('EcranCarte: envie : $e');
-      if (mounted) afficherMessage(context, messageErreurGenerique);
-    } finally {
-      if (mounted) setState(() => _envieEnCours = false);
-    }
   }
 
   // ---------------------------------------------------------------
@@ -593,24 +614,14 @@ class _EcranCarteState extends State<EcranCarte> {
               },
             ),
           ),
-        if (selection != null)
+        if (selection != null && widget.souvenirService != null)
           Positioned(
-            left: TablTokens.espaceM,
-            right: TablTokens.espaceM,
-            bottom: _margeBarre + TablTokens.espaceM,
-            child: TablApercuLieu(
-              nom: selection.nom,
-              description: selection.description,
-              resume: selection.resumeVisites,
-              duReseau: selection.visites > 0,
-              estEnvie: selection.estEnvie,
-              enCours: _envieEnCours,
-              onEnvie: _basculerEnvie,
-              onFermer: () => setState(() => _selection = null),
-              onOuvrir: widget.souvenirService == null
-                  ? null
-                  : () => _ouvrirRestaurant(selection),
-            ),
+            left: 0,
+            right: 0,
+            top: 0,
+            // Au-dessus de la barre de navigation flottante.
+            bottom: _margeBarre,
+            child: _feuilleDuLieu(selection, widget.souvenirService!),
           ),
       ],
     );

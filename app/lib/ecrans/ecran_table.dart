@@ -18,12 +18,16 @@ class EcranTable extends StatefulWidget {
     required this.tableService,
     required this.abonnementService,
     this.carteService,
+    this.souvenirService,
     this.tabInitial = 0,
   });
 
   final String tableId;
   final TableService tableService;
   final AbonnementService abonnementService;
+
+  /// Pour la page des restaurants depuis "Voir sur la carte".
+  final SouvenirService? souvenirService;
 
   /// `null` par défaut : construit à la demande à partir de
   /// `TablBackend.client` (même principe que `EcranPrincipal.carteService`)
@@ -102,6 +106,7 @@ class _EcranTableState extends State<EcranTable> {
           positionService: PositionServiceGeolocator(),
           tableService: widget.tableService,
           abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
           filtresInitiaux: FiltresCarte(tableId: widget.tableId),
           estOnglet: false,
         ),

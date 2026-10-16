@@ -15,11 +15,15 @@ class EcranTables extends StatefulWidget {
     super.key,
     required this.tableService,
     required this.abonnementService,
+    this.souvenirService,
     this.estOnglet = false,
   });
 
   final TableService tableService;
   final AbonnementService abonnementService;
+
+  /// Transmis jusqu'à la carte d'une Table (page des restaurants).
+  final SouvenirService? souvenirService;
 
   /// Affiché comme onglet : pas de bouton retour, et une marge basse
   /// pour la barre de navigation flottante.
@@ -83,6 +87,7 @@ class _EcranTablesState extends State<EcranTables> {
           tableId: tableId,
           tableService: widget.tableService,
           abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
         ),
       ),
     );
