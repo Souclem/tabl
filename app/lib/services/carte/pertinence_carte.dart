@@ -3,19 +3,26 @@ import 'dart:math';
 import '../souvenirs/emotion.dart';
 import 'lieu_carte.dart';
 
-/// Nombre maximal de marqueurs affichés à la fois : au-delà, la carte
-/// devient illisible sur un téléphone.
-const nombreMaxMarqueurs = 60;
+/// Au plus autant de bulles photo à la fois : elles sont grandes.
+const nombreMaxBulles = 40;
 
-/// Écart minimal entre deux marqueurs, en fraction de la largeur visible :
-/// en dessous, ils se chevaucheraient — seul le plus pertinent reste.
-/// Calibré sur la taille d'une bulle photo (~50 pt sur un écran de
-/// ~400 pt de large).
-const _ecartRelatif = 1 / 7;
+/// Au plus autant de marqueurs en tout (bulles et simples points).
+const nombreMaxMarqueurs = 250;
+
+/// Place réservée autour d'un marqueur, en fraction de la largeur visible
+/// (le rayon) : une bulle photo (~50 pt sur ~400 pt de large) prend bien
+/// plus de place qu'un point de l'annuaire.
+const _rayonBulle = 1 / 14;
+const _rayonPoint = 1 / 60;
+
+/// À partir de ce zoom (une rue), plus aucun point n'est écarté : tous les
+/// restaurants de la zone visible s'affichent.
+const zoomToutAfficher = 16.5;
 
 /// La pertinence d'un lieu pour moi : d'abord le nombre d'amis différents
-/// qui y sont allés, puis le nombre de visites, puis les coups de cœur.
-/// Un lieu de l'annuaire (personne n'y est allé) vaut 0.
+/// qui y sont allés, puis le nombre de visites, puis les coups de cœur ;
+/// mes envies passent devant. Un lieu de l'annuaire (personne n'y est
+/// allé) vaut 0.
 double pertinence(LieuCarte lieu) {
   final amis = {
     for (final v in lieu.visites)
@@ -24,15 +31,21 @@ double pertinence(LieuCarte lieu) {
   final coupsDeCoeur = lieu.visites
       .where((v) => v.emotion == Emotion.coupDeCoeur)
       .length;
-  return amis * 100.0 + lieu.visites.length * 10.0 + coupsDeCoeur;
+  return (lieu.estEnvie ? 100000.0 : 0) +
+      amis * 100.0 +
+      lieu.visites.length * 10.0 +
+      coupsDeCoeur;
 }
 
 /// Les lieux à afficher dans [zone], parmi [candidats] (déjà filtrés) :
-/// toutes les envies, puis les plus pertinents, sans chevauchement et
-/// sans dépasser [limite]. Toujours la même règle, quel que soit le zoom.
+/// les plus pertinents d'abord, chacun avec la place qu'il occupe à
+/// l'écran — plus on zoome, plus il y a de place, plus on en voit.
+/// Toujours la même règle, quel que soit le zoom.
 List<LieuCarte> lieuxAAfficher(
   Iterable<LieuCarte> candidats,
   ZoneCarte zone, {
+  double zoom = 0,
+  int limiteBulles = nombreMaxBulles,
   int limite = nombreMaxMarqueurs,
 }) {
   final dansZone = [
@@ -42,10 +55,7 @@ List<LieuCarte> lieuxAAfficher(
           l.longitude >= zone.ouest &&
           l.longitude <= zone.est)
         l,
-  ];
-  final envies = [for (final l in dansZone) if (l.estEnvie) l];
-  final autres = [for (final l in dansZone) if (!l.estEnvie) l]
-    ..sort((a, b) {
+  ]..sort((a, b) {
       final ecart = pertinence(b).compareTo(pertinence(a));
       // À pertinence égale, un ordre stable : la carte ne "clignote" pas
       // d'un déplacement à l'autre.
@@ -55,18 +65,30 @@ List<LieuCarte> lieuxAAfficher(
   // Distances comparées en degrés, la longitude ramenée à l'échelle de
   // la latitude au centre de la zone.
   final echelleLongitude = cos((zone.sud + zone.nord) / 2 * pi / 180);
-  final ecartMin = (zone.est - zone.ouest) * echelleLongitude * _ecartRelatif;
-  bool tropProche(LieuCarte a, LieuCarte b) {
+  final largeur = (zone.est - zone.ouest) * echelleLongitude;
+  final toutAfficher = zoom >= zoomToutAfficher;
+  bool estBulle(LieuCarte l) => l.amiEnAvant?.photoUrl != null;
+  double rayon(LieuCarte l) =>
+      largeur * (estBulle(l) ? _rayonBulle : _rayonPoint);
+  bool chevauche(LieuCarte a, LieuCarte b) {
+    // De très près, seuls les points de l'annuaire peuvent se toucher
+    // sans être écartés : on veut voir tous les restaurants de la rue.
+    if (toutAfficher && !estBulle(a) && !estBulle(b)) return false;
     final dLat = a.latitude - b.latitude;
     final dLng = (a.longitude - b.longitude) * echelleLongitude;
-    return dLat * dLat + dLng * dLng < ecartMin * ecartMin;
+    final distance = rayon(a) + rayon(b);
+    return dLat * dLat + dLng * dLng < distance * distance;
   }
 
-  final retenus = [...envies];
-  for (final lieu in autres) {
-    if (retenus.length >= limite + envies.length) break;
-    if (retenus.any((r) => tropProche(r, lieu))) continue;
+  final retenus = <LieuCarte>[];
+  var bulles = 0;
+  for (final lieu in dansZone) {
+    if (retenus.length >= limite) break;
+    final bulle = estBulle(lieu);
+    if (bulle && bulles >= limiteBulles) continue;
+    if (retenus.any((r) => chevauche(r, lieu))) continue;
     retenus.add(lieu);
+    if (bulle) bulles++;
   }
   return retenus;
 }

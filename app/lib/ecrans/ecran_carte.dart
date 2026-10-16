@@ -60,6 +60,7 @@ class _EcranCarteState extends State<EcranCarte> {
 
   /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
   ZoneCarte _zone = const ZoneCarte(sud: 49.4, ouest: 2.5, nord: 51.6, est: 6.5);
+  double _zoom = 6.5;
 
   bool _enListe = false;
   late FiltresCarte _filtres = widget.filtresInitiaux;
@@ -120,9 +121,10 @@ class _EcranCarteState extends State<EcranCarte> {
     double zoom,
   ) {
     _attenteZone?.cancel();
-    setState(
-      () => _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est),
-    );
+    setState(() {
+      _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
+      _zoom = zoom;
+    });
     if (zoom < _zoomAnnuaire) {
       if (_annuaire.isNotEmpty) setState(() => _annuaire = const []);
       return;
@@ -132,6 +134,7 @@ class _EcranCarteState extends State<EcranCarte> {
       try {
         final lieux = await widget.carteService.lieuxAnnuaire(
           ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est),
+          limite: 600,
         );
         if (mounted) setState(() => _annuaire = lieux);
       } catch (e) {
@@ -506,7 +509,7 @@ class _EcranCarteState extends State<EcranCarte> {
                     lieuxAAfficher([
                       ..._lieuxTablFiltres,
                       ..._annuaireFiltre,
-                    ], _zone),
+                    ], _zone, zoom: _zoom),
                   ),
                   // Belgique, avant de connaître la position.
                   latitudeInitiale: 50.5,

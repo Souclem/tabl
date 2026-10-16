@@ -47,13 +47,21 @@ void main() {
     expect(affiches.map((l) => l.nom), ['populaire', 'loin']);
   });
 
-  test('les envies sont toutes affichées, même serrées', () {
+  test('une envie passe devant un lieu populaire au même endroit', () {
     final affiches = lieuxAAfficher([
-      _lieu('envie1', 50.6400, 5.5700, envie: true),
-      _lieu('envie2', 50.6401, 5.5701, envie: true),
       _lieu('populaire', 50.6402, 5.5702, amis: 9),
+      _lieu('envie', 50.6400, 5.5700, envie: true),
     ], _liege);
-    expect(affiches.map((l) => l.nom), ['envie1', 'envie2']);
+    expect(affiches.map((l) => l.nom), ['envie']);
+  });
+
+  test('de très près, tous les restaurants de l\'annuaire s\'affichent', () {
+    const rue = ZoneCarte(sud: 50.6400, ouest: 5.5700, nord: 50.6420, est: 5.5730);
+    final voisins = [
+      for (var i = 0; i < 12; i++) _lieu('r$i', 50.6410, 5.5710 + i * 0.00001),
+    ];
+    expect(lieuxAAfficher(voisins, rue, zoom: 13).length, lessThan(12));
+    expect(lieuxAAfficher(voisins, rue, zoom: 17), hasLength(12));
   });
 
   test('hors de la zone visible : rien', () {
@@ -67,5 +75,6 @@ void main() {
           _lieu('$i-$j', 50.60 + i * 0.0033, 5.50 + j * 0.005, amis: 1),
     ];
     expect(lieuxAAfficher(grille, _liege, limite: 20), hasLength(20));
+    expect(lieuxAAfficher(grille, _liege, zoom: 18, limite: 900), hasLength(900));
   });
 }
