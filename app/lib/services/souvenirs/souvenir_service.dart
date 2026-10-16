@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
@@ -19,8 +20,7 @@ abstract interface class SouvenirService {
   /// l'identifiant du souvenir créé, statut `brouillon` — invisible pour
   /// quiconque d'autre que l'auteur tant qu'il n'est pas finalisé.
   Future<String> enregistrerBrouillon({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
   });
 
@@ -39,8 +39,7 @@ abstract interface class SouvenirService {
   /// jamais à cause d'un échec d'association : le souvenir est déjà créé
   /// à ce stade.
   Future<List<String>> publier({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
     required Emotion emotion,
     String? legende,

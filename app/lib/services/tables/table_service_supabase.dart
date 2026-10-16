@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../restaurants/lieu_restaurant.dart';
+import '../restaurants/registre_restaurants.dart';
 import '../souvenirs/emotion.dart';
 import 'candidat_date_proposition.dart';
 import 'confirmation_proposition.dart';
@@ -442,7 +444,9 @@ class TableServiceSupabase implements TableService {
     required String nomRestaurant,
     required String ville,
   }) async {
-    final restaurantId = await _idRestaurant(nomRestaurant, ville);
+    final restaurantId = await RegistreRestaurants(
+      _client,
+    ).idPour(LieuRestaurant.manuel(nom: nomRestaurant, ville: ville));
 
     final existante = await _client
         .from('table_propositions')
@@ -986,37 +990,5 @@ class TableServiceSupabase implements TableService {
       }
     }
     return urlParChemin;
-  }
-
-  /// Même logique find-or-create que `SouvenirServiceSupabase._idRestaurant`
-  /// — dupliquée volontairement plutôt que partagée : toucher aux
-  /// fichiers `souvenirs/` est hors périmètre du Bloc 3 (SURGICAL).
-  Future<String> _idRestaurant(String nom, String ville) async {
-    final nomTrim = nom.trim();
-    final villeTrim = ville.trim();
-
-    final existant = await _client
-        .from('restaurants')
-        .select('id')
-        .ilike('nom', _echapperJokers(nomTrim))
-        .ilike('ville', _echapperJokers(villeTrim))
-        .maybeSingle();
-
-    if (existant != null) return existant['id'] as String;
-
-    final cree = await _client
-        .from('restaurants')
-        .insert({'nom': nomTrim, 'ville': villeTrim, 'cree_par': _monId})
-        .select('id')
-        .single();
-
-    return cree['id'] as String;
-  }
-
-  String _echapperJokers(String valeur) {
-    return valeur
-        .replaceAll(r'\', r'\\')
-        .replaceAll('%', r'\%')
-        .replaceAll('_', r'\_');
   }
 }

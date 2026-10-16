@@ -43,10 +43,20 @@ class EcranPublier extends StatefulWidget {
     required this.souvenirService,
     required this.abonnementService,
     this.tableService,
+    this.rechercheLieuService,
+    this.positionService,
   });
 
   final SouvenirService souvenirService;
   final AbonnementService abonnementService;
+
+  /// `null` : pas de recherche dans l'annuaire, seulement la saisie à
+  /// la main (nom + ville).
+  final RechercheLieuService? rechercheLieuService;
+
+  /// `null` : suggestions non triées par proximité, restaurant ajouté à
+  /// la main sans position.
+  final PositionService? positionService;
 
   /// `null` par défaut (même principe que `EcranPrincipal.tableService`) :
   /// si absent, la feuille "Qui peut voir ?" ne propose simplement pas
@@ -64,6 +74,16 @@ class _EcranPublierState extends State<EcranPublier> {
   final _boissonTexte = TextEditingController();
 
   _Etape _etape = _Etape.lieu;
+
+  // Étape Lieu : recherche dans l'annuaire, ou saisie à la main si le
+  // restaurant est introuvable (ou la recherche indisponible).
+  final _recherche = TextEditingController();
+  Timer? _attenteRecherche;
+  List<LieuRestaurant> _suggestions = const [];
+  bool _rechercheEnCours = false;
+  late bool _saisieManuelle = widget.rechercheLieuService == null;
+  Coordonnees? _position;
+  LieuRestaurant? _lieu;
   Uint8List? _photo;
   Uint8List? _boissonPhoto;
   String? _emotion;
@@ -96,7 +116,74 @@ class _EcranPublierState extends State<EcranPublier> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _localiser();
+  }
+
+  Future<void> _localiser() async {
+    final position = await widget.positionService?.positionActuelle();
+    if (!mounted || position == null) return;
+    setState(() => _position = position);
+    // Une recherche tapée avant que la position n'arrive est relancée
+    // pour profiter du tri par proximité.
+    if (_recherche.text.trim().length >= 2) _rechercher(_recherche.text);
+  }
+
+  void _rechercherAvecAttente(String texte) {
+    _attenteRecherche?.cancel();
+    _attenteRecherche = Timer(
+      const Duration(milliseconds: 250),
+      () => _rechercher(texte),
+    );
+  }
+
+  Future<void> _rechercher(String texte) async {
+    final service = widget.rechercheLieuService;
+    if (service == null) return;
+    if (texte.trim().length < 2) {
+      setState(() => _suggestions = const []);
+      return;
+    }
+    setState(() => _rechercheEnCours = true);
+    try {
+      final resultats = await service.rechercher(
+        texte,
+        latitude: _position?.latitude,
+        longitude: _position?.longitude,
+      );
+      // Une réponse plus ancienne que la frappe actuelle est ignorée.
+      if (!mounted || _recherche.text != texte) return;
+      setState(() => _suggestions = resultats);
+    } catch (e) {
+      debugPrint('EcranPublier: recherche de lieu : $e');
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+    } finally {
+      if (mounted) setState(() => _rechercheEnCours = false);
+    }
+  }
+
+  void _choisirLieu(LieuRestaurant lieu) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _lieu = lieu;
+      _etape = _Etape.capturer;
+    });
+  }
+
+  void _passerEnSaisieManuelle() {
+    setState(() {
+      _saisieManuelle = true;
+      // On reprend ce qui a déjà été tapé comme nom.
+      if (_nomRestaurant.text.isEmpty) _nomRestaurant.text = _recherche.text;
+    });
+  }
+
+  @override
   void dispose() {
+    _attenteRecherche?.cancel();
+    _recherche.dispose();
     _nomRestaurant.dispose();
     _ville.dispose();
     _legende.dispose();
@@ -112,7 +199,16 @@ class _EcranPublierState extends State<EcranPublier> {
       _erreurVille = erreurVille;
     });
     if (erreurNom != null || erreurVille != null) return;
-    setState(() => _etape = _Etape.capturer);
+    // Ajouté à la main : la position du téléphone, puisqu'on publie le
+    // plus souvent depuis le restaurant lui-même.
+    _choisirLieu(
+      LieuRestaurant.manuel(
+        nom: _nomRestaurant.text.trim(),
+        ville: _ville.text.trim(),
+        latitude: _position?.latitude,
+        longitude: _position?.longitude,
+      ),
+    );
   }
 
   Future<void> _choisirPhoto({required bool pourBoisson}) async {
@@ -178,8 +274,7 @@ class _EcranPublierState extends State<EcranPublier> {
     setState(() => _enCours = true);
     try {
       await widget.souvenirService.enregistrerBrouillon(
-        nomRestaurant: _nomRestaurant.text.trim(),
-        ville: _ville.text.trim(),
+        lieu: _lieu!,
         photo: photo,
       );
       if (!mounted) return;
@@ -211,8 +306,7 @@ class _EcranPublierState extends State<EcranPublier> {
     setState(() => _enCours = true);
     try {
       final tablesEnEchec = await widget.souvenirService.publier(
-        nomRestaurant: _nomRestaurant.text.trim(),
-        ville: _ville.text.trim(),
+        lieu: _lieu!,
         photo: photo,
         emotion: Emotion.depuisEmoji(emotion)!,
         legende: _legende.text.trim().isEmpty ? null : _legende.text.trim(),
@@ -251,6 +345,15 @@ class _EcranPublierState extends State<EcranPublier> {
       backgroundColor: TablTokens.fond,
       body: SafeArea(
         child: switch (_etape) {
+          _Etape.lieu when !_saisieManuelle => _EtapeRechercheLieu(
+            recherche: _recherche,
+            suggestions: _suggestions,
+            enCours: _rechercheEnCours,
+            onAnnuler: () => Navigator.of(context).pop(),
+            onChange: _rechercherAvecAttente,
+            onChoisir: _choisirLieu,
+            onIntrouvable: _passerEnSaisieManuelle,
+          ),
           _Etape.lieu => _EtapeLieu(
             nomRestaurant: _nomRestaurant,
             ville: _ville,
@@ -266,7 +369,7 @@ class _EcranPublierState extends State<EcranPublier> {
             onContinuer: _validerLieu,
           ),
           _Etape.capturer => _EtapeCapture(
-            nomRestaurant: _nomRestaurant.text,
+            nomRestaurant: _lieu!.nom,
             photo: _photo,
             onAnnuler: () => Navigator.of(context).pop(),
             onDeclencher: () => _choisirPhoto(pourBoisson: false),
@@ -280,8 +383,8 @@ class _EcranPublierState extends State<EcranPublier> {
           ),
           _Etape.finaliser => _EtapeFinaliser(
             photo: _photo!,
-            nomRestaurant: _nomRestaurant.text,
-            ville: _ville.text,
+            nomRestaurant: _lieu!.nom,
+            ville: _lieu!.description,
             emotion: _emotion,
             onEmotionChangee: (e) => setState(() => _emotion = e),
             legende: _legende,
@@ -347,6 +450,97 @@ class _EnTeteEtape extends StatelessWidget {
           const SizedBox(width: 44),
         ],
       ),
+    );
+  }
+}
+
+/// Étape Lieu, version recherche : on tape quelques lettres, l'annuaire
+/// propose, un tap choisit et passe directement à la photo.
+class _EtapeRechercheLieu extends StatelessWidget {
+  const _EtapeRechercheLieu({
+    required this.recherche,
+    required this.suggestions,
+    required this.enCours,
+    required this.onAnnuler,
+    required this.onChange,
+    required this.onChoisir,
+    required this.onIntrouvable,
+  });
+
+  final TextEditingController recherche;
+  final List<LieuRestaurant> suggestions;
+  final bool enCours;
+  final VoidCallback onAnnuler;
+  final ValueChanged<String> onChange;
+  final ValueChanged<LieuRestaurant> onChoisir;
+  final VoidCallback onIntrouvable;
+
+  @override
+  Widget build(BuildContext context) {
+    final aCherche = recherche.text.trim().length >= 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _EnTeteEtape(index: 0, onAnnuler: onAnnuler),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL,
+            TablTokens.espaceL,
+            TablTokens.espaceL,
+            TablTokens.espaceM,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Où êtes-vous ?', style: TablTokens.grandTitre),
+              const SizedBox(height: TablTokens.espaceL),
+              TablChampTexte(
+                libelle: 'Restaurant',
+                controleur: recherche,
+                indication: 'Le Campus, ¡Toma!…',
+                iconePrefixe: Icons.search_rounded,
+                onChanged: onChange,
+              ),
+            ],
+          ),
+        ),
+        if (enCours)
+          const LinearProgressIndicator(
+            minHeight: 2,
+            color: TablTokens.primaire,
+            backgroundColor: Colors.transparent,
+          ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceL),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              for (final lieu in suggestions)
+                TablLigneSuggestionLieu(
+                  nom: lieu.nom,
+                  description: lieu.description,
+                  onSelection: () => onChoisir(lieu),
+                ),
+              if (aCherche && !enCours && suggestions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: TablTokens.espaceM,
+                  ),
+                  child: Text(
+                    'Aucun restaurant trouvé.',
+                    style: TablTokens.legende,
+                  ),
+                ),
+              if (aCherche)
+                TablBoutonTexte(
+                  libelle: 'Je ne trouve pas mon restaurant',
+                  onPresse: onIntrouvable,
+                ),
+              const SizedBox(height: TablTokens.espaceL),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

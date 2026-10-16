@@ -22,6 +22,8 @@ class EcranPrincipal extends StatefulWidget {
     this.entitlementService,
     this.tableService,
     this.instantService,
+    this.rechercheLieuService,
+    this.positionService,
   });
 
   final AuthService authService;
@@ -40,6 +42,8 @@ class EcranPrincipal extends StatefulWidget {
   final EntitlementService? entitlementService;
   final TableService? tableService;
   final InstantService? instantService;
+  final RechercheLieuService? rechercheLieuService;
+  final PositionService? positionService;
 
   /// Route standard vers l'écran principal, une fois connecté. Centralisé
   /// ici (même principe que `EcranAccueil.route`) pour que tous les
@@ -85,6 +89,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
       widget.entitlementService ?? const EntitlementServiceGratuit();
   late final TableService _tableService =
       widget.tableService ?? TableServiceSupabase(TablBackend.client);
+  late final RechercheLieuService _rechercheLieuService =
+      widget.rechercheLieuService ??
+      RechercheLieuServiceSupabase(TablBackend.client);
+  late final PositionService _positionService =
+      widget.positionService ?? PositionServiceGeolocator();
 
   void _selectionnerOnglet(TablOnglet onglet) {
     setState(() {
@@ -100,6 +109,8 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
           souvenirService: widget.souvenirService,
           abonnementService: widget.abonnementService,
           tableService: _tableService,
+          rechercheLieuService: _rechercheLieuService,
+          positionService: _positionService,
         ),
       ),
     );

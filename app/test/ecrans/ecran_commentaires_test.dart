@@ -62,8 +62,7 @@ class _FauxSouvenirService implements SouvenirService {
 
   @override
   Future<List<String>> publier({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
     required Emotion emotion,
     String? legende,
@@ -76,8 +75,7 @@ class _FauxSouvenirService implements SouvenirService {
 
   @override
   Future<String> enregistrerBrouillon({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
   }) => throw UnimplementedError();
 

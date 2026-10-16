@@ -1,0 +1,90 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'categories_lieu.dart';
+import 'lieu_restaurant.dart';
+
+/// Retrouve ou crée la ligne `restaurants` d'un lieu choisi — le seul
+/// endroit où un restaurant entre dans Tabl, partagé par la publication
+/// et les propositions de Table (avant, deux copies de la même logique).
+///
+/// Un lieu de l'annuaire entre dans Tabl la première fois qu'il sert ;
+/// les fois suivantes, `fsq_place_id` ramène toujours la même ligne.
+class RegistreRestaurants {
+  RegistreRestaurants(this._client);
+
+  final SupabaseClient _client;
+
+  String get _monId => _client.auth.currentSession!.user.id;
+
+  Future<String> idPour(LieuRestaurant lieu) async {
+    final dejaDansTabl = lieu.restaurantId;
+    if (dejaDansTabl != null) return dejaDansTabl;
+
+    final fsqId = lieu.fsqPlaceId;
+    if (fsqId != null) {
+      final existant = await _parFsqId(fsqId);
+      if (existant != null) return existant;
+      try {
+        return await _creer(lieu);
+      } on PostgrestException catch (e) {
+        // Deux personnes ont choisi ce lieu au même instant : l'autre
+        // l'a créé entre-temps, on réutilise sa ligne.
+        if (e.code != '23505') rethrow;
+        return (await _parFsqId(fsqId))!;
+      }
+    }
+
+    // Saisi à la main : même nom et même ville = même restaurant.
+    final nom = lieu.nom.trim();
+    final ville = lieu.ville.trim();
+    final existant = await _client
+        .from('restaurants')
+        .select('id')
+        .isFilter('fsq_place_id', null)
+        .ilike('nom', _echapperJokers(nom))
+        .ilike('ville', _echapperJokers(ville))
+        .limit(1)
+        .maybeSingle();
+    if (existant != null) return existant['id'] as String;
+    return _creer(lieu);
+  }
+
+  Future<String?> _parFsqId(String fsqId) async {
+    final ligne = await _client
+        .from('restaurants')
+        .select('id')
+        .eq('fsq_place_id', fsqId)
+        .maybeSingle();
+    return ligne?['id'] as String?;
+  }
+
+  Future<String> _creer(LieuRestaurant lieu) async {
+    final nom = lieu.nom.trim();
+    final cree = await _client
+        .from('restaurants')
+        .insert({
+          'nom': nom,
+          'ville': lieu.ville.trim(),
+          'adresse': lieu.adresse,
+          'latitude': lieu.latitude,
+          'longitude': lieu.longitude,
+          'categories': lieu.categories,
+          'fsq_place_id': lieu.fsqPlaceId,
+          'nom_recherche': normaliserPourRecherche(nom),
+          'cree_par': _monId,
+        })
+        .select('id')
+        .single();
+    return cree['id'] as String;
+  }
+
+  /// `ilike` traite `%` et `_` comme des jokers : sans échappement, un nom
+  /// comme « 50% Chef » élargirait la comparaison au lieu de chercher une
+  /// correspondance exacte.
+  String _echapperJokers(String valeur) {
+    return valeur
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+  }
+}

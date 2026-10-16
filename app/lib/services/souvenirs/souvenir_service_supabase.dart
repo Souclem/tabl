@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../restaurants/lieu_restaurant.dart';
+import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
@@ -14,20 +16,21 @@ import 'souvenir_service.dart';
 /// `20260824000000_storage_souvenirs.sql` et
 /// `20260828000000_flux_moment_complet.sql`).
 class SouvenirServiceSupabase implements SouvenirService {
-  SouvenirServiceSupabase(this._client);
+  SouvenirServiceSupabase(this._client)
+    : _restaurants = RegistreRestaurants(_client);
 
   final SupabaseClient _client;
+  final RegistreRestaurants _restaurants;
 
   String get _monId => _client.auth.currentSession!.user.id;
 
   @override
   Future<String> enregistrerBrouillon({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
   }) async {
     final cheminPhoto = await _deposerPhoto(photo);
-    final restaurantId = await _idRestaurant(nomRestaurant, ville);
+    final restaurantId = await _restaurants.idPour(lieu);
     final maintenant = DateTime.now();
 
     final cree = await _client
@@ -48,8 +51,7 @@ class SouvenirServiceSupabase implements SouvenirService {
 
   @override
   Future<List<String>> publier({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
     required Emotion emotion,
     String? legende,
@@ -64,7 +66,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     final cheminBoisson = boissonPhoto == null
         ? null
         : await _deposerPhoto(boissonPhoto, suffixe: 'boisson');
-    final restaurantId = await _idRestaurant(nomRestaurant, ville);
+    final restaurantId = await _restaurants.idPour(lieu);
     final maintenant = DateTime.now();
 
     final cree = await _client
@@ -486,42 +488,6 @@ class SouvenirServiceSupabase implements SouvenirService {
           fileOptions: const FileOptions(contentType: 'image/jpeg'),
         );
     return chemin;
-  }
-
-  /// Trouve un restaurant existant (nom+ville, comparaison insensible à
-  /// la casse), sinon en crée un. Pas de déduplication plus poussée pour
-  /// l'instant — ça restera dans ce service, pas en trigger SQL.
-  Future<String> _idRestaurant(String nom, String ville) async {
-    final nomTrim = nom.trim();
-    final villeTrim = ville.trim();
-
-    final existant = await _client
-        .from('restaurants')
-        .select('id')
-        .ilike('nom', _echapperJokers(nomTrim))
-        .ilike('ville', _echapperJokers(villeTrim))
-        .maybeSingle();
-
-    if (existant != null) return existant['id'] as String;
-
-    final cree = await _client
-        .from('restaurants')
-        .insert({'nom': nomTrim, 'ville': villeTrim, 'cree_par': _monId})
-        .select('id')
-        .single();
-
-    return cree['id'] as String;
-  }
-
-  /// `ilike` traite `%` et `_` comme des jokers : sans échappement, un nom
-  /// de restaurant contenant l'un de ces caractères (ex. « 50% Chef »)
-  /// élargirait la comparaison au lieu de chercher une correspondance
-  /// exacte, et `.maybeSingle()` planterait si plusieurs lignes matchent.
-  String _echapperJokers(String valeur) {
-    return valeur
-        .replaceAll(r'\', r'\\')
-        .replaceAll('%', r'\%')
-        .replaceAll('_', r'\_');
   }
 
   String _formaterDate(DateTime date) {

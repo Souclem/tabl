@@ -43,14 +43,14 @@ class _FauxSouvenirService implements SouvenirService {
 
   @override
   Future<String> enregistrerBrouillon({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
   }) async {
     if (erreur) throw Exception('erreur réseau');
     appelsBrouillon.add({
-      'nomRestaurant': nomRestaurant,
-      'ville': ville,
+      'nomRestaurant': lieu.nom,
+      'ville': lieu.ville,
+      'lieu': lieu,
       'photo': photo,
     });
     return 'brouillon-1';
@@ -58,8 +58,7 @@ class _FauxSouvenirService implements SouvenirService {
 
   @override
   Future<List<String>> publier({
-    required String nomRestaurant,
-    required String ville,
+    required LieuRestaurant lieu,
     required Uint8List photo,
     required Emotion emotion,
     String? legende,
@@ -71,8 +70,9 @@ class _FauxSouvenirService implements SouvenirService {
   }) async {
     if (erreur) throw Exception('erreur réseau');
     appelsPublier.add({
-      'nomRestaurant': nomRestaurant,
-      'ville': ville,
+      'nomRestaurant': lieu.nom,
+      'ville': lieu.ville,
+      'lieu': lieu,
       'photo': photo,
       'emotion': emotion,
       'legende': legende,
@@ -268,6 +268,42 @@ final _octetsPhoto = base64Decode(
   '42YAAAAASUVORK5CYII=',
 );
 
+/// Faux annuaire : renvoie [lieux] dont le nom contient le texte tapé.
+class _FausseRechercheLieu implements RechercheLieuService {
+  _FausseRechercheLieu(this.lieux);
+
+  final List<LieuRestaurant> lieux;
+  final List<({String texte, double? latitude})> appels = [];
+
+  @override
+  Future<List<LieuRestaurant>> rechercher(
+    String texte, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    appels.add((texte: texte, latitude: latitude));
+    final t = texte.toLowerCase();
+    return lieux.where((l) => l.nom.toLowerCase().contains(t)).toList();
+  }
+}
+
+class _FaussePosition implements PositionService {
+  @override
+  Future<Coordonnees?> positionActuelle() async =>
+      (latitude: 50.6326, longitude: 5.5797);
+}
+
+const _comoEnCasa = LieuRestaurant(
+  fsqPlaceId: 'fsq-como',
+  nom: 'Como en Casa',
+  ville: 'Liège',
+  adresse: 'Rue Hors-Château 76',
+  latitude: 50.6471,
+  longitude: 5.5802,
+  categories: ['Vegan and Vegetarian Restaurant'],
+  distanceM: 1620,
+);
+
 /// Pousse EcranPublier sur une pile de navigation réelle (pour que
 /// `Navigator.pop()` ait un écran en dessous, comme en vrai — poussé
 /// depuis EcranPrincipal).
@@ -276,6 +312,8 @@ Future<void> _ouvrirEcranPublier(
   SouvenirService service, {
   AbonnementService? abonnementService,
   TableService? tableService,
+  RechercheLieuService? rechercheLieuService,
+  PositionService? positionService,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -288,6 +326,8 @@ Future<void> _ouvrirEcranPublier(
                   souvenirService: service,
                   abonnementService: abonnementService ?? _FauxAbonnementService(),
                   tableService: tableService,
+                  rechercheLieuService: rechercheLieuService,
+                  positionService: positionService,
                 ),
               ),
             ),
@@ -709,4 +749,88 @@ void main() {
       expect(find.text('Comment c\'était ?'), findsNothing);
     },
   );
+
+  group('recherche du restaurant dans l\'annuaire', () {
+    testWidgets('taper affiche les suggestions, un tap passe à la photo', (
+      tester,
+    ) async {
+      final recherche = _FausseRechercheLieu([_comoEnCasa]);
+      final service = _FauxSouvenirService();
+      await _ouvrirEcranPublier(
+        tester,
+        service,
+        rechercheLieuService: recherche,
+        positionService: _FaussePosition(),
+      );
+
+      await tester.enterText(find.byType(TextField), 'como');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Como en Casa'), findsOneWidget);
+      expect(
+        find.text('Végétarien · Rue Hors-Château 76, Liège · 1,6 km'),
+        findsOneWidget,
+      );
+      // La position du téléphone sert au tri par proximité.
+      expect(recherche.appels.last.latitude, 50.6326);
+
+      await tester.tap(find.text('Como en Casa'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('bouton-declencheur')), findsOneWidget);
+
+      await _capturerPhoto(tester);
+      await tester.tap(find.text('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Finaliser maintenant'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('🙂'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Garder ce moment.'));
+      await tester.tap(find.text('Garder ce moment.'));
+      await tester.pumpAndSettle();
+
+      final lieu = service.appelsPublier.single['lieu']! as LieuRestaurant;
+      expect(lieu.fsqPlaceId, 'fsq-como');
+    });
+
+    testWidgets(
+      '"Je ne trouve pas mon restaurant" : saisie à la main, avec la position',
+      (tester) async {
+        final service = _FauxSouvenirService();
+        await _ouvrirEcranPublier(
+          tester,
+          service,
+          rechercheLieuService: _FausseRechercheLieu(const []),
+          positionService: _FaussePosition(),
+        );
+
+        await tester.enterText(find.byType(TextField), 'Chez K');
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pumpAndSettle();
+        expect(find.text('Aucun restaurant trouvé.'), findsOneWidget);
+
+        await tester.tap(find.text('Je ne trouve pas mon restaurant'));
+        await tester.pumpAndSettle();
+
+        // Le nom déjà tapé est repris.
+        expect(find.text('Chez K'), findsOneWidget);
+        await tester.enterText(find.byType(TextField).last, 'Liège');
+        await tester.tap(find.text('Continuer'));
+        await tester.pumpAndSettle();
+
+        await _capturerPhoto(tester);
+        await tester.tap(find.text('Continuer'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Plus tard'));
+        await tester.pumpAndSettle();
+
+        final lieu =
+            service.appelsBrouillon.single['lieu']! as LieuRestaurant;
+        expect(lieu.estManuel, isTrue);
+        expect(lieu.nom, 'Chez K');
+        expect(lieu.latitude, 50.6326);
+      },
+    );
+  });
 }
