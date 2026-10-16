@@ -149,9 +149,21 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         // Le mode nuit du style assombrit tout ce qui n'émet pas sa propre
         // lumière : sans ça, les marqueurs dorés deviennent noirs.
         circleEmissiveStrength: 1,
-        circleRadius: 7,
+        // Lieu de mon réseau : marqueur plein ; restaurant où personne
+        // n'est allé : petit point, pour en voir beaucoup sans surcharge.
+        circleRadiusExpression: [
+          'case',
+          ['get', 'reseau'],
+          7.0,
+          4.0,
+        ],
         circleStrokeColor: TablTokens.fond.toARGB32(),
-        circleStrokeWidth: 2,
+        circleStrokeWidthExpression: [
+          'case',
+          ['get', 'reseau'],
+          2.0,
+          1.0,
+        ],
       ),
     );
     await carte.addLayer(

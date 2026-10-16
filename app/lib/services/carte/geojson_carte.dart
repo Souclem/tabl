@@ -20,6 +20,9 @@ String geojsonLieux(Iterable<LieuCarte> lieux) {
             'cle': lieu.cle,
             'visites': lieu.visites.length,
             'envie': lieu.estEnvie,
+            // Visité par mon réseau ou en envie : marqueur plein ; sinon
+            // petit point (un restaurant de l'annuaire).
+            'reseau': lieu.duReseau,
             // Bulle photo de l'ami en avant, avec « +N » autres amis.
             'photo': ?lieu.amiEnAvant?.photoUrl,
             'autres': ?lieu.amiEnAvant?.autres,

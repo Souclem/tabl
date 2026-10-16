@@ -88,6 +88,7 @@ void main() {
       'cle': 'r1',
       'visites': 1,
       'envie': false,
+      'reseau': true,
       'autres': 0,
     });
   });

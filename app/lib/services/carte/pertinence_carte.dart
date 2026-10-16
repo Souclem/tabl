@@ -7,17 +7,19 @@ import 'lieu_carte.dart';
 const nombreMaxBulles = 40;
 
 /// Au plus autant de marqueurs en tout (bulles et simples points).
-const nombreMaxMarqueurs = 250;
+const nombreMaxMarqueurs = 400;
 
 /// Place réservée autour d'un marqueur, en fraction de la largeur visible
-/// (le rayon) : une bulle photo (~50 pt sur ~400 pt de large) prend bien
-/// plus de place qu'un point de l'annuaire.
+/// (le rayon) — calée sur sa taille réelle à l'écran (~400 pt de large) :
+/// bulle photo (~50 pt), marqueur d'un lieu de mon réseau (14 pt), petit
+/// point d'un restaurant où personne n'est allé (8 pt).
 const _rayonBulle = 1 / 14;
-const _rayonPoint = 1 / 60;
+const _rayonReseau = 1 / 60;
+const _rayonAnnuaire = 1 / 110;
 
-/// À partir de ce zoom (une rue), plus aucun point n'est écarté : tous les
-/// restaurants de la zone visible s'affichent.
-const zoomToutAfficher = 16.5;
+/// À partir de ce zoom (quelques rues), plus aucun point n'est écarté :
+/// tous les restaurants de la zone visible s'affichent.
+const zoomToutAfficher = 15.5;
 
 /// La pertinence d'un lieu pour moi : d'abord le nombre d'amis différents
 /// qui y sont allés, puis le nombre de visites, puis les coups de cœur ;
@@ -69,11 +71,16 @@ List<LieuCarte> lieuxAAfficher(
   final toutAfficher = zoom >= zoomToutAfficher;
   bool estBulle(LieuCarte l) => l.amiEnAvant?.photoUrl != null;
   double rayon(LieuCarte l) =>
-      largeur * (estBulle(l) ? _rayonBulle : _rayonPoint);
+      largeur *
+      (estBulle(l)
+          ? _rayonBulle
+          : l.duReseau
+          ? _rayonReseau
+          : _rayonAnnuaire);
   bool chevauche(LieuCarte a, LieuCarte b) {
-    // De très près, seuls les points de l'annuaire peuvent se toucher
-    // sans être écartés : on veut voir tous les restaurants de la rue.
-    if (toutAfficher && !estBulle(a) && !estBulle(b)) return false;
+    // De près, seules les bulles photo s'écartent entre elles : tous les
+    // simples points restent, quitte à passer sous une bulle.
+    if (toutAfficher && !(estBulle(a) && estBulle(b))) return false;
     final dLat = a.latitude - b.latitude;
     final dLng = (a.longitude - b.longitude) * echelleLongitude;
     final distance = rayon(a) + rayon(b);
