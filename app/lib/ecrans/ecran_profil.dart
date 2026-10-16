@@ -4,6 +4,7 @@ import 'package:app/widgets/widgets.dart';
 
 import 'ecran_accueil.dart';
 import 'ecran_cercle.dart';
+import 'ecran_tables.dart';
 
 /// Onglet Profil : identité de l'utilisateur, accès au cercle et
 /// déconnexion.
@@ -18,12 +19,19 @@ class EcranProfil extends StatefulWidget {
     required this.abonnementService,
     required this.souvenirService,
     required this.utilisateur,
+    this.tableService,
   });
 
   final AuthService authService;
   final AbonnementService abonnementService;
   final SouvenirService souvenirService;
   final Utilisateur utilisateur;
+
+  /// `null` par défaut : construit à la demande (au tap de "Vos
+  /// Tables") à partir de `TablBackend.client`, même principe que
+  /// `EcranPrincipal.carteService` — ne jamais toucher `TablBackend`
+  /// avant que ce soit nécessaire.
+  final TableService? tableService;
 
   @override
   State<EcranProfil> createState() => _EcranProfilState();
@@ -51,6 +59,17 @@ class _EcranProfilState extends State<EcranProfil> {
     setState(() {
       _nombreDemandes = widget.abonnementService.nombreDemandesEnAttente();
     });
+  }
+
+  void _allerVersTables() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranTables(
+          tableService: widget.tableService ?? TableServiceSupabase(TablBackend.client),
+          abonnementService: widget.abonnementService,
+        ),
+      ),
+    );
   }
 
   Future<void> _seDeconnecter() async {
@@ -129,13 +148,53 @@ class _EcranProfilState extends State<EcranProfil> {
             Positioned(
               top: TablTokens.espaceS,
               right: TablTokens.espaceM,
-              child: _BoutonCercle(
-                nombreDemandes: _nombreDemandes,
-                onPresse: _allerVersCercle,
+              child: Row(
+                children: [
+                  _BoutonIcone(
+                    icone: Icons.table_restaurant_outlined,
+                    libelle: 'Vos Tables',
+                    onPresse: _allerVersTables,
+                  ),
+                  const SizedBox(width: TablTokens.espaceS),
+                  _BoutonCercle(
+                    nombreDemandes: _nombreDemandes,
+                    onPresse: _allerVersCercle,
+                  ),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Icône ronde simple, même habillage que [_BoutonCercle] mais sans
+/// badge — pour "Vos Tables".
+class _BoutonIcone extends StatelessWidget {
+  const _BoutonIcone({
+    required this.icone,
+    required this.libelle,
+    required this.onPresse,
+  });
+
+  final IconData icone;
+  final String libelle;
+  final VoidCallback onPresse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: TablTokens.surface,
+      shape: const CircleBorder(side: BorderSide(color: TablTokens.bordure)),
+      clipBehavior: Clip.antiAlias,
+      child: IconButton(
+        onPressed: onPresse,
+        icon: Icon(icone, size: 20),
+        color: TablTokens.primaire,
+        splashRadius: 22,
+        tooltip: libelle,
       ),
     );
   }

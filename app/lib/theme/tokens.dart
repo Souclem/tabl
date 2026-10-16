@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Les valeurs brutes du design de Tabl.
 ///
@@ -10,17 +11,18 @@ class TablTokens {
   const TablTokens._();
 
   // --- Couleurs -------------------------------------------------------
-  // Thème sombre, accent doré — voir instruction/Présentation-de-lapp.pdf
-  // et instruction/Inscription.pdf pour les maquettes de référence.
+  // Thème sombre, accent doré — valeurs exactes reprises du prototype
+  // fonctionnel `instruction/Clément (2)/Tabl.dc.html` (source de vérité
+  // pour l'écran Feed), pas d'une approximation à l'œil.
 
   /// Couleur d'accent : boutons principaux, liens, éléments actifs.
-  static const Color primaire = Color(0xFFC9A063);
+  static const Color primaire = Color(0xFFD9AC67);
 
   /// Variante foncée, pour les états pressés.
   static const Color primaireFoncee = Color(0xFFA8804A);
 
   /// Fond des écrans.
-  static const Color fond = Color(0xFF15110D);
+  static const Color fond = Color(0xFF06080C);
 
   /// Fond des cartes, des champs et des surfaces posées sur le fond.
   static const Color surface = Color(0xFF221C17);
@@ -32,7 +34,7 @@ class TablTokens {
   static const Color texteDoux = Color(0xFF9C9284);
 
   /// Texte posé sur la couleur primaire (fond doré → texte foncé pour le contraste).
-  static const Color texteSurPrimaire = Color(0xFF1A1512);
+  static const Color texteSurPrimaire = Color(0xFF05090F);
 
   /// Traits de séparation et contours de champs au repos.
   static const Color bordure = Color(0xFF3A322A);
@@ -54,6 +56,11 @@ class TablTokens {
   static const double arrondiM = 16;
   static const double arrondiL = 24;
 
+  /// Boutons en pilule (radius 999 — voir la bible de design,
+  /// `instruction/Clément (2)/uploads/Tabl_Design_Bible_Complete.docx`,
+  /// section "Border Radius" : "Boutons : 999 px").
+  static const double arrondiBouton = 999;
+
   // --- Dimensions -----------------------------------------------------
   /// Hauteur des champs de saisie et des boutons. 48 est le minimum
   /// confortable pour un doigt sur mobile.
@@ -65,6 +72,16 @@ class TablTokens {
 
   // --- Typographie ----------------------------------------------------
   static const String police = 'Roboto';
+
+  /// Police d'affichage (titres éditoriaux) — "Playfair Display",
+  /// exactement celle du prototype fonctionnel
+  /// (`instruction/Clément (2)/Tabl.dc.html`, ex. le nom d'un restaurant
+  /// dans le Feed, "Tabl." en en-tête). Un getter, pas un `const`, car
+  /// `google_fonts` construit le `TextStyle` à l'exécution.
+  static TextStyle get titreAffichage => GoogleFonts.playfairDisplay(
+    color: texte,
+    fontWeight: FontWeight.w500,
+  );
 
   static const TextStyle grandTitre = TextStyle(
     fontFamily: police,

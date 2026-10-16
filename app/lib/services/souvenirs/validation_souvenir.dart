@@ -14,4 +14,11 @@ class ValidationSouvenir {
     if (valeur.trim().isEmpty) return 'Entre la ville.';
     return null;
   }
+
+  /// La légende est optionnelle : `valeur` peut être vide. 120 caractères
+  /// maximum (voir B9).
+  static String? legende(String valeur) {
+    if (valeur.length > 120) return '120 caractères maximum.';
+    return null;
+  }
 }

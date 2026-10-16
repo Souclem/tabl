@@ -140,4 +140,39 @@ class AbonnementServiceSupabase implements AbonnementService {
         .eq('statut', 'en_attente');
     return lignes.length;
   }
+
+  @override
+  Future<List<ProfilPublic>> mesAmis() async {
+    final lignes = await _client
+        .from('abonnements')
+        .select('suiveur_id, suivi_id, profils_suiveur:profils!suiveur_id(pseudo), '
+            'profils_suivi:profils!suivi_id(pseudo)')
+        .eq('statut', 'accepte')
+        .or('suiveur_id.eq.$_monId,suivi_id.eq.$_monId');
+
+    final amis = <String, String>{};
+    for (final l in lignes) {
+      final suiveurId = l['suiveur_id'] as String;
+      final suiviId = l['suivi_id'] as String;
+      if (suiveurId == _monId) {
+        final profil = l['profils_suivi'] as Map<String, dynamic>?;
+        final pseudo = profil?['pseudo'] as String?;
+        if (pseudo != null) amis[suiviId] = pseudo;
+      } else {
+        final profil = l['profils_suiveur'] as Map<String, dynamic>?;
+        final pseudo = profil?['pseudo'] as String?;
+        if (pseudo != null) amis[suiveurId] = pseudo;
+      }
+    }
+
+    return amis.entries
+        .map(
+          (e) => ProfilPublic(
+            id: e.key,
+            pseudo: e.value,
+            statut: StatutAbonnement.abonne,
+          ),
+        )
+        .toList();
+  }
 }

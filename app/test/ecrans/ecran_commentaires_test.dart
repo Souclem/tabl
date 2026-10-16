@@ -58,12 +58,39 @@ class _FauxSouvenirService implements SouvenirService {
   Future<List<SouvenirFeed>> feed() => throw UnimplementedError();
 
   @override
-  Future<void> publier({
+  Future<List<String>> publier({
     required String nomRestaurant,
     required String ville,
     required Uint8List photo,
+    required Emotion emotion,
     String? legende,
+    List<String> amisTaguesIds = const [],
+    String? boissonTexte,
+    Uint8List? boissonPhoto,
+    bool partagerAvecCercle = true,
+    List<String> impressions = const [],
+    List<String> tableIds = const [],
   }) => throw UnimplementedError();
+
+  @override
+  Future<String> enregistrerBrouillon({
+    required String nomRestaurant,
+    required String ville,
+    required Uint8List photo,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
+    String souvenirId,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<List<String>> modifierPartage(
+    String souvenirId, {
+    required bool partagerAvecCercle,
+    required List<String> tableIds,
+  }) => throw UnimplementedError();
+
 }
 
 void main() {

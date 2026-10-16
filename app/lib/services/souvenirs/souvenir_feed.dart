@@ -1,3 +1,5 @@
+import 'emotion.dart';
+
 /// Un souvenir tel qu'affiché dans le Feed — déjà résolu et prêt à
 /// afficher (l'URL de la photo est une URL signée, pas le chemin brut du
 /// bucket) : l'écran n'a aucune requête à faire, juste à afficher.
@@ -14,6 +16,11 @@ class SouvenirFeed {
     required this.nombreReactions,
     required this.jaiReagi,
     required this.nombreCommentaires,
+    this.emotion,
+    this.premieresReactions = const [],
+    this.amisTagues = const [],
+    this.impressions = const [],
+    this.estAMoi = false,
   });
 
   final String id;
@@ -39,6 +46,26 @@ class SouvenirFeed {
 
   final int nombreCommentaires;
 
+  /// `null` pour un souvenir publié avant l'introduction de ce champ.
+  final Emotion? emotion;
+
+  /// Pseudos des personnes ayant réagi le plus récemment — sert à
+  /// composer la phrase "Martin, Sarah et 12 autres ont aimé" plutôt
+  /// qu'un chiffre brut mis en avant.
+  final List<String> premieresReactions;
+
+  /// Pseudos des amis tagués comme présents lors de ce moment.
+  final List<String> amisTagues;
+
+  /// Ce qui ressort ("Assiette · Exceptionnelle", "Service · Attentionné"...),
+  /// affiché en pastilles sous la légende.
+  final List<String> impressions;
+
+  /// `true` si le compte courant est l'auteur — sert au CTA "+ Instant"
+  /// (megaprompt Bloc 2, règle 3 : owner only, les autres ne le voient
+  /// jamais).
+  final bool estAMoi;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -46,6 +73,7 @@ class SouvenirFeed {
     int? nombreReactions,
     bool? jaiReagi,
     int? nombreCommentaires,
+    List<String>? premieresReactions,
   }) {
     return SouvenirFeed(
       id: id,
@@ -59,6 +87,11 @@ class SouvenirFeed {
       nombreReactions: nombreReactions ?? this.nombreReactions,
       jaiReagi: jaiReagi ?? this.jaiReagi,
       nombreCommentaires: nombreCommentaires ?? this.nombreCommentaires,
+      emotion: emotion,
+      premieresReactions: premieresReactions ?? this.premieresReactions,
+      amisTagues: amisTagues,
+      impressions: impressions,
+      estAMoi: estAMoi,
     );
   }
 }

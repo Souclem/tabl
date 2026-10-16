@@ -30,4 +30,8 @@ abstract interface class AbonnementService {
   /// Nombre de demandes en attente de réponse — pour le badge sur
   /// l'entrée vers l'écran Cercle.
   Future<int> nombreDemandesEnAttente();
+
+  /// Le cercle : profils avec une relation acceptée, dans un sens ou
+  /// l'autre. Sert à proposer qui taguer comme présent sur un moment.
+  Future<List<ProfilPublic>> mesAmis();
 }

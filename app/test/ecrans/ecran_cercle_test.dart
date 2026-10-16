@@ -53,6 +53,9 @@ class _FauxAbonnementService implements AbonnementService {
 
   @override
   Future<int> nombreDemandesEnAttente() async => _demandes.length;
+
+  @override
+  Future<List<ProfilPublic>> mesAmis() async => [];
 }
 
 void main() {

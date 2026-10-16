@@ -33,7 +33,7 @@ class TablBouton extends StatelessWidget {
           disabledBackgroundColor: TablTokens.primaire.withValues(alpha: 0.4),
           disabledForegroundColor: TablTokens.texteSurPrimaire,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(TablTokens.arrondiS),
+            borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
           ),
           textStyle: TablTokens.libelleBouton,
         ),

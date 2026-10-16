@@ -30,6 +30,15 @@ class TablApp extends StatelessWidget {
     final abonnementService = AbonnementServiceSupabase(TablBackend.client);
     final souvenirService = SouvenirServiceSupabase(TablBackend.client);
     final etatOnboarding = EtatOnboardingPreferences();
+    // Contrairement à carteService/tableService (défaut paresseux à
+    // l'intérieur d'EcranPrincipal, sans risque car Explorer/le tap
+    // "Publier" ne s'exécutent jamais pendant les tests qui construisent
+    // EcranPrincipal sans lui) : EcranFeed, qui a besoin de ce service,
+    // est construit eagerly — un défaut paresseux là-bas serait déclenché
+    // dès le premier build, y compris dans des tests sans Supabase
+    // initialisé. Construit ici, au seul endroit où Supabase est déjà
+    // garanti initialisé (après `TablBackend.demarrer` dans `main`).
+    final instantService = InstantServiceSupabase(TablBackend.client);
 
     return MaterialApp(
       title: 'Tabl',
@@ -40,6 +49,7 @@ class TablApp extends StatelessWidget {
         abonnementService: abonnementService,
         souvenirService: souvenirService,
         etatOnboarding: etatOnboarding,
+        instantService: instantService,
       ),
     );
   }
@@ -56,12 +66,18 @@ class EcranDemarrage extends StatefulWidget {
     required this.abonnementService,
     required this.souvenirService,
     required this.etatOnboarding,
+    this.instantService,
   });
 
   final AuthService authService;
   final AbonnementService abonnementService;
   final SouvenirService souvenirService;
   final EtatOnboarding etatOnboarding;
+
+  /// `null` par défaut pour ne pas casser les tests qui construisent cet
+  /// écran sans lui (aucun n'a besoin des Instants) — `TablApp` en
+  /// fournit toujours un vrai dans l'app réelle (voir son commentaire).
+  final InstantService? instantService;
 
   @override
   State<EcranDemarrage> createState() => _EcranDemarrageState();
@@ -125,6 +141,7 @@ class _EcranDemarrageState extends State<EcranDemarrage> {
             abonnementService: abonnementService,
             souvenirService: souvenirService,
             utilisateur: utilisateur,
+            instantService: widget.instantService,
           );
         }
         return EcranConnexion(
