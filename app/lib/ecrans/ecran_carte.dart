@@ -271,12 +271,13 @@ class _EcranCarteState extends State<EcranCarte> {
     ].where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
     setState(() => _selection = lieu);
-    // La feuille réduite couvre le bas de la carte : si le lieu se
-    // retrouve dessous, on remonte la carte pour qu'il reste visible.
+    // La feuille réduite couvre à peu près le bas de la carte, sous ~60 %
+    // de sa hauteur : seulement si le lieu se retrouve dessous, on le
+    // remonte juste au-dessus — le plus petit déplacement possible.
     final zone = _zone;
     final hauteur = (zone.nord - lieu.latitude) / (zone.nord - zone.sud);
-    if (hauteur > 0.5) {
-      _controleur.amenerA(lieu.latitude, lieu.longitude, hauteur: 0.3);
+    if (hauteur > 0.58) {
+      _controleur.amenerA(lieu.latitude, lieu.longitude, hauteur: 0.5);
     }
   }
 
@@ -340,6 +341,7 @@ class _EcranCarteState extends State<EcranCarte> {
           entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
           defilement: defilement,
           onFermer: () => setState(() => _selection = null),
+          flottante: true,
           onToucherEntete: _agrandirFeuille,
           onEnvieChangee: (_) => _charger(),
         ),
@@ -649,11 +651,12 @@ class _EcranCarteState extends State<EcranCarte> {
           ),
         if (selection != null && widget.souvenirService != null)
           Positioned(
-            left: 0,
-            right: 0,
+            // Une carte flottante : un peu d'air sur les côtés et
+            // au-dessus de la barre de navigation.
+            left: TablTokens.espaceS,
+            right: TablTokens.espaceS,
             top: 0,
-            // Au-dessus de la barre de navigation flottante.
-            bottom: _margeBarre,
+            bottom: _margeBarre + TablTokens.espaceS,
             child: _feuilleDuLieu(selection, widget.souvenirService!),
           ),
       ],

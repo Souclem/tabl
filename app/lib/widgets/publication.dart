@@ -31,6 +31,20 @@ enum ContextePublication {
 /// Composant pur : reçoit tout déjà prêt à afficher ([dateLisible],
 /// [libelleReactions]...) et renvoie chaque geste par callback.
 class TablPublication extends StatelessWidget {
+  // Géométrie de la photo, publique pour qu'une vignette puisse s'animer
+  // exactement jusqu'à sa place (avis qui s'agrandit sur place).
+
+  /// Hauteur de la ligne au-dessus de la photo (auteur, date), marge
+  /// comprise.
+  static const hauteurEnTete = 38.0;
+
+  /// Marge à gauche et à droite de la photo.
+  static const margePhoto = TablTokens.espaceM;
+
+  /// Hauteur de la photo par rapport à sa largeur.
+  static const proportionPhoto = 1.06;
+  static const arrondiPhoto = 26.0;
+
   const TablPublication({
     super.key,
     required this.contexte,
@@ -261,7 +275,7 @@ class _EnTete extends StatelessWidget {
         // Le bouton "⋯" a sa propre zone de tap : on rogne la marge pour
         // garder l'icône alignée sur le bord de la photo.
         onOptions != null ? TablTokens.espaceS : TablTokens.espaceL,
-        10,
+        TablPublication.hauteurEnTete - 28,
       ),
       child: SizedBox(
         height: 28,
@@ -322,15 +336,17 @@ class _Photo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TablPublication.margePhoto,
+      ),
       child: Stack(
         // La pastille d'émotion déborde volontairement sous la photo.
         clipBehavior: Clip.none,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(26),
+            borderRadius: BorderRadius.circular(TablPublication.arrondiPhoto),
             child: AspectRatio(
-              aspectRatio: 1 / 1.06,
+              aspectRatio: 1 / TablPublication.proportionPhoto,
               child: Stack(
                 fit: StackFit.expand,
                 children: [

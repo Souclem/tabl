@@ -32,7 +32,12 @@ class TablLigneAvis extends StatelessWidget {
   final String? resumeReactions;
   final VoidCallback onPresse;
 
-  static const _cote = 84.0;
+  // Géométrie de la vignette, publique pour qu'elle puisse s'animer
+  // jusqu'à la photo de la publication complète.
+  static const cotePhoto = 84.0;
+  static const margeGauche = TablTokens.espaceL;
+  static const margeHaut = TablTokens.espaceS + 2;
+  static const arrondiPhoto = TablTokens.arrondiM;
 
   @override
   Widget build(BuildContext context) {
@@ -40,17 +45,17 @@ class TablLigneAvis extends StatelessWidget {
       onTap: onPresse,
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: TablTokens.espaceL,
-          vertical: TablTokens.espaceS + 2,
+          horizontal: margeGauche,
+          vertical: margeHaut,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(TablTokens.arrondiM),
+              borderRadius: BorderRadius.circular(arrondiPhoto),
               child: SizedBox(
-                width: _cote,
-                height: _cote,
+                width: cotePhoto,
+                height: cotePhoto,
                 child: photoUrl == null
                     ? const ColoredBox(color: TablTokens.surface)
                     : Image.network(
@@ -58,7 +63,7 @@ class TablLigneAvis extends StatelessWidget {
                         fit: BoxFit.cover,
                         // Petite vignette : inutile de décoder la photo en
                         // pleine résolution.
-                        cacheWidth: (_cote * 3).round(),
+                        cacheWidth: (cotePhoto * 3).round(),
                         errorBuilder: (_, _, _) =>
                             const ColoredBox(color: TablTokens.surface),
                       ),
