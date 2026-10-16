@@ -29,6 +29,7 @@ export 'instants/raccourci_a_table_maintenant.dart';
 export 'instants/signal_instants_post.dart';
 export 'instants/transition_ensuite.dart';
 export 'lien_bas_de_page.dart';
+export 'ligne_avis.dart';
 export 'ligne_suggestion_lieu.dart';
 export 'logo.dart';
 export 'messages.dart';

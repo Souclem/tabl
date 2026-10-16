@@ -230,7 +230,7 @@ class _EcranFeedState extends State<EcranFeed>
         return construirePublication(
           souvenir,
           contexte: ContextePublication.feed,
-          onOuvrirLieu: _bientotDisponible,
+          onOuvrirLieu: () => ouvrirRestaurant(souvenir),
           signal: signal,
           onOuvrirInstants: (signal?.aDesInstants ?? false)
               ? () => _ouvrirInstants(souvenir.id)

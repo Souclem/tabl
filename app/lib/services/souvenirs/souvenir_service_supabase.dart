@@ -243,10 +243,17 @@ class SouvenirServiceSupabase implements SouvenirService {
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
       _souvenirsPublies(auteurId: auteurId);
 
+  @override
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) =>
+      _souvenirsPublies(restaurantId: restaurantId);
+
   /// Requête commune au Feed et aux pages de profil : seule la
   /// restriction des auteurs change, tout le reste (réactions,
   /// commentaires, URLs signées) est résolu de la même façon.
-  Future<List<SouvenirFeed>> _souvenirsPublies({String? auteurId}) async {
+  Future<List<SouvenirFeed>> _souvenirsPublies({
+    String? auteurId,
+    String? restaurantId,
+  }) async {
     var requete = _client
         .from('souvenirs')
         .select(
@@ -256,6 +263,9 @@ class SouvenirServiceSupabase implements SouvenirService {
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)',
         )
         .eq('statut', 'publie');
+    if (restaurantId != null) {
+      requete = requete.eq('restaurant_id', restaurantId);
+    }
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
     } else {

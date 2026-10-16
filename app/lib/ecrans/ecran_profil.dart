@@ -202,10 +202,6 @@ class _EcranProfilState extends State<EcranProfil>
     }
   }
 
-  void _bientotDisponible() {
-    afficherMessage(context, 'Bientôt disponible.');
-  }
-
   Future<void> _seDeconnecter() async {
     setState(() => _enCours = true);
     try {
@@ -283,7 +279,7 @@ class _EcranProfilState extends State<EcranProfil>
                           construirePublication(
                             souvenir,
                             contexte: ContextePublication.profilPerso,
-                            onOuvrirLieu: _bientotDisponible,
+                            onOuvrirLieu: () => ouvrirRestaurant(souvenir),
                             onOptions: () => _ouvrirOptions(souvenir),
                           ),
                       if (_profilPrive != null)

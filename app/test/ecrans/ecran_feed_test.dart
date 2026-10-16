@@ -13,6 +13,9 @@ import 'package:app/ecrans/ecran_feed.dart';
 import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
+
   final List<(String, bool)> appelsEnvie = [];
 
   @override
@@ -317,7 +320,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.text('Aimé'), findsOneWidget);
-    expect(find.text('avez aimé'), findsOneWidget);
+    expect(find.text('Vous avez aimé'), findsOneWidget);
     expect(service.appelsReaction, [('1', true)]);
   });
 
@@ -339,7 +342,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('avez aimé'), findsOneWidget);
+    expect(find.text('Vous avez aimé'), findsOneWidget);
     await tester.tap(find.byType(TablBoutonReaction));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 800));

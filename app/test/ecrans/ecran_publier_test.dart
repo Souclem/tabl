@@ -31,6 +31,9 @@ class _FauxImagePickerPlatform extends ImagePickerPlatform {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
+
+  @override
   Future<void> basculerEnvie(
     String restaurantId, {
     required bool envie,

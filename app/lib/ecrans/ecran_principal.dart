@@ -142,6 +142,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                       positionService: _positionService,
                       tableService: _tableService,
                       abonnementService: widget.abonnementService,
+                      souvenirService: widget.souvenirService,
                     )
                   : const SizedBox.shrink(),
               EcranProfil(

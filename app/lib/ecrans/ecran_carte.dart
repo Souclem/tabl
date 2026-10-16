@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'ecran_restaurant.dart';
+
 /// Onglet Carte. En haut : le titre, la bascule Carte / Liste et la
 /// rangée de filtres. En bas : la carte (lieux de mon réseau en doré,
 /// annuaire en points discrets de près) ou la liste des lieux de mon
@@ -16,6 +18,7 @@ class EcranCarte extends StatefulWidget {
     this.positionService,
     this.tableService,
     this.abonnementService,
+    this.souvenirService,
     this.filtresInitiaux = FiltresCarte.aucun,
     this.estOnglet = true,
     this.afficherCarte = true,
@@ -33,6 +36,10 @@ class EcranCarte extends StatefulWidget {
   /// Pour les personnes du filtre "Une personne" (celles que je suis).
   /// `null` : filtre masqué.
   final AbonnementService? abonnementService;
+
+  /// Pour la page d'un restaurant (avis de mon réseau). `null` : aperçu
+  /// non cliquable.
+  final SouvenirService? souvenirService;
 
   /// Filtres appliqués à l'ouverture ("Voir sur la carte" depuis une
   /// Table ouvre la carte déjà filtrée sur cette Table).
@@ -233,12 +240,26 @@ class _EcranCarteState extends State<EcranCarte> {
     if (lieu != null) setState(() => _selection = lieu);
   }
 
-  void _ouvrirDepuisListe(LieuCarte lieu) {
-    setState(() {
-      _enListe = false;
-      _selection = lieu;
-    });
-    _controleur.centrerSur(lieu.latitude, lieu.longitude, zoom: 15);
+  /// La page du restaurant ; au retour, la zone est rechargée (une envie
+  /// a pu changer).
+  Future<void> _ouvrirRestaurant(LieuCarte lieu) async {
+    final souvenirs = widget.souvenirService;
+    if (souvenirs == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranRestaurant(
+          nom: lieu.nom,
+          sousTitre: lieu.description,
+          restaurantId: lieu.restaurantId,
+          estEnvie: lieu.estEnvie,
+          souvenirService: souvenirs,
+          entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _selection = null);
+    _charger();
   }
 
   Future<void> _basculerEnvie() async {
@@ -586,6 +607,9 @@ class _EcranCarteState extends State<EcranCarte> {
               enCours: _envieEnCours,
               onEnvie: _basculerEnvie,
               onFermer: () => setState(() => _selection = null),
+              onOuvrir: widget.souvenirService == null
+                  ? null
+                  : () => _ouvrirRestaurant(selection),
             ),
           ),
       ],
@@ -626,7 +650,7 @@ class _EcranCarteState extends State<EcranCarte> {
           duReseau: lieu.visites > 0,
           estEnvie: lieu.estEnvie,
           distance: distance == null ? null : distanceLisible(distance),
-          onPresse: () => _ouvrirDepuisListe(lieu),
+          onPresse: () => _ouvrirRestaurant(lieu),
         );
       },
     );

@@ -16,6 +16,7 @@ class TablApercuLieu extends StatelessWidget {
     required this.onEnvie,
     required this.onFermer,
     this.enCours = false,
+    this.onOuvrir,
   });
 
   final String nom;
@@ -33,6 +34,10 @@ class TablApercuLieu extends StatelessWidget {
   final VoidCallback onEnvie;
   final VoidCallback onFermer;
 
+  /// Ouvre la page du restaurant (tap sur l'aperçu). `null` : aperçu
+  /// non cliquable.
+  final VoidCallback? onOuvrir;
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -40,69 +45,85 @@ class TablApercuLieu extends StatelessWidget {
       elevation: 8,
       shadowColor: Colors.black54,
       borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TablTokens.espaceL,
-          TablTokens.espaceM,
-          TablTokens.espaceS,
-          TablTokens.espaceM,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(nom, style: TablTokens.sousTitre),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOuvrir,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL,
+            TablTokens.espaceM,
+            TablTokens.espaceS,
+            TablTokens.espaceM,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(nom, style: TablTokens.sousTitre),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TablTokens.legende,
+                      ),
+                    ],
+                    const SizedBox(height: TablTokens.espaceS),
                     Text(
-                      description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende,
+                      resume,
+                      style: TablTokens.legende.copyWith(
+                        color: duReseau
+                            ? TablTokens.primaire
+                            : TablTokens.texteDoux,
+                        fontWeight: duReseau
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: TablTokens.espaceS),
+                    TextButton.icon(
+                      onPressed: enCours ? null : onEnvie,
+                      style: TextButton.styleFrom(
+                        foregroundColor: estEnvie
+                            ? TablTokens.primaire
+                            : TablTokens.texte,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: Icon(
+                        estEnvie
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_border_rounded,
+                        size: 18,
+                      ),
+                      label: Text(
+                        estEnvie ? 'Dans mes envies' : 'Ajouter à mes envies',
+                      ),
                     ),
                   ],
-                  const SizedBox(height: TablTokens.espaceS),
-                  Text(
-                    resume,
-                    style: TablTokens.legende.copyWith(
-                      color: duReseau ? TablTokens.primaire : TablTokens.texteDoux,
-                      fontWeight: duReseau ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: TablTokens.espaceS),
-                  TextButton.icon(
-                    onPressed: enCours ? null : onEnvie,
-                    style: TextButton.styleFrom(
-                      foregroundColor: estEnvie
-                          ? TablTokens.primaire
-                          : TablTokens.texte,
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: Icon(
-                      estEnvie
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      size: 18,
-                    ),
-                    label: Text(
-                      estEnvie ? 'Dans mes envies' : 'Ajouter à mes envies',
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: onFermer,
-              tooltip: 'Fermer',
-              icon: const Icon(Icons.close_rounded, size: 20),
-              color: TablTokens.texteDoux,
-            ),
-          ],
+              if (onOuvrir != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: TablTokens.texteDoux,
+                  ),
+                ),
+              IconButton(
+                onPressed: onFermer,
+                tooltip: 'Fermer',
+                icon: const Icon(Icons.close_rounded, size: 20),
+                color: TablTokens.texteDoux,
+              ),
+            ],
+          ),
         ),
       ),
     );

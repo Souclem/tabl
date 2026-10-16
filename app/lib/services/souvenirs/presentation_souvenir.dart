@@ -25,9 +25,15 @@ String dateLisibleSouvenir(DateTime date) {
 /// "Personne n'a encore aimé").
 String libelleReactionsSouvenir(SouvenirFeed s) {
   if (s.nombreReactions == 0) return "Personne n'a encore aimé";
-  final verbe = s.jaiReagi
-      ? 'avez aimé'
-      : (s.nombreReactions > 1 ? 'ont aimé' : 'a aimé');
+  // J'ai aimé : la phrase commence par moi ("Vous et 3 autres avez
+  // aimé"), jamais "Emma, Lucas et 2 autres avez aimé".
+  if (s.jaiReagi) {
+    final autres = s.nombreReactions - 1;
+    return autres == 0
+        ? 'Vous avez aimé'
+        : 'Vous et $autres autre${autres > 1 ? 's' : ''} avez aimé';
+  }
+  final verbe = s.nombreReactions > 1 ? 'ont aimé' : 'a aimé';
   final noms = s.premieresReactions;
   if (noms.isEmpty) return verbe;
   final reste = s.nombreReactions - noms.length;

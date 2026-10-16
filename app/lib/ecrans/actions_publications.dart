@@ -3,6 +3,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'ecran_commentaires.dart';
+import 'ecran_restaurant.dart';
 
 /// Ce que partagent tous les écrans qui affichent une liste de
 /// publications (Feed, profils) : la liste chargée, la réaction
@@ -81,6 +82,24 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     // Le nombre de commentaires a pu changer pendant la visite : on
     // recharge tout au retour plutôt que de suivre les ajouts un par un
     // — plus simple, et cet écran n'est pas quitté souvent.
+    if (!mounted) return;
+    recharger();
+  }
+
+  /// La page du restaurant d'une publication ; au retour, la liste est
+  /// rechargée (une envie a pu changer).
+  Future<void> ouvrirRestaurant(SouvenirFeed souvenir) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranRestaurant(
+          nom: souvenir.restaurantNom,
+          sousTitre: souvenir.ville,
+          restaurantId: souvenir.restaurantId,
+          estEnvie: souvenir.estEnvie,
+          souvenirService: souvenirService,
+        ),
+      ),
+    );
     if (!mounted) return;
     recharger();
   }
