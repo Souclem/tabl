@@ -17,6 +17,9 @@ import 'souvenir_service.dart';
 /// migrations `20260823000000_abonnements_restaurants_souvenirs.sql`,
 /// `20260824000000_storage_souvenirs.sql` et
 /// `20260828000000_flux_moment_complet.sql`).
+/// Nombre de souvenirs chargés d'un coup (Feed, page de profil).
+const nombreMaxSouvenirsCharges = 50;
+
 class SouvenirServiceSupabase implements SouvenirService {
   SouvenirServiceSupabase(this._client)
     : _restaurants = RegistreRestaurants(_client);
@@ -256,9 +259,14 @@ class SouvenirServiceSupabase implements SouvenirService {
     } else {
       requete = requete.or(await conditionSouvenirsDuReseau(_client, _monId));
     }
+    // Les plus récents seulement : au-delà, les requêtes groupées qui
+    // suivent (réactions, commentaires...) dépasseraient la longueur
+    // d'adresse acceptée par l'API. Le chargement au fil du défilement
+    // viendra prendre le relais.
     final lignes = await requete
         .order('date_visite', ascending: false)
-        .order('cree_le', ascending: false);
+        .order('cree_le', ascending: false)
+        .limit(nombreMaxSouvenirsCharges);
 
     final ids = lignes.map((l) => l['id'] as String).toList();
 

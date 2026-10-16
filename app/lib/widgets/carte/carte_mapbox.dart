@@ -24,18 +24,16 @@ class ControleurCarte {
 }
 
 /// La carte Mapbox de Tabl : globe 3D au dézoom, style nuit sans les
-/// commerces de Mapbox (seuls nos lieux ressortent), et deux couches —
-/// les lieux de mon réseau en marqueurs dorés regroupés selon le zoom,
-/// l'annuaire en petits points discrets visibles seulement de près.
+/// commerces de Mapbox (seuls nos lieux ressortent), et les lieux à
+/// afficher, tous avec le même marqueur doré.
 ///
-/// Composant pur : reçoit les lieux déjà au format GeoJSON et renvoie le
-/// tap sur un lieu ([onTapLieu], avec sa clé) et la zone visible après
-/// chaque déplacement ([onZoneVisible]).
+/// Composant pur : reçoit les lieux déjà choisis (les plus pertinents,
+/// au format GeoJSON) et renvoie le tap sur un lieu ([onTapLieu], avec sa
+/// clé) et la zone visible après chaque déplacement ([onZoneVisible]).
 class TablCarteMapbox extends StatefulWidget {
   const TablCarteMapbox({
     super.key,
-    required this.geojsonReseau,
-    required this.geojsonAnnuaire,
+    required this.geojsonLieux,
     required this.latitudeInitiale,
     required this.longitudeInitiale,
     required this.zoomInitial,
@@ -45,8 +43,7 @@ class TablCarteMapbox extends StatefulWidget {
     this.margeBas = 0,
   });
 
-  final String geojsonReseau;
-  final String geojsonAnnuaire;
+  final String geojsonLieux;
   final double latitudeInitiale;
   final double longitudeInitiale;
   final double zoomInitial;
@@ -69,27 +66,16 @@ class TablCarteMapbox extends StatefulWidget {
   /// doivent rester visibles, sont remontés d'autant.
   final double margeBas;
 
-  /// En dessous de ce zoom, les points de l'annuaire sont masqués (trop
-  /// nombreux) — l'écran n'a pas besoin de les charger.
-  static const zoomAnnuaire = 14.0;
-
   @override
   State<TablCarteMapbox> createState() => _TablCarteMapboxState();
 }
 
 class _TablCarteMapboxState extends State<TablCarteMapbox> {
-  static const _sourceReseau = 'tabl-reseau';
-  static const _sourceAnnuaire = 'tabl-annuaire';
-  static const _coucheGroupes = 'tabl-reseau-groupes';
-  static const _coucheNombre = 'tabl-reseau-nombre';
-  static const _couchePoints = 'tabl-reseau-points';
-  static const _coucheAnnuaire = 'tabl-annuaire-points';
+  static const _source = 'tabl-lieux';
+  static const _couche = 'tabl-lieux-points';
 
   MapboxMap? _carte;
   bool _styleCharge = false;
-
-  static String _hex(Color c) =>
-      '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0')}';
 
   Future<void> _creee(MapboxMap carte) async {
     _carte = carte;
@@ -116,134 +102,26 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     );
 
     await carte.addSource(
-      GeoJsonSource(id: _sourceAnnuaire, data: widget.geojsonAnnuaire),
-    );
-    await carte.addSource(
-      GeoJsonSource(
-        id: _sourceReseau,
-        data: widget.geojsonReseau,
-        cluster: true,
-        clusterRadius: 44,
-        clusterMaxZoom: 15,
-      ),
-    );
-
-    final or = _hex(TablTokens.primaire);
-    final fond = _hex(TablTokens.fond);
-    await carte.addLayer(
-      CircleLayer(
-        id: _coucheAnnuaire,
-        sourceId: _sourceAnnuaire,
-        slot: 'top',
-        minZoom: TablCarteMapbox.zoomAnnuaire,
-        // Gris chaud clair : lisible sur la carte de nuit, mais nettement
-        // en retrait des marqueurs dorés du réseau.
-        circleColor: const Color(0xFFC9C1B4).toARGB32(),
-        circleOpacity: 0.7,
-        circleRadius: 3.5,
-      ),
+      GeoJsonSource(id: _source, data: widget.geojsonLieux),
     );
     await carte.addLayer(
       CircleLayer(
-        id: _couchePoints,
-        sourceId: _sourceReseau,
+        id: _couche,
+        sourceId: _source,
         slot: 'top',
-        filter: [
-          '!',
-          ['has', 'point_count'],
-        ],
-        // Visité par le réseau : disque doré plein. Seulement en envie :
-        // anneau doré.
-        circleColorExpression: [
-          'case',
-          [
-            '>',
-            ['get', 'visites'],
-            0,
-          ],
-          or,
-          fond,
-        ],
-        circleRadiusExpression: [
-          'interpolate',
-          ['linear'],
-          ['get', 'visites'],
-          0,
-          7.0,
-          1,
-          7.0,
-          5,
-          10.0,
-        ],
-        circleStrokeColor: TablTokens.primaire.toARGB32(),
-        circleStrokeWidth: 2,
-      ),
-    );
-    await carte.addLayer(
-      CircleLayer(
-        id: _coucheGroupes,
-        sourceId: _sourceReseau,
-        slot: 'top',
-        filter: ['has', 'point_count'],
         circleColor: TablTokens.primaire.toARGB32(),
-        circleOpacity: 0.92,
-        circleRadiusExpression: [
-          'step',
-          ['get', 'point_count'],
-          16.0,
-          10,
-          21.0,
-          50,
-          27.0,
-        ],
+        // Le mode nuit du style assombrit tout ce qui n'émet pas sa propre
+        // lumière : sans ça, les marqueurs dorés deviennent noirs.
+        circleEmissiveStrength: 1,
+        circleRadius: 7,
         circleStrokeColor: TablTokens.fond.toARGB32(),
         circleStrokeWidth: 2,
       ),
     );
-    await carte.addLayer(
-      SymbolLayer(
-        id: _coucheNombre,
-        sourceId: _sourceReseau,
-        slot: 'top',
-        filter: ['has', 'point_count'],
-        textFieldExpression: ['get', 'point_count_abbreviated'],
-        textSize: 13,
-        textColor: TablTokens.texteSurPrimaire.toARGB32(),
-        textAllowOverlap: true,
-      ),
-    );
-
     carte.addInteraction(
-      TapInteraction(FeaturesetDescriptor(layerId: _couchePoints), (lieu, _) {
+      TapInteraction(FeaturesetDescriptor(layerId: _couche), (lieu, _) {
         final cle = lieu.properties['cle'];
         if (cle is String) widget.onTapLieu(cle);
-      }),
-    );
-    carte.addInteraction(
-      TapInteraction(FeaturesetDescriptor(layerId: _coucheAnnuaire), (lieu, _) {
-        final cle = lieu.properties['cle'];
-        if (cle is String) widget.onTapLieu(cle);
-      }),
-    );
-    // Un groupe : on zoome dessus pour le déplier.
-    carte.addInteraction(
-      TapInteraction(FeaturesetDescriptor(layerId: _coucheGroupes), (
-        groupe,
-        _,
-      ) async {
-        final coordonnees = (groupe.geometry['coordinates'] as List?)
-            ?.cast<num>();
-        if (coordonnees == null) return;
-        final camera = await carte.getCameraState();
-        await carte.easeTo(
-          CameraOptions(
-            center: Point(
-              coordinates: Position(coordonnees[0], coordonnees[1]),
-            ),
-            zoom: camera.zoom + 2,
-          ),
-          MapAnimationOptions(duration: 500),
-        );
       }),
     );
 
@@ -276,11 +154,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   void didUpdateWidget(TablCarteMapbox ancien) {
     super.didUpdateWidget(ancien);
     if (!_styleCharge) return;
-    if (ancien.geojsonReseau != widget.geojsonReseau) {
-      _mettreAJour(_sourceReseau, widget.geojsonReseau);
-    }
-    if (ancien.geojsonAnnuaire != widget.geojsonAnnuaire) {
-      _mettreAJour(_sourceAnnuaire, widget.geojsonAnnuaire);
+    if (ancien.geojsonLieux != widget.geojsonLieux) {
+      _mettreAJour(_source, widget.geojsonLieux);
     }
   }
 

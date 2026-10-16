@@ -21,12 +21,14 @@ Usage :
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tempfile
 import urllib.request
 
 import duckdb
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from supabase_cli import executer_fichier as executer, tableau as sql_tableau, texte as sql_texte  # noqa: E402
 
 DATASET = "foursquare/fsq-os-places"
 TAILLE_LOT = 4000
@@ -40,28 +42,6 @@ def derniere_release(jeton: str) -> str:
     with urllib.request.urlopen(requete, timeout=30) as reponse:
         dossiers = [e["path"].split("/")[-1] for e in json.load(reponse)]
     return sorted(d for d in dossiers if d.startswith("dt="))[-1]
-
-
-def sql_texte(valeur) -> str:
-    if valeur is None:
-        return "null"
-    return "'" + str(valeur).replace("'", "''") + "'"
-
-
-def sql_tableau(valeurs) -> str:
-    if not valeurs:
-        return "'{}'::text[]"
-    return "array[" + ",".join(sql_texte(v) for v in valeurs) + "]::text[]"
-
-
-def executer(chemin_sql: str) -> None:
-    resultat = subprocess.run(
-        ["supabase", "db", "query", "--linked", "-f", chemin_sql],
-        capture_output=True,
-        text=True,
-    )
-    if resultat.returncode != 0:
-        sys.exit(f"Échec sur {chemin_sql} :\n{resultat.stderr or resultat.stdout}")
 
 
 def main() -> None:

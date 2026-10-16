@@ -48,10 +48,18 @@ class EcranCarte extends StatefulWidget {
 
 class _EcranCarteState extends State<EcranCarte> {
   /// Place occupée en bas par la barre de navigation flottante.
-  double get _margeBarre =>
-      widget.estOnglet ? TablTokens.espaceXxl + TablTokens.espaceL : 0;
+  double get _margeBarre => widget.estOnglet
+      ? TablBarreNavigation.hauteurOccupee(context)
+      : MediaQuery.paddingOf(context).bottom;
+
+  /// À partir de ce zoom (une ville), l'annuaire complète la carte : plus
+  /// loin, les lieux du réseau suffisent à remplir les places disponibles.
+  static const _zoomAnnuaire = 12.0;
 
   final _controleur = ControleurCarte();
+
+  /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
+  ZoneCarte _zone = const ZoneCarte(sud: 49.4, ouest: 2.5, nord: 51.6, est: 6.5);
 
   bool _enListe = false;
   late FiltresCarte _filtres = widget.filtresInitiaux;
@@ -112,7 +120,10 @@ class _EcranCarteState extends State<EcranCarte> {
     double zoom,
   ) {
     _attenteZone?.cancel();
-    if (zoom < TablCarteMapbox.zoomAnnuaire) {
+    setState(
+      () => _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est),
+    );
+    if (zoom < _zoomAnnuaire) {
       if (_annuaire.isNotEmpty) setState(() => _annuaire = const []);
       return;
     }
@@ -132,7 +143,7 @@ class _EcranCarteState extends State<EcranCarte> {
   List<LieuCarte> get _lieuxTablFiltres =>
       _lieuxTabl.where(_filtres.garde).toList();
 
-  /// L'annuaire sans les lieux déjà affichés en doré, et seulement si
+  /// L'annuaire sans les lieux déjà entrés dans Tabl, et seulement si
   /// aucun filtre "réseau" ne l'exclut.
   List<LieuCarte> get _annuaireFiltre {
     if (!_filtres.annuaireVisible) return const [];
@@ -489,8 +500,14 @@ class _EcranCarteState extends State<EcranCarte> {
         Positioned.fill(
           child: widget.afficherCarte
               ? TablCarteMapbox(
-                  geojsonReseau: geojsonLieux(_lieuxTablFiltres),
-                  geojsonAnnuaire: geojsonLieux(_annuaireFiltre),
+                  // Toujours la même règle : ce que disent les filtres, et
+                  // parmi ça les plus pertinents pour la zone visible.
+                  geojsonLieux: geojsonLieux(
+                    lieuxAAfficher([
+                      ..._lieuxTablFiltres,
+                      ..._annuaireFiltre,
+                    ], _zone),
+                  ),
                   // Belgique, avant de connaître la position.
                   latitudeInitiale: 50.5,
                   longitudeInitiale: 4.6,

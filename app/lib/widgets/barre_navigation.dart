@@ -26,6 +26,14 @@ class TablBarreNavigation extends StatelessWidget {
   final ValueChanged<TablOnglet> onSelection;
   final VoidCallback onPublier;
 
+  static const _hauteur = 60.0;
+
+  /// Hauteur qu'occupe la barre flottante en bas de l'écran (marges et
+  /// zone de sécurité du téléphone comprises) — pour qu'un écran place
+  /// ses éléments du bas juste au-dessus.
+  static double hauteurOccupee(BuildContext context) =>
+      _hauteur + TablTokens.espaceM + MediaQuery.paddingOf(context).bottom;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -38,7 +46,7 @@ class TablBarreNavigation extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: Container(
-          height: 60,
+          height: _hauteur,
           decoration: BoxDecoration(
             color: TablTokens.surface.withValues(alpha: 0.94),
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),

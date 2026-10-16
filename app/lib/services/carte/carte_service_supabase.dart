@@ -15,33 +15,35 @@ class CarteServiceSupabase implements CarteService {
 
   String get _monId => _client.auth.currentSession!.user.id;
 
+  static const _tailleTranche = 1000;
+
   static const _colonnesRestaurant =
       'id, nom, ville, adresse, latitude, longitude, categories, fsq_place_id';
 
   @override
   Future<List<LieuCarte>> lieuxTabl() async {
-    final souvenirs = await _client
-        .from('souvenirs')
-        .select(
-          'id, auteur_id, emotion, moment, date_visite, '
-          'profils!souvenirs_auteur_id_fkey(pseudo), '
-          'restaurants!inner($_colonnesRestaurant)',
-        )
-        .eq('statut', 'publie')
-        .or(await conditionSouvenirsDuReseau(_client, _monId));
-
-    final ids = [for (final s in souvenirs) s['id'] as String];
-    final tablesParSouvenir = <String, Set<String>>{};
-    if (ids.isNotEmpty) {
-      final associations = await _client
-          .from('associations_experience_table')
-          .select('souvenir_id, table_id')
-          .inFilter('souvenir_id', ids);
-      for (final a in associations) {
-        tablesParSouvenir
-            .putIfAbsent(a['souvenir_id'] as String, () => {})
-            .add(a['table_id'] as String);
-      }
+    final reseau = await conditionSouvenirsDuReseau(_client, _monId);
+    // L'API renvoie au plus 1 000 lignes par requête, sans prévenir : on
+    // charge par tranches jusqu'à la dernière.
+    final souvenirs = <Map<String, dynamic>>[];
+    while (true) {
+      final tranche = await _client
+          .from('souvenirs')
+          .select(
+            'id, auteur_id, emotion, moment, date_visite, '
+            'profils!souvenirs_auteur_id_fkey(pseudo), '
+            'restaurants!inner($_colonnesRestaurant), '
+            // Les Tables de chaque souvenir viennent avec lui : une liste
+            // d'identifiants à part serait trop longue pour l'API avec un
+            // grand réseau.
+            'associations_experience_table(table_id)',
+          )
+          .eq('statut', 'publie')
+          .or(reseau)
+          .order('id')
+          .range(souvenirs.length, souvenirs.length + _tailleTranche - 1);
+      souvenirs.addAll(tranche);
+      if (tranche.length < _tailleTranche) break;
     }
 
     final envies = await _client
@@ -67,7 +69,12 @@ class CarteServiceSupabase implements CarteService {
               moment: s['moment'] as String? ?? '',
               date: DateTime.parse(s['date_visite'] as String),
               emotion: Emotion.depuisEmoji(s['emotion'] as String?),
-              tableIds: tablesParSouvenir[s['id']] ?? const {},
+              tableIds: {
+                for (final a
+                    in (s['associations_experience_table'] as List? ??
+                        const []))
+                  (a as Map<String, dynamic>)['table_id'] as String,
+              },
             ),
           );
     }
