@@ -9,7 +9,9 @@ const nombreMaxMarqueurs = 60;
 
 /// Écart minimal entre deux marqueurs, en fraction de la largeur visible :
 /// en dessous, ils se chevaucheraient — seul le plus pertinent reste.
-const _ecartRelatif = 1 / 14;
+/// Calibré sur la taille d'une bulle photo (~50 pt sur un écran de
+/// ~400 pt de large).
+const _ecartRelatif = 1 / 7;
 
 /// La pertinence d'un lieu pour moi : d'abord le nombre d'amis différents
 /// qui y sont allés, puis le nombre de visites, puis les coups de cœur.
