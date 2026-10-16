@@ -46,7 +46,8 @@ class _FauxAuthService implements AuthService {
 class _FauxAbonnementService implements AbonnementService {
   @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
-  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+  abonnesEtAbonnements() async =>
+      (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
 
   @override
   Future<Set<String>> mesAbonnesIds() async => {};
@@ -62,8 +63,7 @@ class _FauxAbonnementService implements AbonnementService {
       throw UnimplementedError();
 
   @override
-  Future<StatutAbonnement> suivre(String suiviId) =>
-      throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) => throw UnimplementedError();
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -86,6 +86,12 @@ class _FauxAbonnementService implements AbonnementService {
 }
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> basculerEnvie(
+    String restaurantId, {
+    required bool envie,
+  }) async {}
+
   @override
   Future<List<String>> publier({
     required LieuRestaurant lieu,
@@ -114,7 +120,6 @@ class _FauxSouvenirService implements SouvenirService {
     String souvenirId,
     AudienceSouvenir audience,
   ) => throw UnimplementedError();
-
 
   @override
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>

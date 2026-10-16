@@ -11,6 +11,12 @@ import 'package:app/ecrans/ecran_commentaires.dart';
 /// commentaire modifie réellement la liste renvoyée par [commentaires],
 /// comme le ferait le vrai service.
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> basculerEnvie(
+    String restaurantId, {
+    required bool envie,
+  }) async {}
+
   _FauxSouvenirService({
     List<Commentaire> commentaires = const [],
     this.erreurChargement = false,
@@ -88,7 +94,6 @@ class _FauxSouvenirService implements SouvenirService {
     String souvenirId,
     AudienceSouvenir audience,
   ) => throw UnimplementedError();
-
 }
 
 void main() {
@@ -150,7 +155,10 @@ void main() {
 
     expect(service.textesEnvoyes, ['Envie d\'y retourner']);
     expect(find.text('Envie d\'y retourner'), findsOneWidget);
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, '');
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      '',
+    );
   });
 
   testWidgets('supprimer son propre commentaire le retire de la liste', (

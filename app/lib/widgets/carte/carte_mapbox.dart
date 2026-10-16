@@ -42,6 +42,7 @@ class TablCarteMapbox extends StatefulWidget {
     required this.onTapLieu,
     required this.onZoneVisible,
     this.controleur,
+    this.margeBas = 0,
   });
 
   final String geojsonReseau;
@@ -62,6 +63,11 @@ class TablCarteMapbox extends StatefulWidget {
   onZoneVisible;
 
   final ControleurCarte? controleur;
+
+  /// Hauteur occupée en bas par ce qui flotte au-dessus de la carte (la
+  /// barre de navigation) : le logo et la mention « i » de Mapbox, qui
+  /// doivent rester visibles, sont remontés d'autant.
+  final double margeBas;
 
   /// En dessous de ce zoom, les points de l'annuaire sont masqués (trop
   /// nombreux) — l'écran n'a pas besoin de les charger.
@@ -90,14 +96,18 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     widget.controleur?._carte = carte;
     await carte.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
     await carte.compass.updateSettings(CompassSettings(enabled: false));
+    await carte.logo.updateSettings(
+      LogoSettings(marginBottom: widget.margeBas + 8),
+    );
+    await carte.attribution.updateSettings(
+      AttributionSettings(marginBottom: widget.margeBas + 8),
+    );
   }
 
   Future<void> _styleChargeListener(StyleLoadedEventData _) async {
     final carte = _carte;
     if (carte == null) return;
-    await carte.setProjection(
-      StyleProjection(name: StyleProjectionName.globe),
-    );
+    await carte.setProjection(StyleProjection(name: StyleProjectionName.globe));
     await carte.setStyleImportConfigProperty('basemap', 'lightPreset', 'night');
     await carte.setStyleImportConfigProperty(
       'basemap',
@@ -126,11 +136,11 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         sourceId: _sourceAnnuaire,
         slot: 'top',
         minZoom: TablCarteMapbox.zoomAnnuaire,
-        circleColor: TablTokens.texteDoux.toARGB32(),
-        circleOpacity: 0.75,
-        circleRadius: 4,
-        circleStrokeColor: TablTokens.fond.toARGB32(),
-        circleStrokeWidth: 1,
+        // Gris chaud clair : lisible sur la carte de nuit, mais nettement
+        // en retrait des marqueurs dorés du réseau.
+        circleColor: const Color(0xFFC9C1B4).toARGB32(),
+        circleOpacity: 0.7,
+        circleRadius: 3.5,
       ),
     );
     await carte.addLayer(
@@ -158,9 +168,12 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
           'interpolate',
           ['linear'],
           ['get', 'visites'],
-          0, 7.0,
-          1, 7.0,
-          5, 10.0,
+          0,
+          7.0,
+          1,
+          7.0,
+          5,
+          10.0,
         ],
         circleStrokeColor: TablTokens.primaire.toARGB32(),
         circleStrokeWidth: 2,

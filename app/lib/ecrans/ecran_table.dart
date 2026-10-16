@@ -69,7 +69,11 @@ class _EcranTableState extends State<EcranTable> {
       ]);
       if (!mounted) return;
       final histoire =
-          resultats[1] as ({List<ExperienceHistoireTable> experiences, List<RecurrenceTable> laOuOnRevient});
+          resultats[1]
+              as ({
+                List<ExperienceHistoireTable> experiences,
+                List<RecurrenceTable> laOuOnRevient,
+              });
       setState(() {
         _table = resultats[0] as GroupeTable;
         _experiences = histoire.experiences;
@@ -96,6 +100,9 @@ class _EcranTableState extends State<EcranTable> {
         builder: (_) => EcranCarte(
           carteService: _carteService,
           positionService: PositionServiceGeolocator(),
+          tableService: widget.tableService,
+          filtresInitiaux: FiltresCarte(tableId: widget.tableId),
+          estOnglet: false,
         ),
       ),
     );
@@ -172,7 +179,9 @@ class _EcranTableState extends State<EcranTable> {
     if (_chargement) {
       return const Scaffold(
         backgroundColor: TablTokens.fond,
-        body: Center(child: CircularProgressIndicator(color: TablTokens.primaire)),
+        body: Center(
+          child: CircularProgressIndicator(color: TablTokens.primaire),
+        ),
       );
     }
     final table = _table;
@@ -196,7 +205,10 @@ class _EcranTableState extends State<EcranTable> {
                         style: TablTokens.corps,
                       ),
                       const SizedBox(height: TablTokens.espaceM),
-                      OutlinedButton(onPressed: _charger, child: const Text('Réessayer')),
+                      OutlinedButton(
+                        onPressed: _charger,
+                        child: const Text('Réessayer'),
+                      ),
                     ],
                   ),
                 ),
@@ -225,7 +237,10 @@ class _EcranTableState extends State<EcranTable> {
                 children: [
                   TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
                   IconButton(
-                    icon: const Icon(Icons.settings_outlined, color: TablTokens.texteDoux),
+                    icon: const Icon(
+                      Icons.settings_outlined,
+                      color: TablTokens.texteDoux,
+                    ),
                     tooltip: 'Gérer la Table',
                     onPressed: _gererLaTable,
                   ),
@@ -255,7 +270,9 @@ class _EcranTableState extends State<EcranTable> {
         0,
       ),
       child: Row(
-        children: [TablBoutonRetour(onPresse: () => Navigator.of(context).pop())],
+        children: [
+          TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
+        ],
       ),
     );
   }
@@ -285,7 +302,9 @@ class _EcranTableState extends State<EcranTable> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  table.emoji == null ? table.nom : '${table.nom} ${table.emoji}',
+                  table.emoji == null
+                      ? table.nom
+                      : '${table.nom} ${table.emoji}',
                   style: TablTokens.titre,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -293,7 +312,9 @@ class _EcranTableState extends State<EcranTable> {
                   table.nombreMembresActifs == 1
                       ? '1 personne'
                       : '${table.nombreMembresActifs} personnes',
-                  style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                  style: TablTokens.legende.copyWith(
+                    color: TablTokens.texteDoux,
+                  ),
                 ),
                 TextButton(
                   onPressed: _voirSurLaCarte,
@@ -334,7 +355,9 @@ class _EcranTableState extends State<EcranTable> {
           Text('Là où l\'on revient', style: TablTokens.sousTitre),
           for (final r in _laOuOnRevient)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXs),
+              padding: const EdgeInsets.symmetric(
+                vertical: TablTokens.espaceXs,
+              ),
               child: Text(
                 '${r.restaurantNom} · ${r.nombreFois} fois ensemble',
                 style: TablTokens.corps,
@@ -379,7 +402,9 @@ class _EcranTableState extends State<EcranTable> {
           child: _propositions.isEmpty
               ? _etatVide('Une adresse en tête ?', 'Proposez-la à la Table.')
               : ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceL),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL,
+                  ),
                   children: [
                     for (final p in _propositions)
                       TablLigneProposition(
@@ -412,12 +437,15 @@ class _EcranTableState extends State<EcranTable> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceL),
       itemCount: _decouvertes.length,
-      separatorBuilder: (_, _) => const Divider(color: TablTokens.bordure, height: 1),
+      separatorBuilder: (_, _) =>
+          const Divider(color: TablTokens.bordure, height: 1),
       itemBuilder: (context, index) {
         final d = _decouvertes[index];
         return TablLigneDecouverte(
           restaurantNom: d.restaurantNom,
-          sousTitreLieu: d.quartier == null ? d.ville : '${d.quartier} · ${d.ville}',
+          sousTitreLieu: d.quartier == null
+              ? d.ville
+              : '${d.quartier} · ${d.ville}',
           connaisseursTexte: _texteConnaisseurs(d.pseudosConnaisseurs),
           emotions: d.emotionsRepresentatives,
           dejaGarde: d.dejaGardeParMoi,
@@ -458,8 +486,18 @@ class _EcranTableState extends State<EcranTable> {
 
   String _dateLisible(DateTime date) {
     const mois = [
-      'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
-      'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
     ];
     return '${date.day} ${mois[date.month - 1]} ${date.year}';
   }
@@ -469,10 +507,12 @@ class _DialogueProposerRestaurant extends StatefulWidget {
   const _DialogueProposerRestaurant();
 
   @override
-  State<_DialogueProposerRestaurant> createState() => _DialogueProposerRestaurantState();
+  State<_DialogueProposerRestaurant> createState() =>
+      _DialogueProposerRestaurantState();
 }
 
-class _DialogueProposerRestaurantState extends State<_DialogueProposerRestaurant> {
+class _DialogueProposerRestaurantState
+    extends State<_DialogueProposerRestaurant> {
   final _nom = TextEditingController();
   final _ville = TextEditingController();
 
@@ -483,7 +523,8 @@ class _DialogueProposerRestaurantState extends State<_DialogueProposerRestaurant
     super.dispose();
   }
 
-  bool get _peutValider => _nom.text.trim().isNotEmpty && _ville.text.trim().isNotEmpty;
+  bool get _peutValider =>
+      _nom.text.trim().isNotEmpty && _ville.text.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -515,10 +556,9 @@ class _DialogueProposerRestaurantState extends State<_DialogueProposerRestaurant
         ),
         FilledButton(
           onPressed: _peutValider
-              ? () => Navigator.of(context).pop((
-                  nom: _nom.text.trim(),
-                  ville: _ville.text.trim(),
-                ))
+              ? () => Navigator.of(
+                  context,
+                ).pop((nom: _nom.text.trim(), ville: _ville.text.trim()))
               : null,
           style: FilledButton.styleFrom(
             backgroundColor: TablTokens.primaire,

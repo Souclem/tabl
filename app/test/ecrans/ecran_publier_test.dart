@@ -30,6 +30,12 @@ class _FauxImagePickerPlatform extends ImagePickerPlatform {
 }
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> basculerEnvie(
+    String restaurantId, {
+    required bool envie,
+  }) async {}
+
   _FauxSouvenirService({this.erreur = false, this.tablesEnEchec = const []});
 
   final bool erreur;
@@ -120,7 +126,8 @@ class _FauxSouvenirService implements SouvenirService {
 class _FauxAbonnementService implements AbonnementService {
   @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
-  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+  abonnesEtAbonnements() async =>
+      (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
 
   @override
   Future<Set<String>> mesAbonnesIds() async => {};
@@ -142,8 +149,7 @@ class _FauxAbonnementService implements AbonnementService {
   Future<List<ProfilPublic>> rechercher(String requete) =>
       throw UnimplementedError();
   @override
-  Future<StatutAbonnement> suivre(String suiviId) =>
-      throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) => throw UnimplementedError();
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
   @override
@@ -250,11 +256,14 @@ class _FauxTableService implements TableService {
   Future<void> annulerProposition(String propositionId) =>
       throw UnimplementedError();
   @override
-  Future<List<MessageOrganisation>> messagesOrganisation(String propositionId) =>
-      throw UnimplementedError();
+  Future<List<MessageOrganisation>> messagesOrganisation(
+    String propositionId,
+  ) => throw UnimplementedError();
   @override
-  Future<void> envoyerMessageOrganisation(String propositionId, String contenu) =>
-      throw UnimplementedError();
+  Future<void> envoyerMessageOrganisation(
+    String propositionId,
+    String contenu,
+  ) => throw UnimplementedError();
   @override
   Future<void> supprimerMessageOrganisation(String messageId) =>
       throw UnimplementedError();
@@ -324,7 +333,8 @@ Future<void> _ouvrirEcranPublier(
               MaterialPageRoute<void>(
                 builder: (_) => EcranPublier(
                   souvenirService: service,
-                  abonnementService: abonnementService ?? _FauxAbonnementService(),
+                  abonnementService:
+                      abonnementService ?? _FauxAbonnementService(),
                   tableService: tableService,
                   rechercheLieuService: rechercheLieuService,
                   positionService: positionService,
@@ -495,9 +505,7 @@ void main() {
     },
   );
 
-  testWidgets('choisir une émotion active "Garder ce moment."', (
-    tester,
-  ) async {
+  testWidgets('choisir une émotion active "Garder ce moment."', (tester) async {
     await _ouvrirEcranPublier(tester, _FauxSouvenirService());
     await _avancerJusquauFinaliser(tester);
 
@@ -520,7 +528,7 @@ void main() {
       await tester.tap(find.text('🤩'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Garder ce moment.'));
-    await tester.tap(find.text('Garder ce moment.'));
+      await tester.tap(find.text('Garder ce moment.'));
       await tester.pumpAndSettle();
 
       expect(service.appelsPublier, hasLength(1));
@@ -825,8 +833,7 @@ void main() {
         await tester.tap(find.text('Plus tard'));
         await tester.pumpAndSettle();
 
-        final lieu =
-            service.appelsBrouillon.single['lieu']! as LieuRestaurant;
+        final lieu = service.appelsBrouillon.single['lieu']! as LieuRestaurant;
         expect(lieu.estManuel, isTrue);
         expect(lieu.nom, 'Chez K');
         expect(lieu.latitude, 50.6326);

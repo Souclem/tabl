@@ -22,6 +22,8 @@ class SouvenirFeed {
     this.impressions = const [],
     this.estAMoi = false,
     this.audienceRestreinte = false,
+    this.restaurantId,
+    this.estEnvie = false,
   });
 
   final String id;
@@ -72,6 +74,11 @@ class SouvenirFeed {
   /// regarde pas), pour le petit cadenas à côté de la date.
   final bool audienceRestreinte;
 
+  final String? restaurantId;
+
+  /// Le restaurant est dans mes envies ("Enregistrer").
+  final bool estEnvie;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -80,6 +87,7 @@ class SouvenirFeed {
     bool? jaiReagi,
     int? nombreCommentaires,
     List<String>? premieresReactions,
+    bool? estEnvie,
   }) {
     return SouvenirFeed(
       id: id,
@@ -99,6 +107,8 @@ class SouvenirFeed {
       impressions: impressions,
       estAMoi: estAMoi,
       audienceRestreinte: audienceRestreinte,
+      restaurantId: restaurantId,
+      estEnvie: estEnvie ?? this.estEnvie,
     );
   }
 }

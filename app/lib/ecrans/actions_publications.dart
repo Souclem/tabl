@@ -41,6 +41,34 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     }
   }
 
+  /// "Enregistrer" : ajoute le restaurant à mes envies (ou l'en retire).
+  /// Optimiste, comme la réaction ; tous les posts du même restaurant
+  /// changent ensemble, puisque l'envie porte sur le lieu.
+  Future<void> basculerEnvie(SouvenirFeed souvenir) async {
+    final restaurantId = souvenir.restaurantId;
+    if (restaurantId == null) return;
+    final envie = !souvenir.estEnvie;
+    _marquerEnvie(restaurantId, envie);
+    try {
+      await souvenirService.basculerEnvie(restaurantId, envie: envie);
+    } catch (_) {
+      if (!mounted) return;
+      _marquerEnvie(restaurantId, !envie);
+      afficherMessage(context, messageErreurGenerique);
+    }
+  }
+
+  void _marquerEnvie(String restaurantId, bool envie) {
+    final actuels = souvenirs;
+    if (actuels == null) return;
+    setState(() {
+      souvenirs = [
+        for (final s in actuels)
+          s.restaurantId == restaurantId ? s.copierAvec(estEnvie: envie) : s,
+      ];
+    });
+  }
+
   Future<void> ouvrirCommentaires(SouvenirFeed souvenir) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -62,7 +90,8 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     if (actuels == null) return;
     setState(() {
       souvenirs = [
-        for (final s in actuels) if (s.id == souvenir.id) souvenir else s,
+        for (final s in actuels)
+          if (s.id == souvenir.id) souvenir else s,
       ];
     });
   }
@@ -73,8 +102,6 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     SouvenirFeed souvenir, {
     required ContextePublication contexte,
     required VoidCallback onOuvrirLieu,
-    bool enregistre = false,
-    VoidCallback? onEnregistrer,
     VoidCallback? onOptions,
     SignalInstants? signal,
     VoidCallback? onOuvrirInstants,
@@ -92,12 +119,12 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       impressions: souvenir.impressions,
       jaiReagi: souvenir.jaiReagi,
       libelleReactions: libelleReactionsSouvenir(souvenir),
-      enregistre: enregistre,
+      enregistre: souvenir.estEnvie,
       audienceRestreinte: souvenir.audienceRestreinte,
       onReagir: () => basculerReaction(souvenir),
       onCommenter: () => ouvrirCommentaires(souvenir),
       onOuvrirLieu: onOuvrirLieu,
-      onEnregistrer: onEnregistrer,
+      onEnregistrer: () => basculerEnvie(souvenir),
       onOptions: onOptions,
       instantsTotal: signal?.total ?? 0,
       instantsNonVus: signal?.nonVus ?? 0,

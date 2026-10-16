@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../restaurants/lieu_restaurant.dart';
+import '../restaurants/envies_restaurants.dart';
 import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
@@ -94,12 +95,10 @@ class SouvenirServiceSupabase implements SouvenirService {
 
     final souvenirId = cree['id'] as String;
     if (amisTaguesIds.isNotEmpty) {
-      await _client
-          .from('souvenirs_amis_tagues')
-          .insert([
-            for (final profilId in amisTaguesIds)
-              {'souvenir_id': souvenirId, 'profil_id': profilId},
-          ]);
+      await _client.from('souvenirs_amis_tagues').insert([
+        for (final profilId in amisTaguesIds)
+          {'souvenir_id': souvenirId, 'profil_id': profilId},
+      ]);
     }
 
     await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
@@ -248,16 +247,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         .from('souvenirs')
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
-          'impressions, visibilite, '
+          'impressions, visibilite, restaurant_id, '
           'restaurants(nom, ville), profils!souvenirs_auteur_id_fkey(pseudo)',
         )
         .eq('statut', 'publie');
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
     } else {
-      requete = requete.or(
-        await conditionSouvenirsDuReseau(_client, _monId),
-      );
+      requete = requete.or(await conditionSouvenirsDuReseau(_client, _monId));
     }
     final lignes = await requete
         .order('date_visite', ascending: false)
@@ -266,14 +263,12 @@ class SouvenirServiceSupabase implements SouvenirService {
     final ids = lignes.map((l) => l['id'] as String).toList();
 
     final urlParChemin = await _resoudreUrlsPhotos(
-      lignes
-          .map((l) => l['photo_url'] as String?)
-          .whereType<String>()
-          .toList(),
+      lignes.map((l) => l['photo_url'] as String?).whereType<String>().toList(),
     );
     final reactions = await _reactionsParSouvenir(ids);
     final nombreCommentaires = await _nombreCommentairesParSouvenir(ids);
     final amisTagues = await _amisTaguesParSouvenir(ids);
+    final envies = await EnviesRestaurants(_client).mesEnviesIds();
 
     return lignes.map((l) {
       final restaurant = l['restaurants'] as Map<String, dynamic>?;
@@ -301,12 +296,21 @@ class SouvenirServiceSupabase implements SouvenirService {
         estAMoi: l['auteur_id'] == _monId,
         audienceRestreinte:
             l['auteur_id'] == _monId && l['visibilite'] != 'tout_le_monde',
+        restaurantId: l['restaurant_id'] as String?,
+        estEnvie: envies.contains(l['restaurant_id']),
       );
     }).toList();
   }
 
   @override
-  Future<void> basculerReaction(String souvenirId, {required bool reagir}) async {
+  Future<void> basculerEnvie(String restaurantId, {required bool envie}) =>
+      EnviesRestaurants(_client).basculer(restaurantId, envie: envie);
+
+  @override
+  Future<void> basculerReaction(
+    String souvenirId, {
+    required bool reagir,
+  }) async {
     if (reagir) {
       try {
         await _client.from('reactions').insert({

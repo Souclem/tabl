@@ -13,6 +13,13 @@ import 'package:app/ecrans/ecran_feed.dart';
 import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
+  final List<(String, bool)> appelsEnvie = [];
+
+  @override
+  Future<void> basculerEnvie(String restaurantId, {required bool envie}) async {
+    appelsEnvie.add((restaurantId, envie));
+  }
+
   _FauxSouvenirService({
     this.souvenirs = const [],
     this.erreur = false,
@@ -35,7 +42,10 @@ class _FauxSouvenirService implements SouvenirService {
   }
 
   @override
-  Future<void> basculerReaction(String souvenirId, {required bool reagir}) async {
+  Future<void> basculerReaction(
+    String souvenirId, {
+    required bool reagir,
+  }) async {
     if (erreurReaction) throw Exception('erreur réseau');
     appelsReaction.add((souvenirId, reagir));
   }
@@ -86,7 +96,8 @@ class _FauxSouvenirService implements SouvenirService {
 class _FauxAbonnementService implements AbonnementService {
   @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
-  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+  abonnesEtAbonnements() async =>
+      (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
 
   @override
   Future<Set<String>> mesAbonnesIds() async => {};
@@ -102,8 +113,7 @@ class _FauxAbonnementService implements AbonnementService {
       throw UnimplementedError();
 
   @override
-  Future<StatutAbonnement> suivre(String suiviId) =>
-      throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) => throw UnimplementedError();
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -131,6 +141,7 @@ SouvenirFeed _souvenirDeTest({
   int nombreCommentaires = 0,
   List<String> premieresReactions = const [],
   bool estAMoi = false,
+  String? restaurantId = 'resto-1',
   String auteurPseudo = 'martin',
   String restaurantNom = 'Le Comptoir',
 }) {
@@ -148,6 +159,7 @@ SouvenirFeed _souvenirDeTest({
     nombreCommentaires: nombreCommentaires,
     premieresReactions: premieresReactions,
     estAMoi: estAMoi,
+    restaurantId: restaurantId,
   );
 }
 
@@ -157,7 +169,9 @@ class _FauxInstantService implements InstantService {
   final Map<String, SignalInstants> signauxParId;
 
   @override
-  Future<Map<String, SignalInstants>> signaux(List<String> experienceIds) async {
+  Future<Map<String, SignalInstants>> signaux(
+    List<String> experienceIds,
+  ) async {
     return {
       for (final id in experienceIds)
         id: signauxParId[id] ?? SignalInstants.aucun,
@@ -210,25 +224,24 @@ void main() {
     expect(find.text('Trouver des personnes'), findsOneWidget);
   });
 
-  testWidgets(
-    'taper sur "Trouver des personnes" ouvre l\'écran Cercle',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: EcranFeed(
-            souvenirService: _FauxSouvenirService(),
-            abonnementService: _FauxAbonnementService(),
-          ),
+  testWidgets('taper sur "Trouver des personnes" ouvre l\'écran Cercle', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(),
+          abonnementService: _FauxAbonnementService(),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Trouver des personnes'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Trouver des personnes'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(EcranAbonnes), findsOneWidget);
-    },
-  );
+    expect(find.byType(EcranAbonnes), findsOneWidget);
+  });
 
   testWidgets('feed rempli : affiche le contenu de chaque souvenir', (
     tester,
@@ -363,9 +376,7 @@ void main() {
     },
   );
 
-  testWidgets('taper sur "Commenter" ouvre EcranCommentaires', (
-    tester,
-  ) async {
+  testWidgets('taper sur "Commenter" ouvre EcranCommentaires', (tester) async {
     _agrandirSurface(tester);
     final souvenirs = [_souvenirDeTest()];
 
@@ -385,34 +396,42 @@ void main() {
     expect(find.byType(EcranCommentaires), findsOneWidget);
   });
 
-  testWidgets('"Enregistrer" bascule en "Enregistrée"', (tester) async {
-    _agrandirSurface(tester);
-    final souvenirs = [_souvenirDeTest()];
+  testWidgets(
+    '"Enregistrer" ajoute le restaurant aux envies, pour tous ses posts',
+    (tester) async {
+      _agrandirSurface(tester);
+      final service = _FauxSouvenirService(
+        souvenirs: [
+          _souvenirDeTest(id: '1'),
+          _souvenirDeTest(id: '2', auteurPseudo: 'sarah'),
+        ],
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: EcranFeed(
-          souvenirService: _FauxSouvenirService(souvenirs: souvenirs),
-          abonnementService: _FauxAbonnementService(),
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EcranFeed(
+            souvenirService: service,
+            abonnementService: _FauxAbonnementService(),
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Enregistrer'), findsOneWidget);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer').first);
+      await tester.pumpAndSettle();
 
-    expect(find.text('Enregistrée'), findsOneWidget);
-  });
+      expect(service.appelsEnvie, [('resto-1', true)]);
+      // L'envie porte sur le lieu : l'autre post du même restaurant suit.
+      await tester.scrollUntilVisible(find.text('Enregistrée').last, 300);
+      expect(find.text('Enregistrer'), findsNothing);
+    },
+  );
 
   testWidgets(
     'sans instantService (règle 52) : aucun signal, aucun CTA Instant',
     (tester) async {
       _agrandirSurface(tester);
-      final souvenirs = [
-        _souvenirDeTest(estAMoi: true),
-      ];
+      final souvenirs = [_souvenirDeTest(estAMoi: true)];
 
       await tester.pumpWidget(
         MaterialApp(
@@ -586,40 +605,39 @@ void main() {
     },
   );
 
-  testWidgets(
-    '"À table maintenant · 2" apparaît avec 2 expériences actives',
-    (tester) async {
-      _agrandirSurface(tester);
-      final deux = [
-        _souvenirDeTest(id: '1', auteurPseudo: 'martin'),
-        _souvenirDeTest(id: '2', auteurPseudo: 'sarah'),
-      ];
+  testWidgets('"À table maintenant · 2" apparaît avec 2 expériences actives', (
+    tester,
+  ) async {
+    _agrandirSurface(tester);
+    final deux = [
+      _souvenirDeTest(id: '1', auteurPseudo: 'martin'),
+      _souvenirDeTest(id: '2', auteurPseudo: 'sarah'),
+    ];
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: EcranFeed(
-            souvenirService: _FauxSouvenirService(souvenirs: deux),
-            abonnementService: _FauxAbonnementService(),
-            instantService: _FauxInstantService(
-              signauxParId: {
-                '1': const SignalInstants(
-                  total: 1,
-                  nonVus: 1,
-                  fenetreCreationOuverte: false,
-                ),
-                '2': const SignalInstants(
-                  total: 1,
-                  nonVus: 0,
-                  fenetreCreationOuverte: false,
-                ),
-              },
-            ),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(souvenirs: deux),
+          abonnementService: _FauxAbonnementService(),
+          instantService: _FauxInstantService(
+            signauxParId: {
+              '1': const SignalInstants(
+                total: 1,
+                nonVus: 1,
+                fenetreCreationOuverte: false,
+              ),
+              '2': const SignalInstants(
+                total: 1,
+                nonVus: 0,
+                fenetreCreationOuverte: false,
+              ),
+            },
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('À table maintenant · 2'), findsOneWidget);
-    },
-  );
+    expect(find.text('À table maintenant · 2'), findsOneWidget);
+  });
 }

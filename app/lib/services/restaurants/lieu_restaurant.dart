@@ -1,4 +1,5 @@
 import 'categories_lieu.dart';
+import 'distance.dart';
 
 /// Un restaurant tel qu'on le choisit au moment de publier (ou de le
 /// proposer à une Table) : soit déjà dans Tabl ([restaurantId]), soit
@@ -57,16 +58,8 @@ class LieuRestaurant {
     final morceaux = <String>[
       if (categories.isNotEmpty) libelleCategorie(categories.first),
       [?adresse, if (ville.isNotEmpty) ville].join(', '),
-      ?_distanceLisible,
+      if (distanceM != null) distanceLisible(distanceM!),
     ];
     return morceaux.where((m) => m.isNotEmpty).join(' · ');
-  }
-
-  String? get _distanceLisible {
-    final d = distanceM;
-    if (d == null) return null;
-    if (d < 1000) return '${(d / 10).round() * 10} m';
-    if (d < 10000) return '${(d / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
-    return '${(d / 1000).round()} km';
   }
 }

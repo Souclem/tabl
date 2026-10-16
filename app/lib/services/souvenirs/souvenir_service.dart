@@ -77,6 +77,9 @@ abstract interface class SouvenirService {
   /// quelqu'un qu'on ne suit pas, la liste revient simplement vide.
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId);
 
+  /// Ajoute le restaurant à mes envies ("Enregistrer") ou l'en retire.
+  Future<void> basculerEnvie(String restaurantId, {required bool envie});
+
   /// Ajoute sa réaction ("j'aime") si [reagir] est vrai, la retire sinon.
   Future<void> basculerReaction(String souvenirId, {required bool reagir});
 

@@ -59,14 +59,8 @@ class _EcranFeedState extends State<EcranFeed>
 
   /// Pastille sur l'icône d'ajout d'ami, même source que le badge de
   /// EcranProfil.
-  late final Future<int> _futurDemandes =
-      widget.abonnementService.nombreDemandesEnAttente();
-
-  // Wishlist ("Enregistrer") : purement locale à la session pour
-  // l'instant, aucune table dédiée côté serveur (l'onglet Wishlist de
-  // EcranPrincipal est encore "à venir" — voir le résumé de fin
-  // d'implémentation).
-  final Set<String> _enregistres = {};
+  late final Future<int> _futurDemandes = widget.abonnementService
+      .nombreDemandesEnAttente();
 
   // Instants : chargés en un seul appel groupé une fois le Feed connu
   // (même principe que réactions/commentaires/amis tagués), pas une
@@ -171,10 +165,10 @@ class _EcranFeedState extends State<EcranFeed>
                 libelleInstants: candidat.signal.nonVus > 1
                     ? '${candidat.signal.nonVus} nouveaux Instants'
                     : candidat.signal.nonVus == 1
-                        ? '1 nouvel Instant'
-                        : (candidat.signal.total > 1
-                            ? '${candidat.signal.total} Instants'
-                            : 'vu'),
+                    ? '1 nouvel Instant'
+                    : (candidat.signal.total > 1
+                          ? '${candidat.signal.total} Instants'
+                          : 'vu'),
                 nonVu: candidat.signal.nonVus > 0,
                 onTap: () {
                   Navigator.of(context).pop();
@@ -216,12 +210,6 @@ class _EcranFeedState extends State<EcranFeed>
     afficherMessage(context, 'Bientôt disponible.');
   }
 
-  void _basculerEnregistrement(String souvenirId) {
-    setState(() {
-      if (!_enregistres.remove(souvenirId)) _enregistres.add(souvenirId);
-    });
-  }
-
   Widget _liste(List<SouvenirFeed> souvenirs) {
     return ListView.builder(
       // La barre de navigation flotte par-dessus (voir EcranPrincipal) :
@@ -243,8 +231,6 @@ class _EcranFeedState extends State<EcranFeed>
           souvenir,
           contexte: ContextePublication.feed,
           onOuvrirLieu: _bientotDisponible,
-          enregistre: _enregistres.contains(souvenir.id),
-          onEnregistrer: () => _basculerEnregistrement(souvenir.id),
           signal: signal,
           onOuvrirInstants: (signal?.aDesInstants ?? false)
               ? () => _ouvrirInstants(souvenir.id)
@@ -320,9 +306,7 @@ class _EcranFeedState extends State<EcranFeed>
                           nombre: candidats.length,
                           onPresse: _ouvrirSheetATableMaintenant,
                         ),
-                      Expanded(
-                        child: _liste(souvenirs),
-                      ),
+                      Expanded(child: _liste(souvenirs)),
                     ],
                   );
                 },
@@ -494,7 +478,10 @@ class _EtatVide extends StatelessWidget {
               style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
             ),
             const SizedBox(height: TablTokens.espaceXl),
-            TablBouton(libelle: 'Trouver des personnes', onPresse: onAjouterAmis),
+            TablBouton(
+              libelle: 'Trouver des personnes',
+              onPresse: onAjouterAmis,
+            ),
           ],
         ),
       ),
@@ -527,7 +514,10 @@ class _PiedDeFeed extends StatelessWidget {
 /// Une expérience candidate à "À table maintenant" — le souvenir Feed
 /// déjà chargé, plus son signal Instants.
 class _CandidatATableMaintenant {
-  const _CandidatATableMaintenant({required this.souvenir, required this.signal});
+  const _CandidatATableMaintenant({
+    required this.souvenir,
+    required this.signal,
+  });
 
   final SouvenirFeed souvenir;
   final SignalInstants signal;

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../restaurants/envies_restaurants.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/registre_restaurants.dart';
 import '../souvenirs/emotion.dart';
@@ -55,18 +56,20 @@ class CarteServiceSupabase implements CarteService {
       final id = restaurant['id'] as String;
       restaurants[id] = restaurant;
       final auteur = s['profils'] as Map<String, dynamic>?;
-      visites.putIfAbsent(id, () => []).add(
-        VisiteCarte(
-          souvenirId: s['id'] as String,
-          auteurId: s['auteur_id'] as String,
-          auteurPseudo: auteur?['pseudo'] as String? ?? '',
-          estMoi: s['auteur_id'] == _monId,
-          moment: s['moment'] as String? ?? '',
-          date: DateTime.parse(s['date_visite'] as String),
-          emotion: Emotion.depuisEmoji(s['emotion'] as String?),
-          tableIds: tablesParSouvenir[s['id']] ?? const {},
-        ),
-      );
+      visites
+          .putIfAbsent(id, () => [])
+          .add(
+            VisiteCarte(
+              souvenirId: s['id'] as String,
+              auteurId: s['auteur_id'] as String,
+              auteurPseudo: auteur?['pseudo'] as String? ?? '',
+              estMoi: s['auteur_id'] == _monId,
+              moment: s['moment'] as String? ?? '',
+              date: DateTime.parse(s['date_visite'] as String),
+              emotion: Emotion.depuisEmoji(s['emotion'] as String?),
+              tableIds: tablesParSouvenir[s['id']] ?? const {},
+            ),
+          );
     }
     final enviesIds = <String>{};
     for (final e in envies) {
@@ -145,23 +148,6 @@ class CarteServiceSupabase implements CarteService {
   }
 
   @override
-  Future<void> basculerEnvie(String restaurantId, {required bool envie}) async {
-    if (envie) {
-      try {
-        await _client.from('restaurants_sauvegardes').insert({
-          'restaurant_id': restaurantId,
-          'profil_id': _monId,
-        });
-      } on PostgrestException catch (e) {
-        // Déjà dans mes envies (double tap) : l'état voulu est atteint.
-        if (e.code != '23505') rethrow;
-      }
-    } else {
-      await _client
-          .from('restaurants_sauvegardes')
-          .delete()
-          .eq('restaurant_id', restaurantId)
-          .eq('profil_id', _monId);
-    }
-  }
+  Future<void> basculerEnvie(String restaurantId, {required bool envie}) =>
+      EnviesRestaurants(_client).basculer(restaurantId, envie: envie);
 }
