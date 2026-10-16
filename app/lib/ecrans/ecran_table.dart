@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'ecran_explorer.dart';
+import 'ecran_carte.dart';
 import 'ecran_gerer_table.dart';
 import 'ecran_proposition_table.dart';
 
@@ -93,11 +93,9 @@ class _EcranTableState extends State<EcranTable> {
   void _voirSurLaCarte() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EcranExplorer(
+        builder: (_) => EcranCarte(
           carteService: _carteService,
-          abonnementService: widget.abonnementService,
-          raccourcisVillesService: RaccourcisVillesServicePreferences(),
-          entitlementService: const EntitlementServiceGratuit(),
+          positionService: PositionServiceGeolocator(),
         ),
       ),
     );
@@ -142,7 +140,7 @@ class _EcranTableState extends State<EcranTable> {
   }
 
   Future<void> _basculerGarder(String restaurantId, bool garder) async {
-    await _carteService.basculerGarder(restaurantId, garder: garder);
+    await _carteService.basculerEnvie(restaurantId, envie: garder);
     await _charger();
   }
 

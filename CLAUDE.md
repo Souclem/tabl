@@ -49,7 +49,7 @@ données et au RLS, la logique vit dans du code applicatif.
 ## Commandes
 
 ```
-cd app && flutter run          # lancer l'app
+cd app && flutter run --dart-define-from-file=.env   # lancer l'app (token Mapbox dans app/.env, non commité)
 flutter analyze                # analyse statique (à la racine : tout le dépôt)
 cd app && flutter test         # tests
 ```

@@ -1,36 +1,22 @@
-import 'mode_carte.dart';
-import 'objet_cartographique.dart';
-import 'periode_carte.dart';
-import 'portee_sociale.dart';
+import 'lieu_carte.dart';
 
-/// Les données de la carte Explorer (megaprompt Bloc 1).
-///
-/// Ne retourne jamais que des agrégats anonymes pour le réseau étendu
-/// (règle 8, 68) — aucune méthode de ce contrat n'expose d'identité
-/// d'ami d'ami, uniquement des compteurs.
+/// Les données de la carte.
 abstract interface class CarteService {
-  /// Les villes où au moins un restaurant est visible dans le [mode] et
-  /// la [portee] donnés, pour la période choisie — sert à l'agrégat de
-  /// ville à grand zoom (règle 21) et à peupler la recherche de la sheet
-  /// d'ajout de raccourci.
-  Future<List<AgregatVille>> agregatsVilles({
-    required ModeCarte mode,
-    required PorteeSociale portee,
-    required PeriodeCarte periode,
-  });
+  /// Les lieux entrés dans Tabl que je peux voir : ceux où mon réseau est
+  /// allé (avec ses visites, pour les filtres) et mes envies. Tous d'un
+  /// coup — c'est un volume modeste, et la carte les regroupe elle-même
+  /// selon le zoom.
+  Future<List<LieuCarte>> lieuxTabl();
 
-  /// Les restaurants d'une ville donnée, prêts à afficher — le
-  /// regroupement en clusters selon le niveau de zoom se fait ensuite
-  /// avec [regrouperEnClusters], côté appelant, pas ici.
-  Future<List<RestaurantMarqueur>> restaurantsPourVille({
-    required String ville,
-    required ModeCarte mode,
-    required PorteeSociale portee,
-    required PeriodeCarte periode,
-    String? amiSelectionneId,
-  });
+  /// Les lieux de l'annuaire dans [zone], pour les afficher en points
+  /// discrets quand on zoome sur un quartier.
+  Future<List<LieuCarte>> lieuxAnnuaire(ZoneCarte zone, {int limite = 400});
 
-  /// Garde ou retire un restaurant (bouton "Garder" / "Gardé ✓" de la
-  /// preview, mode Envies).
-  Future<void> basculerGarder(String restaurantId, {required bool garder});
+  /// L'identifiant `restaurants` d'un lieu, en l'y faisant entrer s'il
+  /// n'est encore que dans l'annuaire (mettre en envie un lieu jamais
+  /// visité le fait entrer dans Tabl, comme une première visite).
+  Future<String> idRestaurant(LieuCarte lieu);
+
+  /// Ajoute ou retire un restaurant de mes envies.
+  Future<void> basculerEnvie(String restaurantId, {required bool envie});
 }

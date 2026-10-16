@@ -7,17 +7,23 @@ import 'ecran_table.dart';
 
 /// "Vos Tables" (megaprompt Bloc 3, règles 5-9) : liste compacte,
 /// premium, humaine — jamais de giant hero cards, jamais de dashboard.
-/// Point d'entrée depuis le Profil (le megaprompt interdit tout nouvel
-/// onglet dans la barre de navigation principale).
+/// Onglet de la barre de navigation (à gauche du ➕) depuis le
+/// 2026-10-16, à la place de l'ancien Explorer — le megaprompt
+/// l'interdisait, décision produit revue depuis.
 class EcranTables extends StatefulWidget {
   const EcranTables({
     super.key,
     required this.tableService,
     required this.abonnementService,
+    this.estOnglet = false,
   });
 
   final TableService tableService;
   final AbonnementService abonnementService;
+
+  /// Affiché comme onglet : pas de bouton retour, et une marge basse
+  /// pour la barre de navigation flottante.
+  final bool estOnglet;
 
   @override
   State<EcranTables> createState() => _EcranTablesState();
@@ -112,8 +118,12 @@ class _EcranTablesState extends State<EcranTables> {
               ),
               child: Row(
                 children: [
-                  TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
-                  const SizedBox(width: TablTokens.espaceM),
+                  if (!widget.estOnglet) ...[
+                    TablBoutonRetour(
+                      onPresse: () => Navigator.of(context).pop(),
+                    ),
+                    const SizedBox(width: TablTokens.espaceM),
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +189,13 @@ class _EcranTablesState extends State<EcranTables> {
       );
     }
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceL),
+      padding: EdgeInsets.fromLTRB(
+        TablTokens.espaceL,
+        0,
+        TablTokens.espaceL,
+        // Comme onglet, la barre de navigation flotte par-dessus.
+        widget.estOnglet ? TablTokens.espaceXxl + TablTokens.espaceL : 0,
+      ),
       children: [
         if (_invitations.isNotEmpty) ...[
           const SizedBox(height: TablTokens.espaceM),

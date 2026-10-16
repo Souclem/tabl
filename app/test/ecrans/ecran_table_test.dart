@@ -126,24 +126,18 @@ class _FauxCarteService implements CarteService {
   final List<({String id, bool garder})> basculements = [];
 
   @override
-  Future<List<AgregatVille>> agregatsVilles({
-    required ModeCarte mode,
-    required PorteeSociale portee,
-    required PeriodeCarte periode,
-  }) async => [];
+  Future<List<LieuCarte>> lieuxTabl() async => [];
 
   @override
-  Future<List<RestaurantMarqueur>> restaurantsPourVille({
-    required String ville,
-    required ModeCarte mode,
-    required PorteeSociale portee,
-    required PeriodeCarte periode,
-    String? amiSelectionneId,
-  }) async => [];
+  Future<List<LieuCarte>> lieuxAnnuaire(ZoneCarte zone, {int limite = 400}) async =>
+      [];
 
   @override
-  Future<void> basculerGarder(String restaurantId, {required bool garder}) async {
-    basculements.add((id: restaurantId, garder: garder));
+  Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;
+
+  @override
+  Future<void> basculerEnvie(String restaurantId, {required bool envie}) async {
+    basculements.add((id: restaurantId, garder: envie));
   }
 }
 

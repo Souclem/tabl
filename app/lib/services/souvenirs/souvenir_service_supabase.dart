@@ -7,6 +7,7 @@ import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
+import 'filtre_reseau.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
 
@@ -254,17 +255,8 @@ class SouvenirServiceSupabase implements SouvenirService {
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
     } else {
-      // La RLS laisse lire les posts de tous les profils publics : le
-      // Feed se limite à soi, aux personnes qu'on suit, et aux posts qui
-      // nous ont été adressés nommément ou via une Table ("Seulement…").
-      final suivis = await _client
-          .from('abonnements')
-          .select('suivi_id')
-          .eq('suiveur_id', _monId)
-          .eq('statut', 'accepte');
-      final auteurs = [_monId, ...suivis.map((l) => l['suivi_id'] as String)];
       requete = requete.or(
-        'auteur_id.in.(${auteurs.join(',')}),visibilite.eq.seulement',
+        await conditionSouvenirsDuReseau(_client, _monId),
       );
     }
     final lignes = await requete

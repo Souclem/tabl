@@ -5,12 +5,11 @@ import 'package:app/widgets/widgets.dart';
 import 'actions_publications.dart';
 import 'ecran_accueil.dart';
 import 'ecran_abonnes.dart';
-import 'ecran_tables.dart';
 import 'feuille_audience.dart';
 
 /// Onglet Profil : identité de l'utilisateur, ses propres publications
 /// (présentées comme dans le Feed, via le même [TablPublication]), accès
-/// au cercle, aux Tables et déconnexion.
+/// aux abonnés et déconnexion.
 class EcranProfil extends StatefulWidget {
   const EcranProfil({
     super.key,
@@ -26,8 +25,8 @@ class EcranProfil extends StatefulWidget {
   final SouvenirService souvenirService;
   final Utilisateur utilisateur;
 
-  /// `null` par défaut : construit à la demande (au tap de "Vos
-  /// Tables") à partir de `TablBackend.client`, même principe que
+  /// `null` par défaut : construit à la demande (feuille "Qui peut
+  /// voir ?") à partir de `TablBackend.client`, même principe que
   /// `EcranPrincipal.carteService` — ne jamais toucher `TablBackend`
   /// avant que ce soit nécessaire.
   final TableService? tableService;
@@ -141,17 +140,6 @@ class _EcranProfilState extends State<EcranProfil>
     setState(() {
       _nombreDemandes = widget.abonnementService.nombreDemandesEnAttente();
     });
-  }
-
-  void _allerVersTables() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranTables(
-          tableService: _tableService,
-          abonnementService: widget.abonnementService,
-        ),
-      ),
-    );
   }
 
   void _ouvrirOptions(SouvenirFeed souvenir) {
@@ -321,12 +309,6 @@ class _EcranProfilState extends State<EcranProfil>
               right: TablTokens.espaceM,
               child: Row(
                 children: [
-                  _BoutonIcone(
-                    icone: Icons.table_restaurant_outlined,
-                    libelle: 'Vos Tables',
-                    onPresse: _allerVersTables,
-                  ),
-                  const SizedBox(width: TablTokens.espaceS),
                   _BoutonAbonnes(
                     nombreDemandes: _nombreDemandes,
                     onPresse: _allerVersAbonnes,
@@ -447,36 +429,6 @@ class _MessageListe extends StatelessWidget {
         texte,
         textAlign: TextAlign.center,
         style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
-      ),
-    );
-  }
-}
-
-/// Icône ronde simple, même habillage que [_BoutonAbonnes] mais sans
-/// badge — pour "Vos Tables".
-class _BoutonIcone extends StatelessWidget {
-  const _BoutonIcone({
-    required this.icone,
-    required this.libelle,
-    required this.onPresse,
-  });
-
-  final IconData icone;
-  final String libelle;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: TablTokens.surface,
-      shape: const CircleBorder(side: BorderSide(color: TablTokens.bordure)),
-      clipBehavior: Clip.antiAlias,
-      child: IconButton(
-        onPressed: onPresse,
-        icon: Icon(icone, size: 20),
-        color: TablTokens.primaire,
-        splashRadius: 22,
-        tooltip: libelle,
       ),
     );
   }

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'ecran_explorer.dart';
+import 'ecran_carte.dart';
 import 'ecran_feed.dart';
 import 'ecran_profil.dart';
 import 'ecran_publier.dart';
+import 'ecran_tables.dart';
 
 /// Coquille de l'app une fois connecté : barre de navigation en bas
 /// (Feed, Explorer, publier, Wishlist, Profil). Wishlist attend encore
@@ -18,8 +19,6 @@ class EcranPrincipal extends StatefulWidget {
     required this.souvenirService,
     required this.utilisateur,
     this.carteService,
-    this.raccourcisVillesService,
-    this.entitlementService,
     this.tableService,
     this.instantService,
     this.rechercheLieuService,
@@ -38,8 +37,6 @@ class EcranPrincipal extends StatefulWidget {
   /// services alors qu'ils ne les utilisent jamais eux-mêmes. Les tests
   /// injectent des faux via ces mêmes paramètres.
   final CarteService? carteService;
-  final RaccourcisVillesService? raccourcisVillesService;
-  final EntitlementService? entitlementService;
   final TableService? tableService;
   final InstantService? instantService;
   final RechercheLieuService? rechercheLieuService;
@@ -73,20 +70,19 @@ class EcranPrincipal extends StatefulWidget {
 class _EcranPrincipalState extends State<EcranPrincipal> {
   TablOnglet _onglet = TablOnglet.feed;
 
-  // L'onglet Explorer n'est construit qu'une fois réellement ouvert :
-  // IndexedStack construit sinon tous ses enfants dès le premier
-  // affichage de l'écran, ce qui déclencherait un appel réseau (et,
-  // sans backend explicitement injecté, un accès à `TablBackend.client`
-  // avant que Supabase ne soit forcément initialisé) même pour un
-  // utilisateur qui ne visite jamais cet onglet.
-  bool _explorerConstruit = false;
+  // Les onglets Tables et Carte ne sont construits qu'une fois réellement
+  // ouverts : IndexedStack construit sinon tous ses enfants dès le
+  // premier affichage, ce qui déclencherait des appels réseau (et, sans
+  // backend injecté, un accès à `TablBackend.client` avant que Supabase
+  // ne soit forcément initialisé) même pour qui ne les visite jamais —
+  // et la carte Mapbox est lourde à démarrer.
+  final Set<TablOnglet> _ongletsConstruits = {
+    TablOnglet.feed,
+    TablOnglet.profil,
+  };
 
   late final CarteService _carteService =
       widget.carteService ?? CarteServiceSupabase(TablBackend.client);
-  late final RaccourcisVillesService _raccourcisVillesService =
-      widget.raccourcisVillesService ?? RaccourcisVillesServicePreferences();
-  late final EntitlementService _entitlementService =
-      widget.entitlementService ?? const EntitlementServiceGratuit();
   late final TableService _tableService =
       widget.tableService ?? TableServiceSupabase(TablBackend.client);
   late final RechercheLieuService _rechercheLieuService =
@@ -98,7 +94,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   void _selectionnerOnglet(TablOnglet onglet) {
     setState(() {
       _onglet = onglet;
-      if (onglet == TablOnglet.explorer) _explorerConstruit = true;
+      _ongletsConstruits.add(onglet);
     });
   }
 
@@ -133,15 +129,19 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                 abonnementService: widget.abonnementService,
                 instantService: widget.instantService,
               ),
-              _explorerConstruit
-                  ? EcranExplorer(
-                      carteService: _carteService,
+              _ongletsConstruits.contains(TablOnglet.tables)
+                  ? EcranTables(
+                      tableService: _tableService,
                       abonnementService: widget.abonnementService,
-                      raccourcisVillesService: _raccourcisVillesService,
-                      entitlementService: _entitlementService,
+                      estOnglet: true,
                     )
-                  : const _EcranOngletAVenir(titre: 'Explorer'),
-              const _EcranOngletAVenir(titre: 'Wishlist'),
+                  : const SizedBox.shrink(),
+              _ongletsConstruits.contains(TablOnglet.carte)
+                  ? EcranCarte(
+                      carteService: _carteService,
+                      positionService: _positionService,
+                    )
+                  : const SizedBox.shrink(),
               EcranProfil(
                 authService: widget.authService,
                 abonnementService: widget.abonnementService,
@@ -168,23 +168,6 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Contenu d'un onglet pas encore implémenté.
-class _EcranOngletAVenir extends StatelessWidget {
-  const _EcranOngletAVenir({required this.titre});
-
-  final String titre;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$titre — bientôt disponible.',
-        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
       ),
     );
   }

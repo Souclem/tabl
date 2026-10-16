@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'config_mapbox.dart';
 import 'config_supabase.dart';
 import 'ecrans/ecran_connexion.dart';
 import 'ecrans/ecran_onboarding.dart';
@@ -10,6 +12,14 @@ import 'ecrans/ecran_principal.dart';
 Future<void> main() async {
   // Obligatoire avant tout appel asynchrone précédant `runApp`.
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (ConfigMapbox.token.isEmpty) {
+    debugPrint(
+      'Token Mapbox absent : lancer avec --dart-define-from-file=.env '
+      '(la carte restera vide).',
+    );
+  }
+  MapboxOptions.setAccessToken(ConfigMapbox.token);
 
   await TablBackend.demarrer(
     url: ConfigSupabase.url,

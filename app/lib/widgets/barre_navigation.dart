@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 
 /// Les onglets de la barre de navigation principale.
-enum TablOnglet { feed, explorer, wishlist, profil }
+enum TablOnglet { feed, tables, carte, profil }
 
 /// Barre de navigation flottante — une pilule posée au-dessus du
 /// contenu, jamais collée aux bords ni pleine largeur (voir
@@ -49,15 +49,15 @@ class TablBarreNavigation extends StatelessWidget {
             children: [
               _item(TablOnglet.feed, Icons.home_rounded, Icons.home_outlined),
               _item(
-                TablOnglet.explorer,
-                Icons.location_on_rounded,
-                Icons.location_on_outlined,
+                TablOnglet.tables,
+                Icons.table_restaurant_rounded,
+                Icons.table_restaurant_outlined,
               ),
               _boutonPublier(),
               _item(
-                TablOnglet.wishlist,
-                Icons.bookmark_rounded,
-                Icons.bookmark_border_rounded,
+                TablOnglet.carte,
+                Icons.location_on_rounded,
+                Icons.location_on_outlined,
               ),
               _item(
                 TablOnglet.profil,
