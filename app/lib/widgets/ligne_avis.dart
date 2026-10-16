@@ -3,24 +3,30 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'avatar.dart';
 
-/// Un avis en version compacte, sur la page d'un restaurant : la photo du
-/// plat en petit à gauche, et à droite qui, quand, l'émotion et le début
-/// de la légende. Un tap ouvre la publication en entier.
+/// Une publication en version compacte : la photo du plat en petit à
+/// gauche, et à droite un titre, la date, l'émotion et le début de la
+/// légende. Le titre dépend de la page : l'auteur (avec son avatar) sur
+/// celle d'un restaurant, le restaurant sur un profil. Un tap ouvre la
+/// publication en entier.
 class TablLigneAvis extends StatelessWidget {
   const TablLigneAvis({
     super.key,
-    required this.auteurPseudo,
+    required this.titre,
     required this.dateLisible,
     required this.onPresse,
-    this.auteurPhotoUrl,
+    this.avatarPseudo,
+    this.avatarPhotoUrl,
     this.photoUrl,
     this.emoji,
     this.legende,
     this.resumeReactions,
   });
 
-  final String auteurPseudo;
-  final String? auteurPhotoUrl;
+  final String titre;
+
+  /// Avatar devant le titre (l'auteur) ; aucun si `null`.
+  final String? avatarPseudo;
+  final String? avatarPhotoUrl;
 
   /// "12 mars".
   final String dateLisible;
@@ -76,15 +82,17 @@ class TablLigneAvis extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      TablAvatar(
-                        pseudo: auteurPseudo,
-                        photoUrl: auteurPhotoUrl,
-                        rayon: 10,
-                      ),
-                      const SizedBox(width: TablTokens.espaceS),
+                      if (avatarPseudo != null) ...[
+                        TablAvatar(
+                          pseudo: avatarPseudo!,
+                          photoUrl: avatarPhotoUrl,
+                          rayon: 10,
+                        ),
+                        const SizedBox(width: TablTokens.espaceS),
+                      ],
                       Expanded(
                         child: Text(
-                          auteurPseudo,
+                          titre,
                           overflow: TextOverflow.ellipsis,
                           style: TablTokens.corps.copyWith(
                             fontSize: 13,

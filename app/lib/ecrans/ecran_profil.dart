@@ -39,6 +39,26 @@ class _EcranProfilState extends State<EcranProfil>
     with ActionsPublications<EcranProfil> {
   bool _enCours = false;
 
+  /// La publication dépliée sur place (une seule à la fois), comme sur la
+  /// page d'un restaurant.
+  String? _ouvert;
+
+  /// Sur son propre profil, l'auteur est toujours le même : la ligne
+  /// compacte montre le restaurant.
+  Widget _publicationReduite(SouvenirFeed s) {
+    return TablLigneAvis(
+      titre: s.restaurantNom,
+      dateLisible: dateLisibleSouvenir(s.dateVisite),
+      photoUrl: s.photoUrl,
+      emoji: s.emotion?.emoji,
+      legende: s.legende,
+      resumeReactions: s.nombreReactions == 0
+          ? null
+          : libelleReactionsSouvenir(s),
+      onPresse: () => setState(() => _ouvert = s.id),
+    );
+  }
+
   // Même principe que le Feed : chargé une fois (l'écran vit dans
   // l'IndexedStack de EcranPrincipal), rechargé seulement sur demande
   // (tirer vers le bas, retour des commentaires ou du partage).
@@ -126,8 +146,8 @@ class _EcranProfilState extends State<EcranProfil>
   // quoi un changement d'onglet dans l'IndexedStack parent ou toute autre
   // reconstruction sans rapport relancerait la requête et ferait
   // clignoter le badge à 0 le temps qu'elle reparte.
-  late Future<int> _nombreDemandes =
-      widget.abonnementService.nombreDemandesEnAttente();
+  late Future<int> _nombreDemandes = widget.abonnementService
+      .nombreDemandesEnAttente();
 
   Future<void> _allerVersAbonnes() async {
     await Navigator.of(context).push(
@@ -276,11 +296,18 @@ class _EcranProfilState extends State<EcranProfil>
                         )
                       else
                         for (final souvenir in mesSouvenirs)
-                          construirePublication(
-                            souvenir,
-                            contexte: ContextePublication.profilPerso,
-                            onOuvrirLieu: () => ouvrirRestaurant(souvenir),
-                            onOptions: () => _ouvrirOptions(souvenir),
+                          TablPublicationDepliable(
+                            key: ValueKey(souvenir.id),
+                            ouvert: _ouvert == souvenir.id,
+                            photoUrl: souvenir.photoUrl,
+                            compact: _publicationReduite(souvenir),
+                            complet: construirePublication(
+                              souvenir,
+                              contexte: ContextePublication.profilPerso,
+                              onOuvrirLieu: () => ouvrirRestaurant(souvenir),
+                              onOptions: () => _ouvrirOptions(souvenir),
+                            ),
+                            onReduire: () => setState(() => _ouvert = null),
                           ),
                       if (_profilPrive != null)
                         _InterrupteurProfilPrive(

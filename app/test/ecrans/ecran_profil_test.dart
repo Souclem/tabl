@@ -145,11 +145,39 @@ void main() {
     expect(find.text('Enregistrer'), findsNothing);
   });
 
+  testWidgets('une publication se déplie sur place, puis se réduit', (
+    tester,
+  ) async {
+    await _ouvrirProfil(tester, [
+      _monSouvenir('1', 'Bibo'),
+      _monSouvenir('2', 'Le Comptoir'),
+    ]);
+
+    // Compactes : pas de "⋯", pas de "Réduire".
+    expect(find.byTooltip('Options'), findsNothing);
+    expect(find.text('Réduire'), findsNothing);
+
+    await tester.tap(find.text('Bibo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Réduire'), findsOneWidget);
+    expect(find.byTooltip('Options'), findsOneWidget);
+    // Toujours sur le profil : pas de nouvelle page.
+    expect(find.text('2 moments'), findsOneWidget);
+
+    await tester.tap(find.text('Réduire'));
+    await tester.pumpAndSettle();
+    expect(find.text('Réduire'), findsNothing);
+    expect(find.byTooltip('Options'), findsNothing);
+  });
+
   testWidgets('"⋯" → "Qui peut voir" modifie l\'audience sans changer de page', (
     tester,
   ) async {
     final service = await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
 
+    // Les "⋯" sont sur la publication dépliée.
+    await tester.tap(find.text('Bibo'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Options'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Qui peut voir'));

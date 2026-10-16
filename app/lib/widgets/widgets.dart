@@ -34,6 +34,7 @@ export 'logo.dart';
 export 'messages.dart';
 export 'option_audience.dart';
 export 'publication.dart';
+export 'publication_depliable.dart';
 export 'selecteur_emotion.dart';
 export 'separateur_texte.dart';
 export 'tables/bulle_message_organisation.dart';

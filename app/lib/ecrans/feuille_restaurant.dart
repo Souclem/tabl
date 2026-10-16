@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -205,12 +203,18 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
             )
           else
             for (final a in avis)
-              _AvisDepliable(
+              TablPublicationDepliable(
                 key: ValueKey(a.id),
                 ouvert: _ouvert == a.id,
                 photoUrl: a.photoUrl,
                 compact: _avisReduit(a),
-                complet: _avisOuvert(a),
+                complet: construirePublication(
+                  a,
+                  contexte: ContextePublication.feed,
+                  // On est déjà sur ce restaurant.
+                  onOuvrirLieu: () {},
+                ),
+                onReduire: () => setState(() => _ouvert = null),
               ),
         ],
       ),
@@ -219,8 +223,9 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
 
   Widget _avisReduit(SouvenirFeed a) {
     return TablLigneAvis(
-      auteurPseudo: a.auteurPseudo,
-      auteurPhotoUrl: a.auteurPhotoUrl,
+      titre: a.auteurPseudo,
+      avatarPseudo: a.auteurPseudo,
+      avatarPhotoUrl: a.auteurPhotoUrl,
       dateLisible: dateLisibleSouvenir(a.dateVisite),
       photoUrl: a.photoUrl,
       emoji: a.emotion?.emoji,
@@ -229,34 +234,6 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
           ? null
           : libelleReactionsSouvenir(a),
       onPresse: () => setState(() => _ouvert = a.id),
-    );
-  }
-
-  Widget _avisOuvert(SouvenirFeed a) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          height: _AvisDepliable.hauteurReduire,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => setState(() => _ouvert = null),
-              icon: const Icon(Icons.expand_less_rounded, size: 18),
-              label: const Text('Réduire'),
-              style: TextButton.styleFrom(
-                foregroundColor: TablTokens.texteDoux,
-              ),
-            ),
-          ),
-        ),
-        construirePublication(
-          a,
-          contexte: ContextePublication.feed,
-          // On est déjà sur ce restaurant.
-          onOuvrirLieu: () {},
-        ),
-      ],
     );
   }
 
@@ -334,183 +311,6 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Un avis qui passe de sa version compacte à la publication complète,
-/// sur place : la vignette grandit et glisse jusqu'à la place de la
-/// grande photo, le texte compact s'efface en glissant pendant que la
-/// hauteur s'ouvre, puis le reste de la publication apparaît. À la
-/// fermeture, l'animation inverse.
-class _AvisDepliable extends StatefulWidget {
-  const _AvisDepliable({
-    super.key,
-    required this.ouvert,
-    required this.photoUrl,
-    required this.compact,
-    required this.complet,
-  });
-
-  /// Hauteur de la ligne "Réduire" au-dessus de la publication complète.
-  static const hauteurReduire = 44.0;
-
-  final bool ouvert;
-  final String? photoUrl;
-  final Widget compact;
-  final Widget complet;
-
-  @override
-  State<_AvisDepliable> createState() => _AvisDepliableState();
-}
-
-class _AvisDepliableState extends State<_AvisDepliable>
-    with SingleTickerProviderStateMixin {
-  late final _animation = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-    value: widget.ouvert ? 1 : 0,
-  );
-  final _cleCompact = GlobalKey();
-  final _cleComplet = GlobalKey();
-
-  /// Hauteurs mesurées des deux versions (la complète n'est connue
-  /// qu'une fois construite).
-  double? _hauteurCompacte;
-  double? _hauteurComplete;
-
-  @override
-  void initState() {
-    super.initState();
-    _animation.addStatusListener((_) => setState(() {}));
-  }
-
-  @override
-  void didUpdateWidget(_AvisDepliable ancien) {
-    super.didUpdateWidget(ancien);
-    if (widget.ouvert == ancien.ouvert) return;
-    if (widget.ouvert) {
-      // On construit d'abord la version complète (invisible) pour la
-      // mesurer, puis on anime.
-      _hauteurComplete = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _hauteurCompacte = _cleCompact.currentContext?.size?.height;
-          _hauteurComplete = _cleComplet.currentContext?.size?.height;
-        });
-        _animation.forward();
-      });
-    } else {
-      _animation.reverse();
-    }
-  }
-
-  @override
-  void dispose() {
-    _animation.dispose();
-    super.dispose();
-  }
-
-  bool get _auRepos =>
-      _animation.status == AnimationStatus.completed ||
-      _animation.status == AnimationStatus.dismissed;
-
-  @override
-  Widget build(BuildContext context) {
-    // Au repos : la version affichée, telle quelle.
-    if (_auRepos && !(widget.ouvert && _hauteurComplete == null)) {
-      return widget.ouvert ? widget.complet : widget.compact;
-    }
-    return LayoutBuilder(
-      builder: (context, contraintes) => AnimatedBuilder(
-        animation: _animation,
-        builder: (context, _) => _enMouvement(contraintes.maxWidth),
-      ),
-    );
-  }
-
-  Widget _enMouvement(double largeur) {
-    final t = Curves.easeInOutCubic.transform(_animation.value);
-    final hauteurCompacte =
-        _hauteurCompacte ?? TablLigneAvis.cotePhoto + 2 * TablLigneAvis.margeHaut;
-    final hauteurComplete = _hauteurComplete ?? hauteurCompacte;
-
-    // La vignette, de sa place compacte à celle de la grande photo.
-    const depart = Rect.fromLTWH(
-      TablLigneAvis.margeGauche,
-      TablLigneAvis.margeHaut,
-      TablLigneAvis.cotePhoto,
-      TablLigneAvis.cotePhoto,
-    );
-    final largeurPhoto = largeur - 2 * TablPublication.margePhoto;
-    final arrivee = Rect.fromLTWH(
-      TablPublication.margePhoto,
-      _AvisDepliable.hauteurReduire + TablPublication.hauteurEnTete,
-      largeurPhoto,
-      largeurPhoto * TablPublication.proportionPhoto,
-    );
-    final photo = Rect.lerp(depart, arrivee, t)!;
-    final arrondi = lerpDouble(
-      TablLigneAvis.arrondiPhoto,
-      TablPublication.arrondiPhoto,
-      t,
-    )!;
-
-    // Le texte compact s'efface en glissant vers le bas pendant le début,
-    // le reste de la publication apparaît à la fin.
-    final effacement = const Interval(0, 0.4).transform(t);
-    final apparition = const Interval(0.7, 1).transform(t);
-
-    return ClipRect(
-      child: SizedBox(
-        height: lerpDouble(hauteurCompacte, hauteurComplete, t),
-        child: OverflowBox(
-          alignment: Alignment.topCenter,
-          minHeight: 0,
-          maxHeight: double.infinity,
-          child: Stack(
-            children: [
-              Opacity(
-                opacity: apparition,
-                child: KeyedSubtree(key: _cleComplet, child: widget.complet),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: 1 - effacement,
-                    child: Transform.translate(
-                      offset: Offset(0, 24 * t),
-                      child: KeyedSubtree(
-                        key: _cleCompact,
-                        child: widget.compact,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fromRect(
-                rect: photo,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(arrondi),
-                  child: widget.photoUrl == null
-                      ? const ColoredBox(color: TablTokens.surface)
-                      : Image.network(
-                          widget.photoUrl!,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                          errorBuilder: (_, _, _) =>
-                              const ColoredBox(color: TablTokens.surface),
-                        ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
