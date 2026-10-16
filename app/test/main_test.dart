@@ -53,6 +53,9 @@ class _FauxAuthService implements AuthService {
 /// tests, les écrans se contentent de le recevoir en paramètre.
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<ProfilVisite> profil(String id) => throw UnimplementedError();
+
+  @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
   abonnesEtAbonnements() async =>
       (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);

@@ -29,6 +29,41 @@ class ProfilPublic {
   final StatutAbonnement statut;
 }
 
+/// Le profil d'une autre personne, tel qu'on le visite.
+class ProfilVisite {
+  const ProfilVisite({
+    required this.id,
+    required this.pseudo,
+    required this.estPrive,
+    required this.statut,
+    this.photoUrl,
+  });
+
+  final String id;
+  final String pseudo;
+  final String? photoUrl;
+  final bool estPrive;
+
+  /// Où j'en suis avec cette personne, dans mon sens : je ne la suis pas
+  /// ([StatutAbonnement.aucun]), j'ai demandé, ou je la suis.
+  final StatutAbonnement statut;
+
+  /// Comme Instagram : un profil privé ne montre ses publications qu'à
+  /// ses abonnés acceptés ; aux autres, seulement l'en-tête. Le filtrage
+  /// publication par publication ("Qui peut voir ?") reste fait par la
+  /// base (RLS).
+  bool get publicationsVisibles =>
+      !estPrive || statut == StatutAbonnement.abonne;
+
+  ProfilVisite copierAvec({StatutAbonnement? statut}) => ProfilVisite(
+    id: id,
+    pseudo: pseudo,
+    photoUrl: photoUrl,
+    estPrive: estPrive,
+    statut: statut ?? this.statut,
+  );
+}
+
 /// Une demande de suivi reçue, en attente de réponse.
 class DemandeAbonnement {
   const DemandeAbonnement({required this.suiveurId, required this.pseudo});

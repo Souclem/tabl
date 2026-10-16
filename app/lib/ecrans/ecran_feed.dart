@@ -49,6 +49,9 @@ class _EcranFeedState extends State<EcranFeed>
   SouvenirService get souvenirService => widget.souvenirService;
 
   @override
+  AbonnementService get abonnementService => widget.abonnementService;
+
+  @override
   void recharger() {
     setState(() {
       _futurFeed = widget.souvenirService.feed();

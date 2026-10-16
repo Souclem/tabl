@@ -10,6 +10,7 @@ import 'package:app/ecrans/ecran_abonnes.dart';
 import 'package:app/ecrans/ecran_commentaires.dart';
 import 'package:app/ecrans/ecran_creer_instant.dart';
 import 'package:app/ecrans/ecran_feed.dart';
+import 'package:app/ecrans/ecran_profil_autre.dart';
 import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
@@ -98,6 +99,14 @@ class _FauxSouvenirService implements SouvenirService {
 /// tape pas sur "Trouver des personnes".
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<ProfilVisite> profil(String id) async => ProfilVisite(
+    id: id,
+    pseudo: 'martin',
+    estPrive: true,
+    statut: StatutAbonnement.aucun,
+  );
+
+  @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
   abonnesEtAbonnements() async =>
       (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
@@ -163,6 +172,7 @@ SouvenirFeed _souvenirDeTest({
     premieresReactions: premieresReactions,
     estAMoi: estAMoi,
     restaurantId: restaurantId,
+    auteurId: estAMoi ? 'moi-id' : '$auteurPseudo-id',
   );
 }
 
@@ -210,6 +220,49 @@ void _agrandirSurface(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('taper sur l\'auteur ouvre son profil, pas sur le sien', (
+    tester,
+  ) async {
+    _agrandirSurface(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(
+            souvenirs: [_souvenirDeTest()],
+          ),
+          abonnementService: _FauxAbonnementService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('martin'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranProfilAutre), findsOneWidget);
+    expect(find.text('Ce profil est privé'), findsOneWidget);
+  });
+
+  testWidgets('son propre nom n\'est pas touchable', (tester) async {
+    _agrandirSurface(tester);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(
+            souvenirs: [_souvenirDeTest(estAMoi: true, auteurPseudo: 'moi')],
+          ),
+          abonnementService: _FauxAbonnementService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('moi'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranProfilAutre), findsNothing);
+  });
+
   testWidgets('feed vide : état vide avec bouton "Trouver des personnes"', (
     tester,
   ) async {

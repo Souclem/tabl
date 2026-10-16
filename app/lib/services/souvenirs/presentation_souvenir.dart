@@ -24,6 +24,10 @@ String dateLisibleSouvenir(DateTime date, {DateTime? maintenant}) {
   return date.year == annee ? jour : '$jour ${date.year}';
 }
 
+/// "Aucun moment", "1 moment", "12 moments" — en-tête d'un profil.
+String libelleNombreMoments(int nombre) =>
+    nombre == 0 ? 'Aucun moment' : '$nombre moment${nombre > 1 ? 's' : ''}';
+
 /// Reprend l'algorithme `proofText` du prototype : jamais un chiffre brut
 /// mis en avant, toujours une phrase ("a aimé"/"ont aimé"/"avez aimé"/
 /// "Personne n'a encore aimé").

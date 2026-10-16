@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'abonnement_service.dart';
+import 'photo_profil.dart';
 import 'profil_public.dart';
 
 /// Graphe social adossé à Supabase (table `abonnements`, voir migration
@@ -68,6 +69,34 @@ class AbonnementServiceSupabase implements AbonnementService {
           ),
         )
         .toList();
+  }
+
+  @override
+  Future<ProfilVisite> profil(String id) async {
+    final (profil, relation) = await (
+      _client
+          .from('profils')
+          .select('pseudo, photo_url, est_prive')
+          .eq('id', id)
+          .single(),
+      _client
+          .from('abonnements')
+          .select('statut')
+          .eq('suiveur_id', _monId)
+          .eq('suivi_id', id)
+          .maybeSingle(),
+    ).wait;
+    return ProfilVisite(
+      id: id,
+      pseudo: profil['pseudo'] as String,
+      photoUrl: urlPhotoProfil(_client, profil['photo_url'] as String?),
+      estPrive: profil['est_prive'] as bool? ?? true,
+      statut: switch (relation?['statut']) {
+        null => StatutAbonnement.aucun,
+        'accepte' => StatutAbonnement.abonne,
+        _ => StatutAbonnement.demandeEnvoyee,
+      },
+    );
   }
 
   @override

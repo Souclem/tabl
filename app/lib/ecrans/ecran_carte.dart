@@ -219,10 +219,11 @@ class _EcranCarteState extends State<EcranCarte> {
   /// Ce que dit la règle de pertinence pour la zone, plus le lieu dont la
   /// feuille est ouverte, toujours visible même si la règle l'écartait.
   List<LieuCarte> get _lieuxAffiches {
-    final affiches = lieuxAAfficher([
-      ..._reseau,
-      ..._annuaireFiltre,
-    ], _zone, zoom: _zoom);
+    final affiches = lieuxAAfficher(
+      [..._reseau, ..._annuaireFiltre],
+      _zone,
+      zoom: _zoom,
+    );
     final selection = _selection;
     if (selection != null && !affiches.any((l) => l.cle == selection.cle)) {
       affiches.add(selection);
@@ -294,6 +295,7 @@ class _EcranCarteState extends State<EcranCarte> {
       restaurantId: lieu.restaurantId,
       estEnvie: lieu.estEnvie,
       souvenirService: souvenirs,
+      abonnementService: widget.abonnementService,
       entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
     );
     if (mounted) _charger();
@@ -338,6 +340,7 @@ class _EcranCarteState extends State<EcranCarte> {
           restaurantId: lieu.restaurantId,
           estEnvie: lieu.estEnvie,
           souvenirService: souvenirs,
+          abonnementService: widget.abonnementService,
           entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
           defilement: defilement,
           onFermer: () => setState(() => _selection = null),

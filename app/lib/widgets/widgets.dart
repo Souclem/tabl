@@ -15,6 +15,7 @@ export 'carte/puce_filtre.dart';
 export 'carte/segment_mode_carte.dart';
 export 'champ_mot_de_passe.dart';
 export 'champ_texte.dart';
+export 'en_tete_profil.dart';
 export 'entree_echelonnee.dart';
 export 'enveloppe_formulaire.dart';
 export 'etape_onboarding.dart';

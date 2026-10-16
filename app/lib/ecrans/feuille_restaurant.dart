@@ -16,6 +16,7 @@ Future<void> ouvrirFeuilleRestaurant(
   required String nom,
   required String sousTitre,
   required SouvenirService souvenirService,
+  AbonnementService? abonnementService,
   String? restaurantId,
   String? resume,
   bool estEnvie = false,
@@ -39,6 +40,7 @@ Future<void> ouvrirFeuilleRestaurant(
         estEnvie: estEnvie,
         entrerDansTabl: entrerDansTabl,
         souvenirService: souvenirService,
+        abonnementService: abonnementService,
         defilement: defilement,
         onFermer: () => Navigator.of(contexteFeuille).pop(),
       ),
@@ -58,6 +60,7 @@ class FeuilleRestaurant extends StatefulWidget {
     required this.sousTitre,
     required this.souvenirService,
     required this.defilement,
+    this.abonnementService,
     this.resume,
     this.restaurantId,
     this.estEnvie = false,
@@ -76,6 +79,9 @@ class FeuilleRestaurant extends StatefulWidget {
   /// "Emma et 2 autres y sont allés", si connu.
   final String? resume;
   final SouvenirService souvenirService;
+
+  /// Pour ouvrir le profil des auteurs des avis.
+  final AbonnementService? abonnementService;
 
   /// Le défilement de la feuille (fourni par DraggableScrollableSheet).
   final ScrollController defilement;
@@ -111,11 +117,11 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
   bool _chargement = true;
   bool _erreur = false;
 
-  /// L'avis agrandi en publication complète, s'il y en a un.
-  String? _ouvert;
-
   @override
   SouvenirService get souvenirService => widget.souvenirService;
+
+  @override
+  AbonnementService? get abonnementService => widget.abonnementService;
 
   @override
   void initState() {
@@ -203,37 +209,15 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
             )
           else
             for (final a in avis)
-              TablPublicationDepliable(
-                key: ValueKey(a.id),
-                ouvert: _ouvert == a.id,
-                photoUrl: a.photoUrl,
-                compact: _avisReduit(a),
-                complet: construirePublication(
-                  a,
-                  contexte: ContextePublication.feed,
-                  // On est déjà sur ce restaurant.
-                  onOuvrirLieu: () {},
-                ),
-                onReduire: () => setState(() => _ouvert = null),
+              publicationDepliable(
+                a,
+                contexte: ContextePublication.feed,
+                titreAuteur: true,
+                // On est déjà sur ce restaurant.
+                onOuvrirLieu: () {},
               ),
         ],
       ),
-    );
-  }
-
-  Widget _avisReduit(SouvenirFeed a) {
-    return TablLigneAvis(
-      titre: a.auteurPseudo,
-      avatarPseudo: a.auteurPseudo,
-      avatarPhotoUrl: a.auteurPhotoUrl,
-      dateLisible: dateLisibleSouvenir(a.dateVisite),
-      photoUrl: a.photoUrl,
-      emoji: a.emotion?.emoji,
-      legende: a.legende,
-      resumeReactions: a.nombreReactions == 0
-          ? null
-          : libelleReactionsSouvenir(a),
-      onPresse: () => setState(() => _ouvert = a.id),
     );
   }
 

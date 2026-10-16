@@ -11,6 +11,9 @@ abstract interface class AbonnementService {
   /// déjà résolue pour chacun.
   Future<List<ProfilPublic>> rechercher(String requete);
 
+  /// Le profil d'une autre personne, avec où j'en suis avec elle.
+  Future<ProfilVisite> profil(String id);
+
   /// Suit [suiviId] : abonnement immédiat si son profil est public
   /// ([StatutAbonnement.abonne]), demande en attente sinon
   /// ([StatutAbonnement.demandeEnvoyee]).

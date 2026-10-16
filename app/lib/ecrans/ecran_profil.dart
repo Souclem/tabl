@@ -39,25 +39,8 @@ class _EcranProfilState extends State<EcranProfil>
     with ActionsPublications<EcranProfil> {
   bool _enCours = false;
 
-  /// La publication dépliée sur place (une seule à la fois), comme sur la
-  /// page d'un restaurant.
-  String? _ouvert;
-
-  /// Sur son propre profil, l'auteur est toujours le même : la ligne
-  /// compacte montre le restaurant.
-  Widget _publicationReduite(SouvenirFeed s) {
-    return TablLigneAvis(
-      titre: s.restaurantNom,
-      dateLisible: dateLisibleSouvenir(s.dateVisite),
-      photoUrl: s.photoUrl,
-      emoji: s.emotion?.emoji,
-      legende: s.legende,
-      resumeReactions: s.nombreReactions == 0
-          ? null
-          : libelleReactionsSouvenir(s),
-      onPresse: () => setState(() => _ouvert = s.id),
-    );
-  }
+  @override
+  AbonnementService get abonnementService => widget.abonnementService;
 
   // Même principe que le Feed : chargé une fois (l'écran vit dans
   // l'IndexedStack de EcranPrincipal), rechargé seulement sur demande
@@ -152,8 +135,10 @@ class _EcranProfilState extends State<EcranProfil>
   Future<void> _allerVersAbonnes() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            EcranAbonnes(abonnementService: widget.abonnementService),
+        builder: (_) => EcranAbonnes(
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+        ),
       ),
     );
     if (!mounted) return;
@@ -275,9 +260,13 @@ class _EcranProfilState extends State<EcranProfil>
                       bottom: TablTokens.espaceXxl + TablTokens.espaceL,
                     ),
                     children: [
-                      _EnTeteProfil(
-                        utilisateur: widget.utilisateur,
-                        nombrePublications: mesSouvenirs?.length,
+                      TablEnTeteProfil(
+                        pseudo: widget.utilisateur.pseudo,
+                        photoUrl: widget.utilisateur.photoUrl,
+                        sousTitre: widget.utilisateur.email,
+                        resumeMoments: mesSouvenirs == null
+                            ? null
+                            : libelleNombreMoments(mesSouvenirs.length),
                       ),
                       if (!termine)
                         const Padding(
@@ -296,18 +285,10 @@ class _EcranProfilState extends State<EcranProfil>
                         )
                       else
                         for (final souvenir in mesSouvenirs)
-                          TablPublicationDepliable(
-                            key: ValueKey(souvenir.id),
-                            ouvert: _ouvert == souvenir.id,
-                            photoUrl: souvenir.photoUrl,
-                            compact: _publicationReduite(souvenir),
-                            complet: construirePublication(
-                              souvenir,
-                              contexte: ContextePublication.profilPerso,
-                              onOuvrirLieu: () => ouvrirRestaurant(souvenir),
-                              onOptions: () => _ouvrirOptions(souvenir),
-                            ),
-                            onReduire: () => setState(() => _ouvert = null),
+                          publicationDepliable(
+                            souvenir,
+                            contexte: ContextePublication.profilPerso,
+                            onOptions: () => _ouvrirOptions(souvenir),
                           ),
                       if (_profilPrive != null)
                         _InterrupteurProfilPrive(
@@ -341,62 +322,6 @@ class _EcranProfilState extends State<EcranProfil>
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Haut du profil : avatar, pseudo, e-mail et nombre de publications.
-class _EnTeteProfil extends StatelessWidget {
-  const _EnTeteProfil({
-    required this.utilisateur,
-    required this.nombrePublications,
-  });
-
-  final Utilisateur utilisateur;
-
-  /// `null` tant que la liste n'est pas chargée.
-  final int? nombrePublications;
-
-  @override
-  Widget build(BuildContext context) {
-    final nombre = nombrePublications;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        TablTokens.espaceL,
-        TablTokens.espaceXxl,
-        TablTokens.espaceL,
-        TablTokens.espaceXl,
-      ),
-      child: Column(
-        children: [
-          TablAvatar(
-            pseudo: utilisateur.pseudo,
-            photoUrl: utilisateur.photoUrl,
-            rayon: 45,
-          ),
-          const SizedBox(height: TablTokens.espaceM),
-          Text(
-            utilisateur.pseudo,
-            textAlign: TextAlign.center,
-            style: TablTokens.titre,
-          ),
-          const SizedBox(height: TablTokens.espaceXs),
-          Text(
-            utilisateur.email,
-            textAlign: TextAlign.center,
-            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
-          ),
-          if (nombre != null) ...[
-            const SizedBox(height: TablTokens.espaceM),
-            Text(
-              nombre == 0
-                  ? 'Aucun moment'
-                  : '$nombre moment${nombre > 1 ? 's' : ''}',
-              style: TablTokens.legende,
-            ),
-          ],
-        ],
       ),
     );
   }

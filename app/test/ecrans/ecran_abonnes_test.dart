@@ -4,11 +4,20 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'package:app/ecrans/ecran_abonnes.dart';
+import 'package:app/ecrans/ecran_profil_autre.dart';
 
 /// Faux [AbonnementService] à état contrôlable : les demandes acceptées
 /// ou refusées disparaissent réellement de [demandesRecues], comme le
 /// ferait le vrai service — pour tester le rafraîchissement après action.
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<ProfilVisite> profil(String id) async => ProfilVisite(
+    id: id,
+    pseudo: 'martin',
+    estPrive: true,
+    statut: StatutAbonnement.aucun,
+  );
+
   List<ProfilPublic> abonnes = const [];
   List<ProfilPublic> abonnements = const [];
 
@@ -76,7 +85,33 @@ class _FauxAbonnementService implements AbonnementService {
   Future<List<ProfilPublic>> mesRelations() async => [];
 }
 
+class _FauxSouvenirService implements SouvenirService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 void main() {
+  testWidgets('taper sur un nom ouvre son profil', (tester) async {
+    final service = _FauxAbonnementService(
+      demandes: const [DemandeAbonnement(suiveurId: 'u1', pseudo: 'martin')],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('martin'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranProfilAutre), findsOneWidget);
+    expect(find.text('Ce profil est privé'), findsOneWidget);
+  });
+
   testWidgets('affiche les demandes reçues avec Accepter/Refuser', (
     tester,
   ) async {

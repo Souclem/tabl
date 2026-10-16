@@ -25,9 +25,13 @@ class SouvenirFeed {
     this.restaurantId,
     this.estEnvie = false,
     this.auteurPhotoUrl,
+    this.auteurId,
   });
 
   final String id;
+
+  /// L'auteur, pour ouvrir son profil.
+  final String? auteurId;
 
   /// `null` si le souvenir n'a pas de photo, ou si l'URL n'a pas pu être
   /// résolue (fichier introuvable côté bucket).
@@ -112,6 +116,7 @@ class SouvenirFeed {
       estAMoi: estAMoi,
       audienceRestreinte: audienceRestreinte,
       restaurantId: restaurantId,
+      auteurId: auteurId,
       estEnvie: estEnvie ?? this.estEnvie,
       auteurPhotoUrl: auteurPhotoUrl,
     );

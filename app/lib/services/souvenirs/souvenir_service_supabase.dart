@@ -317,6 +317,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         audienceRestreinte:
             l['auteur_id'] == _monId && l['visibilite'] != 'tout_le_monde',
         restaurantId: l['restaurant_id'] as String?,
+        auteurId: l['auteur_id'] as String?,
         auteurPhotoUrl: urlPhotoProfil(
           _client,
           auteur?['photo_url'] as String?,

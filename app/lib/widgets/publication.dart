@@ -66,6 +66,7 @@ class TablPublication extends StatelessWidget {
     this.audienceRestreinte = false,
     this.onEnregistrer,
     this.onOptions,
+    this.onTapAuteur,
     this.instantsTotal = 0,
     this.instantsNonVus = 0,
     this.onOuvrirInstants,
@@ -110,6 +111,10 @@ class TablPublication extends StatelessWidget {
   /// fourni.
   final VoidCallback? onOptions;
 
+  /// Tap sur l'avatar ou le pseudo de l'auteur (ouvre son profil) ;
+  /// `null` : pas touchable.
+  final VoidCallback? onTapAuteur;
+
   /// 0 : pas d'Instant actif, aucun signal affiché.
   final int instantsTotal;
   final int instantsNonVus;
@@ -140,6 +145,7 @@ class TablPublication extends StatelessWidget {
             dateLisible: dateLisible,
             audienceRestreinte: audienceRestreinte,
             onOptions: _afficheOptions ? onOptions : null,
+            onTapAuteur: onTapAuteur,
           ),
           _Photo(
             photoUrl: photoUrl,
@@ -243,6 +249,7 @@ class _EnTete extends StatelessWidget {
     required this.dateLisible,
     required this.audienceRestreinte,
     required this.onOptions,
+    required this.onTapAuteur,
   });
 
   /// `null` : auteur masqué.
@@ -251,6 +258,7 @@ class _EnTete extends StatelessWidget {
   final String dateLisible;
   final bool audienceRestreinte;
   final VoidCallback? onOptions;
+  final VoidCallback? onTapAuteur;
 
   @override
   Widget build(BuildContext context) {
@@ -282,15 +290,28 @@ class _EnTete extends StatelessWidget {
         child: Row(
           children: [
             if (auteurPseudo != null) ...[
-              TablAvatar(pseudo: auteurPseudo!, photoUrl: auteurPhotoUrl),
-              const SizedBox(width: TablTokens.espaceS),
               Expanded(
-                child: Text(
-                  auteurPseudo!,
-                  overflow: TextOverflow.ellipsis,
-                  style: TablTokens.corps.copyWith(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                child: GestureDetector(
+                  onTap: onTapAuteur,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      TablAvatar(
+                        pseudo: auteurPseudo!,
+                        photoUrl: auteurPhotoUrl,
+                      ),
+                      const SizedBox(width: TablTokens.espaceS),
+                      Flexible(
+                        child: Text(
+                          auteurPseudo!,
+                          overflow: TextOverflow.ellipsis,
+                          style: TablTokens.corps.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -439,7 +460,10 @@ class _Photo extends StatelessWidget {
                     color: TablTokens.primaire.withValues(alpha: 0.18),
                   ),
                 ),
-                child: Text(emojiEmotion!, style: const TextStyle(fontSize: 19)),
+                child: Text(
+                  emojiEmotion!,
+                  style: const TextStyle(fontSize: 19),
+                ),
               ),
             ),
         ],

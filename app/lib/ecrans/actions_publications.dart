@@ -3,6 +3,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'ecran_commentaires.dart';
+import 'ecran_profil_autre.dart';
 import 'feuille_restaurant.dart';
 
 /// Ce que partagent tous les écrans qui affichent une liste de
@@ -11,6 +12,14 @@ import 'feuille_restaurant.dart';
 /// [SouvenirFeed] en [TablPublication] prête à afficher.
 mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   SouvenirService get souvenirService;
+
+  /// Pour ouvrir le profil d'un auteur ; `null` (par défaut) : les
+  /// auteurs ne sont pas touchables.
+  AbonnementService? get abonnementService => null;
+
+  /// La publication dépliée sur place (une seule à la fois), voir
+  /// [publicationDepliable].
+  String? publicationOuverte;
 
   /// `null` tant que le premier chargement n'est pas terminé. Mutable :
   /// une réaction met à jour la liste en place, sans tout recharger.
@@ -97,9 +106,68 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       restaurantId: souvenir.restaurantId,
       estEnvie: souvenir.estEnvie,
       souvenirService: souvenirService,
+      abonnementService: abonnementService,
     );
     if (!mounted) return;
     recharger();
+  }
+
+  /// Le profil de l'auteur d'une publication, en page ; à son retour, la
+  /// liste est rechargée (un abonnement a pu changer ce qui est visible).
+  Future<void> ouvrirProfil(SouvenirFeed souvenir) async {
+    final service = abonnementService;
+    final auteurId = souvenir.auteurId;
+    if (service == null || auteurId == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranProfilAutre(
+          profilId: auteurId,
+          pseudo: souvenir.auteurPseudo,
+          abonnementService: service,
+          souvenirService: souvenirService,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    recharger();
+  }
+
+  /// Une publication en ligne compacte, qui se déplie sur place en
+  /// publication complète au tap (page d'un restaurant, profils). La
+  /// ligne compacte montre ce qui varie sur la page : l'auteur sur un
+  /// restaurant ([titreAuteur]), le restaurant sur un profil.
+  Widget publicationDepliable(
+    SouvenirFeed souvenir, {
+    required ContextePublication contexte,
+    bool titreAuteur = false,
+    VoidCallback? onOuvrirLieu,
+    VoidCallback? onOptions,
+  }) {
+    return TablPublicationDepliable(
+      key: ValueKey(souvenir.id),
+      ouvert: publicationOuverte == souvenir.id,
+      photoUrl: souvenir.photoUrl,
+      compact: TablLigneAvis(
+        titre: titreAuteur ? souvenir.auteurPseudo : souvenir.restaurantNom,
+        avatarPseudo: titreAuteur ? souvenir.auteurPseudo : null,
+        avatarPhotoUrl: titreAuteur ? souvenir.auteurPhotoUrl : null,
+        dateLisible: dateLisibleSouvenir(souvenir.dateVisite),
+        photoUrl: souvenir.photoUrl,
+        emoji: souvenir.emotion?.emoji,
+        legende: souvenir.legende,
+        resumeReactions: souvenir.nombreReactions == 0
+            ? null
+            : libelleReactionsSouvenir(souvenir),
+        onPresse: () => setState(() => publicationOuverte = souvenir.id),
+      ),
+      complet: construirePublication(
+        souvenir,
+        contexte: contexte,
+        onOuvrirLieu: onOuvrirLieu ?? () => ouvrirRestaurant(souvenir),
+        onOptions: onOptions,
+      ),
+      onReduire: () => setState(() => publicationOuverte = null),
+    );
   }
 
   void remplacer(SouvenirFeed souvenir) {
@@ -144,6 +212,9 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       onOuvrirLieu: onOuvrirLieu,
       onEnregistrer: () => basculerEnvie(souvenir),
       onOptions: onOptions,
+      onTapAuteur: abonnementService == null || souvenir.estAMoi
+          ? null
+          : () => ouvrirProfil(souvenir),
       instantsTotal: signal?.total ?? 0,
       instantsNonVus: signal?.nonVus ?? 0,
       onOuvrirInstants: onOuvrirInstants,
