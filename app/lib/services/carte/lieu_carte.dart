@@ -1,40 +1,9 @@
 import '../restaurants/categories_lieu.dart';
-import '../souvenirs/emotion.dart';
 
-/// Une visite visible sur la carte : un souvenir de mon réseau, réduit à
-/// ce dont les filtres ont besoin (qui, quand, comment, dans quelle
-/// Table).
-class VisiteCarte {
-  const VisiteCarte({
-    required this.souvenirId,
-    required this.auteurId,
-    required this.auteurPseudo,
-    required this.estMoi,
-    required this.moment,
-    required this.date,
-    this.emotion,
-    this.tableIds = const {},
-    this.auteurPhotoUrl,
-  });
-
-  final String souvenirId;
-  final String auteurId;
-  final String auteurPseudo;
-  final String? auteurPhotoUrl;
-  final bool estMoi;
-
-  /// `'midi'` ou `'soir'`.
-  final String moment;
-  final DateTime date;
-  final Emotion? emotion;
-
-  /// Tables auxquelles ce souvenir est associé (parmi celles qu'on peut
-  /// voir).
-  final Set<String> tableIds;
-}
-
-/// Un lieu affichable sur la carte : soit entré dans Tabl (visité par
-/// mon réseau, ou mis en envie), soit seulement présent dans l'annuaire.
+/// Un lieu affichable sur la carte, déjà résumé par la base : soit entré
+/// dans Tabl et visité par mon réseau (ou mis en envie), soit seulement
+/// présent dans l'annuaire. Les chiffres tiennent déjà compte des
+/// filtres de la recherche qui l'a renvoyé.
 class LieuCarte {
   const LieuCarte({
     required this.nom,
@@ -45,8 +14,13 @@ class LieuCarte {
     this.fsqPlaceId,
     this.adresse,
     this.categories = const [],
-    this.visites = const [],
+    this.amis = 0,
+    this.visites = 0,
+    this.coupsDeCoeur = 0,
+    this.visiteParMoi = false,
     this.estEnvie = false,
+    this.amiPseudo,
+    this.amiPhotoUrl,
   });
 
   final String nom;
@@ -59,41 +33,37 @@ class LieuCarte {
   final String? fsqPlaceId;
   final String? adresse;
   final List<String> categories;
-  final List<VisiteCarte> visites;
+
+  /// Amis différents qui y sont allés (moi exclu).
+  final int amis;
+
+  /// Visites de mon réseau, les miennes comprises.
+  final int visites;
+
+  /// Visites notées 😍.
+  final int coupsDeCoeur;
+  final bool visiteParMoi;
 
   /// Dans mes envies.
   final bool estEnvie;
 
+  /// L'ami mis en avant (celui qui y est allé le plus souvent).
+  final String? amiPseudo;
+  final String? amiPhotoUrl;
+
   /// Identifiant stable sur la carte, quelle que soit l'origine du lieu.
   String get cle => restaurantId ?? 'fsq:$fsqPlaceId';
 
-  /// Mis en avant (marqueur doré) : visité par mon réseau ou mis en
-  /// envie — par opposition aux simples points de l'annuaire.
-  bool get duReseau => visites.isNotEmpty || estEnvie;
-
-  bool get visiteParMoi => visites.any((v) => v.estMoi);
+  /// Visité par mon réseau ou mis en envie — par opposition aux simples
+  /// points de l'annuaire.
+  bool get duReseau => visites > 0 || estEnvie;
 
   /// L'ami mis en avant sur le marqueur (sa photo), et le nombre d'autres
-  /// amis qui y sont allés (le « +2 ») : celui qui y est allé le plus
-  /// souvent, le plus récemment à égalité. `null` si aucun ami n'y est
-  /// allé (seulement moi, ou un lieu de l'annuaire).
+  /// amis qui y sont allés (le « +2 »). `null` si aucun ami n'y est allé.
   ({String pseudo, String? photoUrl, int autres})? get amiEnAvant {
-    final parAmi = <String, List<VisiteCarte>>{};
-    for (final v in visites) {
-      if (!v.estMoi) parAmi.putIfAbsent(v.auteurId, () => []).add(v);
-    }
-    if (parAmi.isEmpty) return null;
-    DateTime derniere(List<VisiteCarte> l) =>
-        l.map((v) => v.date).reduce((a, b) => a.isAfter(b) ? a : b);
-    final meilleur = parAmi.values.reduce((a, b) {
-      if (a.length != b.length) return a.length > b.length ? a : b;
-      return derniere(a).isAfter(derniere(b)) ? a : b;
-    }).first;
-    return (
-      pseudo: meilleur.auteurPseudo,
-      photoUrl: meilleur.auteurPhotoUrl,
-      autres: parAmi.length - 1,
-    );
+    final pseudo = amiPseudo;
+    if (pseudo == null || amis == 0) return null;
+    return (pseudo: pseudo, photoUrl: amiPhotoUrl, autres: amis - 1);
   }
 
   /// "Italien · Rue du Pont 16, Liège".
@@ -105,22 +75,42 @@ class LieuCarte {
     return morceaux.where((m) => m.isNotEmpty).join(' · ');
   }
 
-  /// "Emma, Thomas et 2 autres y sont allés" / "Vous y êtes allé" —
-  /// jamais un chiffre seul, comme sur le Feed.
+  /// "Emma et 2 autres y sont allés" / "Vous y êtes allé" — jamais un
+  /// chiffre seul, comme sur le Feed.
   String get resumeVisites {
-    if (visites.isEmpty) {
-      return estEnvie ? 'Dans vos envies' : 'Personne de votre réseau n\'y est allé';
+    final ami = amiEnAvant;
+    if (ami == null) {
+      if (visiteParMoi) return 'Vous y êtes allé';
+      return estEnvie
+          ? 'Dans vos envies'
+          : 'Personne de votre réseau n\'y est allé';
     }
-    final autres = {
-      for (final v in visites)
-        if (!v.estMoi) v.auteurId: v.auteurPseudo,
-    }.values.toList();
-    if (autres.isEmpty) return 'Vous y êtes allé';
-    final tete = autres.take(2).join(', ');
-    final reste = autres.length - 2;
-    final verbe = autres.length > 1 ? 'y sont allés' : 'y est allé';
-    final qui = reste > 0 ? '$tete et $reste autre${reste > 1 ? 's' : ''}' : tete;
-    return visiteParMoi ? '$qui et vous y êtes allés' : '$qui $verbe';
+    final qui = ami.autres == 0
+        ? ami.pseudo
+        : '${ami.pseudo} et ${ami.autres} autre${ami.autres > 1 ? 's' : ''}';
+    if (visiteParMoi) return '$qui et vous y êtes allés';
+    return '$qui ${ami.autres == 0 ? 'y est allé' : 'y sont allés'}';
+  }
+
+  /// Le même lieu, entré dans Tabl et/ou avec une envie changée.
+  LieuCarte copierAvec({String? restaurantId, bool? estEnvie}) {
+    return LieuCarte(
+      nom: nom,
+      ville: ville,
+      latitude: latitude,
+      longitude: longitude,
+      restaurantId: restaurantId ?? this.restaurantId,
+      fsqPlaceId: fsqPlaceId,
+      adresse: adresse,
+      categories: categories,
+      amis: amis,
+      visites: visites,
+      coupsDeCoeur: coupsDeCoeur,
+      visiteParMoi: visiteParMoi,
+      estEnvie: estEnvie ?? this.estEnvie,
+      amiPseudo: amiPseudo,
+      amiPhotoUrl: amiPhotoUrl,
+    );
   }
 }
 

@@ -1,4 +1,3 @@
-import '../souvenirs/emotion.dart';
 import 'lieu_carte.dart';
 
 /// Les familles de cuisine proposées dans le filtre "Cuisine" : les
@@ -147,28 +146,20 @@ class FiltresCarte {
     moment != null,
   ].where((actif) => actif).length;
 
-  bool _visiteCorrespond(VisiteCarte v) =>
-      (personneId == null || v.auteurId == personneId) &&
-      (tableId == null || v.tableIds.contains(tableId)) &&
-      (!coupsDeCoeur || v.emotion == Emotion.coupDeCoeur) &&
-      (moment == null || v.moment == moment);
+  /// Les catégories Foursquare des familles choisies (pour la base),
+  /// `null` si aucune famille n'est choisie.
+  List<String>? get categories => familles.isEmpty
+      ? null
+      : [for (final f in familles) ...?famillesCuisine[f]];
 
-  bool _cuisineCorrespond(LieuCarte lieu) {
-    if (familles.isEmpty) return true;
-    final categories = {for (final f in familles) ...?famillesCuisine[f]};
-    return lieu.categories.any(categories.contains);
-  }
-
-  /// Le lieu passe-t-il les filtres ?
-  bool garde(LieuCarte lieu) {
-    if (mesEnvies && !lieu.estEnvie) return false;
-    if (jamaisEssaye && lieu.visiteParMoi) return false;
-    if (!_cuisineCorrespond(lieu)) return false;
-    if (_filtreVisites) {
-      final visites = lieu.visites.where(_visiteCorrespond).length;
-      if (visites < (laOuOnRevient ? 2 : 1)) return false;
-    }
-    return true;
+  /// Un lieu de l'annuaire passe-t-il les filtres ? (Les lieux de mon
+  /// réseau arrivent déjà filtrés par la base.) Personne de mon réseau
+  /// n'y est allé : seuls la cuisine et l'absence de filtre "réseau"
+  /// comptent.
+  bool gardeAnnuaire(LieuCarte lieu) {
+    if (!annuaireVisible) return false;
+    final choisies = categories;
+    return choisies == null || lieu.categories.any(choisies.contains);
   }
 
   FiltresCarte copierAvec({
@@ -192,20 +183,4 @@ class FiltresCarte {
       moment: moment != null ? moment() : this.moment,
     );
   }
-}
-
-/// Les personnes de mon réseau qui ont au moins une visite sur la carte
-/// (moi exclu) — pour le filtre "une personne", triées par pseudo.
-List<({String id, String pseudo})> personnesDesLieux(
-  Iterable<LieuCarte> lieux,
-) {
-  final pseudos = <String, String>{
-    for (final lieu in lieux)
-      for (final v in lieu.visites)
-        if (!v.estMoi) v.auteurId: v.auteurPseudo,
-  };
-  return [
-    for (final MapEntry(key: id, value: pseudo) in pseudos.entries)
-      (id: id, pseudo: pseudo),
-  ]..sort((a, b) => a.pseudo.toLowerCase().compareTo(b.pseudo.toLowerCase()));
 }

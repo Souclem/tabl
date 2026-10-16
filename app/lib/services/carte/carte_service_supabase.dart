@@ -4,9 +4,8 @@ import '../restaurants/envies_restaurants.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/registre_restaurants.dart';
 import '../social/photo_profil.dart';
-import '../souvenirs/emotion.dart';
-import '../souvenirs/filtre_reseau.dart';
 import 'carte_service.dart';
+import 'filtres_carte.dart';
 import 'lieu_carte.dart';
 
 class CarteServiceSupabase implements CarteService {
@@ -16,106 +15,73 @@ class CarteServiceSupabase implements CarteService {
 
   String get _monId => _client.auth.currentSession!.user.id;
 
-  static const _tailleTranche = 1000;
-
-  static const _colonnesRestaurant =
-      'id, nom, ville, adresse, latitude, longitude, categories, fsq_place_id';
-
   @override
-  Future<List<LieuCarte>> lieuxTabl() async {
-    final reseau = await conditionSouvenirsDuReseau(_client, _monId);
-    // L'API renvoie au plus 1 000 lignes par requête, sans prévenir : on
-    // charge par tranches jusqu'à la dernière.
-    final souvenirs = <Map<String, dynamic>>[];
-    while (true) {
-      final tranche = await _client
-          .from('souvenirs')
-          .select(
-            'id, auteur_id, emotion, moment, date_visite, '
-            'profils!souvenirs_auteur_id_fkey(pseudo, photo_url), '
-            'restaurants!inner($_colonnesRestaurant), '
-            // Les Tables de chaque souvenir viennent avec lui : une liste
-            // d'identifiants à part serait trop longue pour l'API avec un
-            // grand réseau.
-            'associations_experience_table(table_id)',
-          )
-          .eq('statut', 'publie')
-          .or(reseau)
-          .order('id')
-          .range(souvenirs.length, souvenirs.length + _tailleTranche - 1);
-      souvenirs.addAll(tranche);
-      if (tranche.length < _tailleTranche) break;
-    }
-
-    final envies = await _client
-        .from('restaurants_sauvegardes')
-        .select('restaurants!inner($_colonnesRestaurant)')
-        .eq('profil_id', _monId);
-
-    final restaurants = <String, Map<String, dynamic>>{};
-    final visites = <String, List<VisiteCarte>>{};
-    for (final s in souvenirs) {
-      final restaurant = s['restaurants'] as Map<String, dynamic>;
-      final id = restaurant['id'] as String;
-      restaurants[id] = restaurant;
-      final auteur = s['profils'] as Map<String, dynamic>?;
-      visites
-          .putIfAbsent(id, () => [])
-          .add(
-            VisiteCarte(
-              souvenirId: s['id'] as String,
-              auteurId: s['auteur_id'] as String,
-              auteurPseudo: auteur?['pseudo'] as String? ?? '',
-          auteurPhotoUrl: urlPhotoProfil(
+  Future<List<LieuCarte>> lieuxReseau(
+    ZoneCarte zone,
+    FiltresCarte filtres, {
+    int limite = 400,
+  }) async {
+    final lignes = await _client.rpc<List<dynamic>>(
+      'lieux_carte',
+      params: {
+        'p_sud': zone.sud,
+        'p_ouest': zone.ouest,
+        'p_nord': zone.nord,
+        'p_est': zone.est,
+        'p_personne': filtres.personneId,
+        'p_table': filtres.tableId,
+        'p_categories': filtres.categories,
+        'p_mes_envies': filtres.mesEnvies,
+        'p_jamais_essaye': filtres.jamaisEssaye,
+        'p_coups_de_coeur': filtres.coupsDeCoeur,
+        'p_la_ou_on_revient': filtres.laOuOnRevient,
+        'p_moment': filtres.moment,
+        'p_limite': limite,
+      },
+    );
+    return [
+      for (final l in lignes.cast<Map<String, dynamic>>())
+        LieuCarte(
+          restaurantId: l['restaurant_id'] as String,
+          fsqPlaceId: l['fsq_place_id'] as String?,
+          nom: l['nom'] as String,
+          ville: l['ville'] as String? ?? '',
+          adresse: l['adresse'] as String?,
+          latitude: (l['latitude'] as num).toDouble(),
+          longitude: (l['longitude'] as num).toDouble(),
+          categories: (l['categories'] as List?)?.cast<String>() ?? const [],
+          amis: l['amis'] as int,
+          visites: l['visites'] as int,
+          coupsDeCoeur: l['coups_de_coeur'] as int,
+          visiteParMoi: l['visite_par_moi'] as bool,
+          estEnvie: l['est_envie'] as bool,
+          amiPseudo: l['ami_pseudo'] as String?,
+          amiPhotoUrl: urlPhotoProfil(
             _client,
-            auteur?['photo_url'] as String?,
+            l['ami_photo'] as String?,
             miniature: true,
           ),
-              estMoi: s['auteur_id'] == _monId,
-              moment: s['moment'] as String? ?? '',
-              date: DateTime.parse(s['date_visite'] as String),
-              emotion: Emotion.depuisEmoji(s['emotion'] as String?),
-              tableIds: {
-                for (final a
-                    in (s['associations_experience_table'] as List? ??
-                        const []))
-                  (a as Map<String, dynamic>)['table_id'] as String,
-              },
-            ),
-          );
-    }
-    final enviesIds = <String>{};
-    for (final e in envies) {
-      final restaurant = e['restaurants'] as Map<String, dynamic>;
-      final id = restaurant['id'] as String;
-      restaurants[id] = restaurant;
-      enviesIds.add(id);
-    }
-
-    return [
-      for (final MapEntry(key: id, value: r) in restaurants.entries)
-        // Sans position (anciens restaurants saisis à la main), un lieu
-        // ne peut pas apparaître sur une carte.
-        if (r['latitude'] != null && r['longitude'] != null)
-          LieuCarte(
-            restaurantId: id,
-            fsqPlaceId: r['fsq_place_id'] as String?,
-            nom: r['nom'] as String,
-            ville: r['ville'] as String? ?? '',
-            adresse: r['adresse'] as String?,
-            latitude: (r['latitude'] as num).toDouble(),
-            longitude: (r['longitude'] as num).toDouble(),
-            categories: (r['categories'] as List?)?.cast<String>() ?? const [],
-            visites: visites[id] ?? const [],
-            estEnvie: enviesIds.contains(id),
-          ),
+        ),
     ];
+  }
+
+  @override
+  Future<Set<String>> mesLieuxVisites() async {
+    final lignes = await _client
+        .from('souvenirs')
+        .select('restaurants!inner(fsq_place_id)')
+        .eq('auteur_id', _monId)
+        .not('restaurants.fsq_place_id', 'is', null);
+    return {
+      for (final l in lignes)
+        (l['restaurants'] as Map<String, dynamic>)['fsq_place_id'] as String,
+    };
   }
 
   @override
   Future<List<LieuCarte>> lieuxAnnuaire(
     ZoneCarte zone, {
-    int limite = 400,
+    int limite = 600,
   }) async {
     final lignes = await _client
         .from('lieux_reference')

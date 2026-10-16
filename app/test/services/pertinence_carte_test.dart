@@ -16,17 +16,9 @@ LieuCarte _lieu(
   latitude: lat,
   longitude: lng,
   estEnvie: envie,
-  visites: [
-    for (var i = 0; i < amis; i++)
-      VisiteCarte(
-        souvenirId: '$id-$i',
-        auteurId: 'ami$i',
-        auteurPseudo: 'ami$i',
-        estMoi: false,
-        moment: 'soir',
-        date: DateTime(2026, 10, 1),
-      ),
-  ],
+  amis: amis,
+  visites: amis,
+  amiPseudo: amis > 0 ? 'ami' : null,
 );
 
 void main() {

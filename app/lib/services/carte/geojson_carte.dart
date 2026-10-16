@@ -18,7 +18,7 @@ String geojsonLieux(Iterable<LieuCarte> lieux) {
           },
           'properties': {
             'cle': lieu.cle,
-            'visites': lieu.visites.length,
+            'visites': lieu.visites,
             'envie': lieu.estEnvie,
             // Visité par mon réseau ou en envie : marqueur plein ; sinon
             // petit point (un restaurant de l'annuaire).

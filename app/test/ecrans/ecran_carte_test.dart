@@ -5,31 +5,58 @@ import 'package:app/widgets/widgets.dart';
 
 import 'package:app/ecrans/ecran_carte.dart';
 
+/// Faux service : applique quelques filtres comme le ferait la base, et
+/// garde les filtres reçus pour vérifier que l'écran recharge.
 class _FauxCarteService implements CarteService {
   _FauxCarteService(this.lieux);
 
   final List<LieuCarte> lieux;
+  final List<FiltresCarte> recherches = [];
 
   @override
-  Future<List<LieuCarte>> lieuxTabl() async => lieux;
-
-  @override
-  Future<List<LieuCarte>> lieuxAnnuaire(
-    ZoneCarte zone, {
+  Future<List<LieuCarte>> lieuxReseau(
+    ZoneCarte zone,
+    FiltresCarte filtres, {
     int limite = 400,
-  }) async => [];
+  }) async {
+    recherches.add(filtres);
+    return [
+      for (final l in lieux)
+        if ((!filtres.coupsDeCoeur || l.coupsDeCoeur > 0) &&
+            (!filtres.mesEnvies || l.estEnvie))
+          l,
+    ];
+  }
+
+  @override
+  Future<List<LieuCarte>> lieuxAnnuaire(ZoneCarte zone, {int limite = 600}) async =>
+      [];
+
+  @override
+  Future<Set<String>> mesLieuxVisites() async => {};
 
   @override
   Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;
 
   @override
-  Future<void> basculerEnvie(
-    String restaurantId, {
-    required bool envie,
-  }) async {}
+  Future<void> basculerEnvie(String restaurantId, {required bool envie}) async {}
 }
 
-LieuCarte _lieu(String nom, {Emotion? emotion, bool envie = false}) =>
+class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (
+    abonnes: <ProfilPublic>[],
+    abonnements: const [
+      ProfilPublic(id: 'emma', pseudo: 'Emma', statut: StatutAbonnement.abonne),
+    ],
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+LieuCarte _lieu(String nom, {bool coupDeCoeur = false, bool envie = false}) =>
     LieuCarte(
       restaurantId: nom,
       nom: nom,
@@ -38,32 +65,29 @@ LieuCarte _lieu(String nom, {Emotion? emotion, bool envie = false}) =>
       longitude: 5.57,
       categories: const ['Brasserie'],
       estEnvie: envie,
-      visites: envie
-          ? const []
-          : [
-              VisiteCarte(
-                souvenirId: 's-$nom',
-                auteurId: 'emma',
-                auteurPseudo: 'Emma',
-                estMoi: false,
-                moment: 'soir',
-                date: DateTime(2026, 10, 1),
-                emotion: emotion,
-              ),
-            ],
+      amis: envie ? 0 : 1,
+      visites: envie ? 0 : 1,
+      coupsDeCoeur: coupDeCoeur ? 1 : 0,
+      amiPseudo: envie ? null : 'Emma',
     );
 
-Future<void> _ouvrir(WidgetTester tester, List<LieuCarte> lieux) async {
+Future<_FauxCarteService> _ouvrir(
+  WidgetTester tester,
+  List<LieuCarte> lieux,
+) async {
+  final service = _FauxCarteService(lieux);
   await tester.pumpWidget(
     MaterialApp(
       theme: TablTheme.sombre(),
       home: EcranCarte(
-        carteService: _FauxCarteService(lieux),
+        carteService: service,
+        abonnementService: _FauxAbonnementService(),
         afficherCarte: false,
       ),
     ),
   );
   await tester.pumpAndSettle();
+  return service;
 }
 
 /// La rangée de filtres défile horizontalement : on amène la pastille à
@@ -90,7 +114,7 @@ void main() {
 
   testWidgets('la liste montre les lieux du réseau, filtrés', (tester) async {
     await _ouvrir(tester, [
-      _lieu('Le Campus', emotion: Emotion.coupDeCoeur),
+      _lieu('Le Campus', coupDeCoeur: true),
       _lieu('Bibo'),
       _lieu('Como en Casa', envie: true),
     ]);
@@ -116,8 +140,8 @@ void main() {
   });
 
   testWidgets('filtre "une personne" : choix dans une feuille', (tester) async {
-    await _ouvrir(tester, [_lieu('Bibo')]);
 
+    final service = await _ouvrir(tester, [_lieu('Bibo')]);
     await tester.tap(find.text('Une personne'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Emma'));
@@ -125,6 +149,8 @@ void main() {
 
     expect(find.text('Emma'), findsOneWidget);
     expect(find.text('Effacer (1)'), findsOneWidget);
+    // Le filtre part à la base : nouvelle recherche avec la personne.
+    expect(service.recherches.last.personneId, 'emma');
   });
 
   testWidgets('liste vide avec filtres : message dédié', (tester) async {

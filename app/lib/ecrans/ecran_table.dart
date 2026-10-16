@@ -101,6 +101,7 @@ class _EcranTableState extends State<EcranTable> {
           carteService: _carteService,
           positionService: PositionServiceGeolocator(),
           tableService: widget.tableService,
+          abonnementService: widget.abonnementService,
           filtresInitiaux: FiltresCarte(tableId: widget.tableId),
           estOnglet: false,
         ),

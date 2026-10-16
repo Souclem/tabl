@@ -15,6 +15,7 @@ class EcranCarte extends StatefulWidget {
     required this.carteService,
     this.positionService,
     this.tableService,
+    this.abonnementService,
     this.filtresInitiaux = FiltresCarte.aucun,
     this.estOnglet = true,
     this.afficherCarte = true,
@@ -28,6 +29,10 @@ class EcranCarte extends StatefulWidget {
 
   /// Pour le nom des Tables du filtre "Table". `null` : filtre masqué.
   final TableService? tableService;
+
+  /// Pour les personnes du filtre "Une personne" (celles que je suis).
+  /// `null` : filtre masqué.
+  final AbonnementService? abonnementService;
 
   /// Filtres appliqués à l'ouverture ("Voir sur la carte" depuis une
   /// Table ouvre la carte déjà filtrée sur cette Table).
@@ -59,42 +64,77 @@ class _EcranCarteState extends State<EcranCarte> {
   final _controleur = ControleurCarte();
 
   /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
-  ZoneCarte _zone = const ZoneCarte(sud: 49.4, ouest: 2.5, nord: 51.6, est: 6.5);
+  ZoneCarte _zone = const ZoneCarte(
+    sud: 49.4,
+    ouest: 2.5,
+    nord: 51.6,
+    est: 6.5,
+  );
   double _zoom = 6.5;
 
   bool _enListe = false;
   late FiltresCarte _filtres = widget.filtresInitiaux;
-  List<LieuCarte> _lieuxTabl = const [];
+
+  /// Lieux de mon réseau dans la zone visible, filtres appliqués par la
+  /// base (une ligne résumée par lieu).
+  List<LieuCarte> _reseau = const [];
   List<LieuCarte> _annuaire = const [];
+  Set<String> _mesLieuxVisites = const {};
   List<ResumeTable> _tables = const [];
+  List<ProfilPublic> _personnes = const [];
   LieuCarte? _selection;
   bool _envieEnCours = false;
+  bool _chargement = false;
   Coordonnees? _position;
-  Timer? _attenteZone;
+
+  /// Numéro de la dernière recherche lancée : une réponse plus ancienne,
+  /// arrivée après une plus récente, est ignorée.
+  int _recherche = 0;
 
   @override
   void initState() {
     super.initState();
-    _chargerLieuxTabl();
+    _charger();
     _chargerTables();
+    _chargerPersonnes();
+    _chargerMesLieuxVisites();
     _localiser();
   }
 
-  @override
-  void dispose() {
-    _attenteZone?.cancel();
-    super.dispose();
+  /// Recharge la zone visible avec les filtres actuels : les lieux de mon
+  /// réseau, et l'annuaire de près.
+  Future<void> _charger() async {
+    final numero = ++_recherche;
+    final zone = _zone;
+    final filtres = _filtres;
+    setState(() => _chargement = true);
+    try {
+      final resultats = await Future.wait([
+        widget.carteService.lieuxReseau(zone, filtres),
+        _zoom >= _zoomAnnuaire && filtres.annuaireVisible
+            ? widget.carteService.lieuxAnnuaire(zone)
+            : Future.value(const <LieuCarte>[]),
+      ]);
+      if (!mounted || numero != _recherche) return;
+      setState(() {
+        _reseau = resultats[0];
+        _annuaire = resultats[1];
+      });
+    } catch (e) {
+      debugPrint('EcranCarte: chargement : $e');
+      if (mounted && numero == _recherche) {
+        afficherMessage(context, messageErreurGenerique);
+      }
+    } finally {
+      if (mounted && numero == _recherche) {
+        setState(() => _chargement = false);
+      }
+    }
   }
 
-  Future<void> _chargerLieuxTabl() async {
-    try {
-      final lieux = await widget.carteService.lieuxTabl();
-      if (!mounted) return;
-      setState(() => _lieuxTabl = lieux);
-    } catch (e) {
-      debugPrint('EcranCarte: lieux du réseau : $e');
-      if (mounted) afficherMessage(context, messageErreurGenerique);
-    }
+  void _appliquerFiltres(FiltresCarte filtres) {
+    setState(() => _filtres = filtres);
+    _charger();
   }
 
   Future<void> _chargerTables() async {
@@ -106,6 +146,26 @@ class _EcranCarteState extends State<EcranCarte> {
     }
   }
 
+  Future<void> _chargerPersonnes() async {
+    try {
+      final listes = await widget.abonnementService?.abonnesEtAbonnements();
+      if (mounted && listes != null) {
+        setState(() => _personnes = listes.abonnements);
+      }
+    } catch (e) {
+      debugPrint('EcranCarte: personnes : $e');
+    }
+  }
+
+  Future<void> _chargerMesLieuxVisites() async {
+    try {
+      final lieux = await widget.carteService.mesLieuxVisites();
+      if (mounted) setState(() => _mesLieuxVisites = lieux);
+    } catch (e) {
+      debugPrint('EcranCarte: mes lieux visités : $e');
+    }
+  }
+
   Future<void> _localiser() async {
     final position = await widget.positionService?.positionActuelle();
     if (!mounted || position == null) return;
@@ -113,6 +173,7 @@ class _EcranCarteState extends State<EcranCarte> {
     await _controleur.centrerSur(position.latitude, position.longitude);
   }
 
+  /// Appelée par la carte une fois immobile depuis un instant.
   void _zoneVisible(
     double sud,
     double ouest,
@@ -120,43 +181,25 @@ class _EcranCarteState extends State<EcranCarte> {
     double est,
     double zoom,
   ) {
-    _attenteZone?.cancel();
-    setState(() {
-      _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
-      _zoom = zoom;
-    });
-    if (zoom < _zoomAnnuaire) {
-      if (_annuaire.isNotEmpty) setState(() => _annuaire = const []);
-      return;
-    }
-    // On attend que la carte s'immobilise avant de charger le quartier.
-    _attenteZone = Timer(const Duration(milliseconds: 300), () async {
-      try {
-        final lieux = await widget.carteService.lieuxAnnuaire(
-          ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est),
-          limite: 600,
-        );
-        if (mounted) setState(() => _annuaire = lieux);
-      } catch (e) {
-        debugPrint('EcranCarte: annuaire : $e');
-      }
-    });
+    _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
+    _zoom = zoom;
+    _charger();
   }
 
-  List<LieuCarte> get _lieuxTablFiltres =>
-      _lieuxTabl.where(_filtres.garde).toList();
-
-  /// L'annuaire sans les lieux déjà entrés dans Tabl, et seulement si
-  /// aucun filtre "réseau" ne l'exclut.
+  /// L'annuaire sans les lieux déjà affichés comme lieux de mon réseau,
+  /// filtres appliqués (cuisine, jamais essayé).
   List<LieuCarte> get _annuaireFiltre {
-    if (!_filtres.annuaireVisible) return const [];
-    final dejaDansTabl = {
-      for (final l in _lieuxTabl)
+    final dejaAffiches = {
+      for (final l in _reseau)
         if (l.fsqPlaceId != null) l.fsqPlaceId,
     };
     return [
       for (final l in _annuaire)
-        if (!dejaDansTabl.contains(l.fsqPlaceId) && _filtres.garde(l)) l,
+        if (!dejaAffiches.contains(l.fsqPlaceId) &&
+            !(_filtres.jamaisEssaye &&
+                _mesLieuxVisites.contains(l.fsqPlaceId)) &&
+            _filtres.gardeAnnuaire(l))
+          l,
     ];
   }
 
@@ -171,21 +214,20 @@ class _EcranCarteState extends State<EcranCarte> {
     );
   }
 
-  /// La liste : lieux de mon réseau filtrés, du plus proche au plus loin
-  /// si la position est connue, sinon les plus visités d'abord.
+  /// La liste : les lieux de mon réseau de la zone visible, du plus
+  /// proche au plus loin si la position est connue, sinon les plus
+  /// pertinents d'abord (l'ordre de la base).
   List<LieuCarte> get _lieuxListe {
-    final lieux = _lieuxTablFiltres;
+    final lieux = [..._reseau];
     if (_position != null) {
       lieux.sort((a, b) => _distance(a)!.compareTo(_distance(b)!));
-    } else {
-      lieux.sort((a, b) => b.visites.length.compareTo(a.visites.length));
     }
     return lieux;
   }
 
   void _tapLieu(String cle) {
     final lieu = [
-      ..._lieuxTabl,
+      ..._reseau,
       ..._annuaire,
     ].where((l) => l.cle == cle).firstOrNull;
     if (lieu != null) setState(() => _selection = lieu);
@@ -207,23 +249,15 @@ class _EcranCarteState extends State<EcranCarte> {
       final restaurantId = await widget.carteService.idRestaurant(lieu);
       final envie = !lieu.estEnvie;
       await widget.carteService.basculerEnvie(restaurantId, envie: envie);
-      final misAJour = LieuCarte(
+      final misAJour = lieu.copierAvec(
         restaurantId: restaurantId,
-        fsqPlaceId: lieu.fsqPlaceId,
-        nom: lieu.nom,
-        ville: lieu.ville,
-        adresse: lieu.adresse,
-        latitude: lieu.latitude,
-        longitude: lieu.longitude,
-        categories: lieu.categories,
-        visites: lieu.visites,
         estEnvie: envie,
       );
       if (!mounted) return;
       setState(() {
         _selection = misAJour;
-        _lieuxTabl = [
-          for (final l in _lieuxTabl)
+        _reseau = [
+          for (final l in _reseau)
             if (l.cle != lieu.cle && l.cle != misAJour.cle) l,
           if (misAJour.duReseau) misAJour,
         ];
@@ -294,16 +328,13 @@ class _EcranCarteState extends State<EcranCarte> {
       actuel: _filtres.personneId,
       options: [
         (valeur: null, libelle: 'Tout mon réseau'),
-        for (final p in personnesDesLieux(_lieuxTabl))
-          (valeur: p.id, libelle: p.pseudo),
+        for (final p in _personnes) (valeur: p.id, libelle: p.pseudo),
       ],
     );
     if (choix == null) return;
-    setState(() {
-      _filtres = _filtres.copierAvec(
-        personneId: () => choix.isEmpty ? null : choix,
-      );
-    });
+    _appliquerFiltres(
+      _filtres.copierAvec(personneId: () => choix.isEmpty ? null : choix),
+    );
   }
 
   Future<void> _choisirTable() async {
@@ -316,11 +347,9 @@ class _EcranCarteState extends State<EcranCarte> {
       ],
     );
     if (choix == null) return;
-    setState(() {
-      _filtres = _filtres.copierAvec(
-        tableId: () => choix.isEmpty ? null : choix,
-      );
-    });
+    _appliquerFiltres(
+      _filtres.copierAvec(tableId: () => choix.isEmpty ? null : choix),
+    );
   }
 
   Future<void> _choisirMoment() async {
@@ -334,11 +363,9 @@ class _EcranCarteState extends State<EcranCarte> {
       ],
     );
     if (choix == null) return;
-    setState(() {
-      _filtres = _filtres.copierAvec(
-        moment: () => choix.isEmpty ? null : choix,
-      );
-    });
+    _appliquerFiltres(
+      _filtres.copierAvec(moment: () => choix.isEmpty ? null : choix),
+    );
   }
 
   Future<void> _choisirCuisine() async {
@@ -348,14 +375,12 @@ class _EcranCarteState extends State<EcranCarte> {
       builder: (_) => _FeuilleCuisine(selection: _filtres.familles),
     );
     if (choisies == null) return;
-    setState(() => _filtres = _filtres.copierAvec(familles: choisies));
+    _appliquerFiltres(_filtres.copierAvec(familles: choisies));
   }
 
   String? _pseudo(String? id) => id == null
       ? null
-      : personnesDesLieux(
-          _lieuxTabl,
-        ).where((p) => p.id == id).firstOrNull?.pseudo;
+      : _personnes.where((p) => p.id == id).firstOrNull?.pseudo;
 
   @override
   Widget build(BuildContext context) {
@@ -415,8 +440,7 @@ class _EcranCarteState extends State<EcranCarte> {
                   TablPuceFiltre(
                     libelle: 'Effacer (${f.nombreActifs})',
                     actif: false,
-                    onPresse: () =>
-                        setState(() => _filtres = FiltresCarte.aucun),
+                    onPresse: () => _appliquerFiltres(FiltresCarte.aucun),
                   ),
                 TablPuceFiltre(
                   libelle: pseudo ?? 'Une personne',
@@ -444,33 +468,28 @@ class _EcranCarteState extends State<EcranCarte> {
                 TablPuceFiltre(
                   libelle: 'Mes envies',
                   actif: f.mesEnvies,
-                  onPresse: () => setState(
-                    () => _filtres = f.copierAvec(mesEnvies: !f.mesEnvies),
-                  ),
+                  onPresse: () =>
+                      _appliquerFiltres(f.copierAvec(mesEnvies: !f.mesEnvies)),
                 ),
                 TablPuceFiltre(
                   libelle: 'Jamais essayé',
                   actif: f.jamaisEssaye,
-                  onPresse: () => setState(
-                    () =>
-                        _filtres = f.copierAvec(jamaisEssaye: !f.jamaisEssaye),
+                  onPresse: () => _appliquerFiltres(
+                    f.copierAvec(jamaisEssaye: !f.jamaisEssaye),
                   ),
                 ),
                 TablPuceFiltre(
                   libelle: 'Coups de cœur 😍',
                   actif: f.coupsDeCoeur,
-                  onPresse: () => setState(
-                    () =>
-                        _filtres = f.copierAvec(coupsDeCoeur: !f.coupsDeCoeur),
+                  onPresse: () => _appliquerFiltres(
+                    f.copierAvec(coupsDeCoeur: !f.coupsDeCoeur),
                   ),
                 ),
                 TablPuceFiltre(
                   libelle: 'Là où on revient',
                   actif: f.laOuOnRevient,
-                  onPresse: () => setState(
-                    () => _filtres = f.copierAvec(
-                      laOuOnRevient: !f.laOuOnRevient,
-                    ),
+                  onPresse: () => _appliquerFiltres(
+                    f.copierAvec(laOuOnRevient: !f.laOuOnRevient),
                   ),
                 ),
                 TablPuceFiltre(
@@ -492,6 +511,16 @@ class _EcranCarteState extends State<EcranCarte> {
           ),
         ),
         const SizedBox(height: TablTokens.espaceS),
+        // Discret : la zone ou les filtres changent, la carte se recharge.
+        SizedBox(
+          height: 2,
+          child: _chargement
+              ? const LinearProgressIndicator(
+                  color: TablTokens.primaire,
+                  backgroundColor: Colors.transparent,
+                )
+              : null,
+        ),
       ],
     );
   }
@@ -506,10 +535,11 @@ class _EcranCarteState extends State<EcranCarte> {
                   // Toujours la même règle : ce que disent les filtres, et
                   // parmi ça les plus pertinents pour la zone visible.
                   geojsonLieux: geojsonLieux(
-                    lieuxAAfficher([
-                      ..._lieuxTablFiltres,
-                      ..._annuaireFiltre,
-                    ], _zone, zoom: _zoom),
+                    lieuxAAfficher(
+                      [..._reseau, ..._annuaireFiltre],
+                      _zone,
+                      zoom: _zoom,
+                    ),
                   ),
                   // Belgique, avant de connaître la position.
                   latitudeInitiale: 50.5,
@@ -551,7 +581,7 @@ class _EcranCarteState extends State<EcranCarte> {
               nom: selection.nom,
               description: selection.description,
               resume: selection.resumeVisites,
-              duReseau: selection.visites.isNotEmpty,
+              duReseau: selection.visites > 0,
               estEnvie: selection.estEnvie,
               enCours: _envieEnCours,
               onEnvie: _basculerEnvie,
@@ -593,7 +623,7 @@ class _EcranCarteState extends State<EcranCarte> {
           nom: lieu.nom,
           description: lieu.description,
           resume: lieu.resumeVisites,
-          duReseau: lieu.visites.isNotEmpty,
+          duReseau: lieu.visites > 0,
           estEnvie: lieu.estEnvie,
           distance: distance == null ? null : distanceLisible(distance),
           onPresse: () => _ouvrirDepuisListe(lieu),

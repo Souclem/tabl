@@ -1,6 +1,5 @@
 import 'dart:math';
 
-import '../souvenirs/emotion.dart';
 import 'lieu_carte.dart';
 
 /// Au plus autant de bulles photo à la fois : elles sont grandes.
@@ -25,19 +24,11 @@ const zoomToutAfficher = 15.5;
 /// qui y sont allés, puis le nombre de visites, puis les coups de cœur ;
 /// mes envies passent devant. Un lieu de l'annuaire (personne n'y est
 /// allé) vaut 0.
-double pertinence(LieuCarte lieu) {
-  final amis = {
-    for (final v in lieu.visites)
-      if (!v.estMoi) v.auteurId,
-  }.length;
-  final coupsDeCoeur = lieu.visites
-      .where((v) => v.emotion == Emotion.coupDeCoeur)
-      .length;
-  return (lieu.estEnvie ? 100000.0 : 0) +
-      amis * 100.0 +
-      lieu.visites.length * 10.0 +
-      coupsDeCoeur;
-}
+double pertinence(LieuCarte lieu) =>
+    (lieu.estEnvie ? 100000.0 : 0) +
+    lieu.amis * 100.0 +
+    lieu.visites * 10.0 +
+    lieu.coupsDeCoeur;
 
 /// Les lieux à afficher dans [zone], parmi [candidats] (déjà filtrés) :
 /// les plus pertinents d'abord, chacun avec la place qu'il occupe à
