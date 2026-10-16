@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
 import 'souvenir_feed.dart';
@@ -28,10 +29,10 @@ abstract interface class SouvenirService {
   /// tout le reste ([legende], [amisTaguesIds], la boisson) reste
   /// optionnel, conformément à la maquette de finalisation.
   ///
-  /// [tableIds] (megaprompt Bloc 5, règle 5, 26) : une association Table
-  /// est toujours aussi un grant de visibilité, jamais une deuxième
-  /// publication — l'expérience créée ici est la seule source, associée
-  /// à chacune de ces Tables en plus de [partagerAvecCercle]. Retourne
+  /// [audience] : qui peut voir (voir [AudienceSouvenir]). Ses Tables
+  /// (mode "Seulement…") sont des associations, jamais une deuxième
+  /// publication — l'expérience créée ici est la seule source (megaprompt
+  /// Bloc 5, règle 5, 26). Retourne
   /// les identifiants de Table dont l'association a échoué (règle 51 :
   /// ne jamais prétendre qu'une association a réussi si elle a échoué) —
   /// liste vide si tout a réussi. La publication elle-même n'échoue
@@ -47,28 +48,25 @@ abstract interface class SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
-    bool partagerAvecCercle = true,
-    List<String> tableIds = const [],
+    AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   });
 
-  /// Le partage actuel d'un souvenir déjà publié : sa visibilité de base
-  /// et les Tables auxquelles il est associé — pour préremplir l'écran
-  /// "Modifier le partage" (règle 80). Réservé à l'auteur (RLS).
-  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
+  /// L'audience actuelle d'un souvenir déjà publié, et les amis tagués
+  /// (pour l'avertissement "ne verra pas ce moment") — pour préremplir
+  /// la feuille "Qui peut voir ?". Réservé à l'auteur (RLS).
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId);
+
+  /// Remplace l'audience d'un souvenir déjà publié : mode, personnes et
+  /// Tables (les Tables retirées sont désassociées, les nouvelles
+  /// ajoutées — règle 42, 48). Ne change jamais la date d'origine du
+  /// souvenir (règle 40, 68) ni ne recrée d'item Feed (règle 41, 65).
+  /// Retourne les Tables dont l'association a échoué. Réservé à
+  /// l'auteur (RLS).
+  Future<List<String>> modifierAudience(
     String souvenirId,
+    AudienceSouvenir audience,
   );
-
-  /// Modifie le partage d'un souvenir déjà publié : nouvelle visibilité
-  /// de base et nouvel ensemble de Tables associées (les Tables absentes
-  /// de [tableIds] mais présentes avant sont retirées ; les nouvelles
-  /// sont ajoutées — règle 42, 48). Ne change jamais la date d'origine
-  /// du souvenir (règle 40, 68) ni ne recrée de nouvel item Feed
-  /// (règle 41, 65). Réservé à l'auteur (RLS).
-  Future<List<String>> modifierPartage(
-    String souvenirId, {
-    required bool partagerAvecCercle,
-    required List<String> tableIds,
-  });
 
   /// Le Feed : les souvenirs qu'on a le droit de voir (les siens, et ceux
   /// des abonnements acceptés — la RLS de `souvenirs` s'en charge, ce

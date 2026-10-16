@@ -69,10 +69,24 @@ class _FauxCarteService implements CarteService {
 
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
+  @override
   Future<List<ProfilPublic>> rechercher(String requete) async => [];
 
   @override
-  Future<void> suivre(String suiviId) => throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) =>
+      throw UnimplementedError();
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -90,7 +104,7 @@ class _FauxAbonnementService implements AbonnementService {
   Future<int> nombreDemandesEnAttente() async => 0;
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async => [
+  Future<List<ProfilPublic>> mesRelations() async => [
     const ProfilPublic(id: 'emma', pseudo: 'Emma', statut: StatutAbonnement.abonne),
   ];
 }

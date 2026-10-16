@@ -47,6 +47,7 @@ class TablPublication extends StatelessWidget {
     this.legende,
     this.impressions = const [],
     this.enregistre = false,
+    this.audienceRestreinte = false,
     this.onEnregistrer,
     this.onOptions,
     this.instantsTotal = 0,
@@ -74,6 +75,11 @@ class TablPublication extends StatelessWidget {
   final String libelleReactions;
 
   final bool enregistre;
+
+  /// Petit cadenas à côté de la date : l'audience n'est pas "Tout le
+  /// monde" (ne concerne que ses propres posts).
+  final bool audienceRestreinte;
+
   final VoidCallback onReagir;
   final VoidCallback onCommenter;
   final VoidCallback onOuvrirLieu;
@@ -112,6 +118,7 @@ class TablPublication extends StatelessWidget {
           _EnTete(
             auteurPseudo: _afficheAuteur ? auteurPseudo : null,
             dateLisible: dateLisible,
+            audienceRestreinte: audienceRestreinte,
             onOptions: _afficheOptions ? onOptions : null,
           ),
           _Photo(
@@ -213,19 +220,31 @@ class _EnTete extends StatelessWidget {
   const _EnTete({
     required this.auteurPseudo,
     required this.dateLisible,
+    required this.audienceRestreinte,
     required this.onOptions,
   });
 
   /// `null` : auteur masqué.
   final String? auteurPseudo;
   final String dateLisible;
+  final bool audienceRestreinte;
   final VoidCallback? onOptions;
 
   @override
   Widget build(BuildContext context) {
-    final date = Text(
-      dateLisible,
-      style: TablTokens.legende.copyWith(fontSize: 11),
+    final date = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (audienceRestreinte) ...[
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 11,
+            color: TablTokens.texteDoux,
+          ),
+          const SizedBox(width: 4),
+        ],
+        Text(dateLisible, style: TablTokens.legende.copyWith(fontSize: 11)),
+      ],
     );
     return Padding(
       padding: EdgeInsets.fromLTRB(

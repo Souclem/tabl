@@ -36,7 +36,7 @@ const List<_DonneesEtape> _etapes = [
   ),
   _DonneesEtape(
     titre: 'Réseau privé entre amis',
-    texte: 'Tabl est privé : seuls tes amis voient ce que tu publies.',
+    texte: 'Tabl est privé par défaut : tu choisis qui voit ce que tu publies.',
     icone: Icons.lock_outline_rounded,
   ),
   _DonneesEtape(

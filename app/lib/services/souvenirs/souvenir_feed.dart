@@ -21,6 +21,7 @@ class SouvenirFeed {
     this.amisTagues = const [],
     this.impressions = const [],
     this.estAMoi = false,
+    this.audienceRestreinte = false,
   });
 
   final String id;
@@ -66,6 +67,11 @@ class SouvenirFeed {
   /// jamais).
   final bool estAMoi;
 
+  /// `true` si l'audience n'est pas "Tout le monde" — n'est renseigné
+  /// que pour ses propres publications (l'audience des autres ne nous
+  /// regarde pas), pour le petit cadenas à côté de la date.
+  final bool audienceRestreinte;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -92,6 +98,7 @@ class SouvenirFeed {
       amisTagues: amisTagues,
       impressions: impressions,
       estAMoi: estAMoi,
+      audienceRestreinte: audienceRestreinte,
     );
   }
 }

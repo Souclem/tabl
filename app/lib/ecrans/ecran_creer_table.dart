@@ -43,7 +43,7 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
 
   Future<void> _chargerAmis() async {
     try {
-      final amis = await widget.abonnementService.mesAmis();
+      final amis = await widget.abonnementService.mesRelations();
       if (!mounted) return;
       setState(() {
         _amis = amis;
@@ -132,7 +132,7 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
                     )
                   else if (_amis.isEmpty)
                     Text(
-                      'Votre cercle est vide pour le moment.',
+                      'Suivez des personnes pour pouvoir les inviter.',
                       style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
                     )
                   else

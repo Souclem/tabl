@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'feuille_audience.dart';
+
 /// Les 4 emoji parmi lesquels choisir à la finalisation — ensemble et
 /// ordre exacts du prototype fonctionnel (`emotionOptions` dans
 /// `instruction/Clément (2)/Tabl.dc.html`).
@@ -28,23 +30,6 @@ const List<String> _impressionsDisponibles = [
 
 enum _Etape { lieu, capturer, brouillon, finaliser, animation, publie }
 
-/// Résumé humain du partage, affiché juste avant "Garder ce moment."
-/// (megaprompt Bloc 5, règles 13-14, 17) — jamais de jargon ("audience",
-/// "grant"), jamais un libellé contradictoire : une fois qu'une Table
-/// est choisie, le résultat effectif n'est plus "Personnel" même si
-/// [partagerAvecCercle] est resté à `false` (règle 14).
-String resumePartage(bool partagerAvecCercle, List<String> nomsTables) {
-  if (nomsTables.isEmpty) {
-    return partagerAvecCercle
-        ? 'Visible par votre cercle.'
-        : 'Visible uniquement par vous.';
-  }
-  final tables = nomsTables.join(' + ');
-  return partagerAvecCercle
-      ? 'Visible par votre cercle et les membres de $tables.'
-      : 'Visible uniquement par les membres de $tables.';
-}
-
 /// Créer un moment : Lieu → Capturer → Brouillon → Finaliser → Animation
 /// → Publié (voir `instruction/Clément (2)/scraps/clement.txt`, B7-B11).
 ///
@@ -64,9 +49,8 @@ class EcranPublier extends StatefulWidget {
   final AbonnementService abonnementService;
 
   /// `null` par défaut (même principe que `EcranPrincipal.tableService`) :
-  /// si absent, le picker "Ajouter à une Table" (megaprompt Bloc 5,
-  /// règle 19) reste simplement masqué plutôt que de planter — un moment
-  /// reste publiable sans Table, ce n'est jamais obligatoire.
+  /// si absent, la feuille "Qui peut voir ?" ne propose simplement pas
+  /// de Tables — un moment reste publiable sans Table.
   final TableService? tableService;
 
   @override
@@ -85,17 +69,31 @@ class _EcranPublierState extends State<EcranPublier> {
   String? _emotion;
   final Set<String> _amisTaguesIds = {};
   final Set<String> _impressionsSelectionnees = {};
-  bool _partagerAvecCercle = true;
-  final Set<String> _tablesSelectionneesIds = {};
+  AudienceSouvenir _audience = AudienceSouvenir.toutLeMonde;
 
   String? _erreurNom;
   String? _erreurVille;
   bool _enCours = false;
 
-  late final Future<List<ProfilPublic>> _futurAmis =
-      widget.abonnementService.mesAmis();
-  late final Future<List<ResumeTable>> _futurTables =
-      widget.tableService?.mesTables() ?? Future.value(const []);
+  // Chargé une fois : sert à la fois aux personnes à taguer, au libellé
+  // de l'audience et à la feuille "Qui peut voir ?".
+  late final Future<DonneesAudience> _futurAudience = chargerDonneesAudience(
+    widget.abonnementService,
+    widget.tableService,
+  );
+
+  Future<void> _choisirAudience() async {
+    final choisie = await ouvrirFeuilleAudience(
+      context,
+      audienceInitiale: _audience,
+      abonnementService: widget.abonnementService,
+      tableService: widget.tableService,
+      donnees: _futurAudience,
+      amisTaguesIds: _amisTaguesIds,
+    );
+    if (choisie == null || !mounted) return;
+    setState(() => _audience = choisie);
+  }
 
   @override
   void dispose() {
@@ -224,8 +222,7 @@ class _EcranPublierState extends State<EcranPublier> {
             ? null
             : _boissonTexte.text.trim(),
         boissonPhoto: _boissonPhoto,
-        partagerAvecCercle: _partagerAvecCercle,
-        tableIds: _tablesSelectionneesIds.toList(),
+        audience: _audience,
       );
       if (!mounted) return;
       // Le moment est publié malgré tout (règle 51) : un message discret
@@ -288,7 +285,7 @@ class _EcranPublierState extends State<EcranPublier> {
             emotion: _emotion,
             onEmotionChangee: (e) => setState(() => _emotion = e),
             legende: _legende,
-            futurAmis: _futurAmis,
+            futurAudience: _futurAudience,
             amisTaguesIds: _amisTaguesIds,
             onBasculerAmi: (id) => setState(() {
               if (!_amisTaguesIds.remove(id)) _amisTaguesIds.add(id);
@@ -302,16 +299,8 @@ class _EcranPublierState extends State<EcranPublier> {
             boissonTexte: _boissonTexte,
             boissonPhoto: _boissonPhoto,
             onChoisirPhotoBoisson: () => _choisirPhoto(pourBoisson: true),
-            partagerAvecCercle: _partagerAvecCercle,
-            onVisibiliteChangee: (v) =>
-                setState(() => _partagerAvecCercle = v),
-            futurTables: _futurTables,
-            tablesSelectionneesIds: _tablesSelectionneesIds,
-            onBasculerTable: (id) => setState(() {
-              if (!_tablesSelectionneesIds.remove(id)) {
-                _tablesSelectionneesIds.add(id);
-              }
-            }),
+            audience: _audience,
+            onChoisirAudience: _choisirAudience,
             enCours: _enCours,
             onGarderCeMoment: _emotion != null ? _garderCeMoment : null,
           ),
@@ -571,7 +560,7 @@ class _EtapeFinaliser extends StatelessWidget {
     required this.emotion,
     required this.onEmotionChangee,
     required this.legende,
-    required this.futurAmis,
+    required this.futurAudience,
     required this.amisTaguesIds,
     required this.onBasculerAmi,
     required this.impressionsSelectionnees,
@@ -579,11 +568,8 @@ class _EtapeFinaliser extends StatelessWidget {
     required this.boissonTexte,
     required this.boissonPhoto,
     required this.onChoisirPhotoBoisson,
-    required this.partagerAvecCercle,
-    required this.onVisibiliteChangee,
-    required this.futurTables,
-    required this.tablesSelectionneesIds,
-    required this.onBasculerTable,
+    required this.audience,
+    required this.onChoisirAudience,
     required this.enCours,
     required this.onGarderCeMoment,
   });
@@ -594,7 +580,7 @@ class _EtapeFinaliser extends StatelessWidget {
   final String? emotion;
   final ValueChanged<String> onEmotionChangee;
   final TextEditingController legende;
-  final Future<List<ProfilPublic>> futurAmis;
+  final Future<DonneesAudience> futurAudience;
   final Set<String> amisTaguesIds;
   final ValueChanged<String> onBasculerAmi;
   final Set<String> impressionsSelectionnees;
@@ -602,14 +588,8 @@ class _EtapeFinaliser extends StatelessWidget {
   final TextEditingController boissonTexte;
   final Uint8List? boissonPhoto;
   final VoidCallback onChoisirPhotoBoisson;
-  final bool partagerAvecCercle;
-  final ValueChanged<bool> onVisibiliteChangee;
-
-  /// Tables où l'utilisateur a une adhésion active (megaprompt Bloc 5,
-  /// règle 19) — jamais les Tables en attente/quittées.
-  final Future<List<ResumeTable>> futurTables;
-  final Set<String> tablesSelectionneesIds;
-  final ValueChanged<String> onBasculerTable;
+  final AudienceSouvenir audience;
+  final VoidCallback onChoisirAudience;
 
   final bool enCours;
   final VoidCallback? onGarderCeMoment;
@@ -669,12 +649,12 @@ class _EtapeFinaliser extends StatelessWidget {
             lignes: 2,
           ),
           const SizedBox(height: TablTokens.espaceL),
-          Text('Amis présents', style: TablTokens.sousTitre),
+          Text('Personnes présentes', style: TablTokens.sousTitre),
           const SizedBox(height: TablTokens.espaceS),
-          FutureBuilder<List<ProfilPublic>>(
-            future: futurAmis,
+          FutureBuilder<DonneesAudience>(
+            future: futurAudience,
             builder: (context, snapshot) {
-              final amis = snapshot.data ?? const [];
+              final amis = snapshot.data?.relations ?? const [];
               if (amis.isEmpty) {
                 return Text(
                   'Personne à taguer pour l\'instant.',
@@ -686,16 +666,10 @@ class _EtapeFinaliser extends StatelessWidget {
                 runSpacing: TablTokens.espaceS,
                 children: [
                   for (final ami in amis)
-                    FilterChip(
-                      label: Text(ami.pseudo),
-                      selected: amisTaguesIds.contains(ami.id),
-                      onSelected: (_) => onBasculerAmi(ami.id),
-                      backgroundColor: TablTokens.surface,
-                      selectedColor: TablTokens.primaire.withValues(
-                        alpha: 0.2,
-                      ),
-                      labelStyle: TablTokens.corps,
-                      side: const BorderSide(color: TablTokens.bordure),
+                    TablPuceSelection(
+                      libelle: ami.pseudo,
+                      selectionnee: amisTaguesIds.contains(ami.id),
+                      onBascule: () => onBasculerAmi(ami.id),
                     ),
                 ],
               );
@@ -709,14 +683,10 @@ class _EtapeFinaliser extends StatelessWidget {
             runSpacing: TablTokens.espaceS,
             children: [
               for (final impression in _impressionsDisponibles)
-                FilterChip(
-                  label: Text(impression),
-                  selected: impressionsSelectionnees.contains(impression),
-                  onSelected: (_) => onBasculerImpression(impression),
-                  backgroundColor: TablTokens.surface,
-                  selectedColor: TablTokens.primaire.withValues(alpha: 0.2),
-                  labelStyle: TablTokens.legende,
-                  side: const BorderSide(color: TablTokens.bordure),
+                TablPuceSelection(
+                  libelle: impression,
+                  selectionnee: impressionsSelectionnees.contains(impression),
+                  onBascule: () => onBasculerImpression(impression),
                 ),
             ],
           ),
@@ -761,83 +731,47 @@ class _EtapeFinaliser extends StatelessWidget {
             ],
           ),
           const SizedBox(height: TablTokens.espaceL),
-          SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(
-                value: true,
-                label: Text('Partager avec mon cercle'),
-              ),
-              ButtonSegment(value: false, label: Text('Garder pour moi')),
-            ],
-            selected: {partagerAvecCercle},
-            onSelectionChanged: (selection) =>
-                onVisibiliteChangee(selection.first),
-            // Segment actif en aplat doré plein, texte foncé dessus —
-            // même traitement que le sélecteur Carte/Liste de la
-            // direction artistique (`scraps/04-e3.png`), pas une simple
-            // teinte.
-            style: SegmentedButton.styleFrom(
-              backgroundColor: TablTokens.surface,
-              selectedBackgroundColor: TablTokens.primaire,
-              foregroundColor: TablTokens.texte,
-              selectedForegroundColor: TablTokens.texteSurPrimaire,
-            ),
-          ),
-          FutureBuilder<List<ResumeTable>>(
-            future: futurTables,
+          FutureBuilder<DonneesAudience>(
+            future: futurAudience,
             builder: (context, snapshot) {
-              final tables = snapshot.data ?? const [];
-              // Masqué plutôt qu'un état vide inutile (règle 75 : le
-              // composer doit rester léger) — pas de Table, rien à
-              // proposer ici.
-              if (tables.isEmpty) return const SizedBox.shrink();
+              final donnees = snapshot.data;
+              final pseudos = {
+                for (final r in donnees?.relations ?? const <ProfilPublic>[])
+                  r.id: r.pseudo,
+              };
+              final horsAudience =
+                  donnees?.contexte.taguesHorsAudience(
+                    audience,
+                    amisTaguesIds,
+                  ) ??
+                  const <String>{};
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: TablTokens.espaceL),
-                  Text('Ajouter à une Table', style: TablTokens.sousTitre),
-                  const SizedBox(height: TablTokens.espaceS),
-                  Wrap(
-                    spacing: TablTokens.espaceS,
-                    runSpacing: TablTokens.espaceS,
-                    children: [
-                      for (final table in tables)
-                        FilterChip(
-                          label: Text(
-                            table.emoji == null
-                                ? table.nom
-                                : '${table.nom} ${table.emoji}',
-                          ),
-                          selected: tablesSelectionneesIds.contains(table.id),
-                          onSelected: (_) => onBasculerTable(table.id),
-                          backgroundColor: TablTokens.surface,
-                          selectedColor: TablTokens.primaire.withValues(
-                            alpha: 0.2,
-                          ),
-                          labelStyle: TablTokens.legende,
-                          side: const BorderSide(color: TablTokens.bordure),
-                        ),
-                    ],
+                  TablLigneAudience(
+                    libelle: libelleAudience(
+                      audience,
+                      nomsTables: {
+                        for (final t in donnees?.tables ?? const <ResumeTable>[])
+                          t.id: t.nom,
+                      },
+                      pseudos: pseudos,
+                    ),
+                    restreinte: audience.mode != ModeAudience.toutLeMonde,
+                    onPresse: onChoisirAudience,
                   ),
+                  for (final id in horsAudience)
+                    Padding(
+                      padding: const EdgeInsets.only(top: TablTokens.espaceXs),
+                      child: Text(
+                        '${pseudos[id] ?? 'Une personne taguée'} '
+                        'ne verra pas ce moment.',
+                        style: TablTokens.legende.copyWith(
+                          color: TablTokens.primaire,
+                        ),
+                      ),
+                    ),
                 ],
-              );
-            },
-          ),
-          const SizedBox(height: TablTokens.espaceM),
-          FutureBuilder<List<ResumeTable>>(
-            future: futurTables,
-            builder: (context, snapshot) {
-              final tables = snapshot.data ?? const [];
-              final nomsSelectionnes = [
-                for (final table in tables)
-                  if (tablesSelectionneesIds.contains(table.id)) table.nom,
-              ];
-              return Text(
-                resumePartage(partagerAvecCercle, nomsSelectionnes),
-                textAlign: TextAlign.center,
-                style: TablTokens.legende.copyWith(
-                  color: TablTokens.texteDoux,
-                ),
               );
             },
           ),

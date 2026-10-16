@@ -53,7 +53,7 @@ class _EcranGererTableState extends State<EcranGererTable> {
   }
 
   Future<void> _inviter() async {
-    final amis = await widget.abonnementService.mesAmis();
+    final amis = await widget.abonnementService.mesRelations();
     if (!mounted) return;
     final dejaMembres = _table.membres.map((m) => m.profilId).toSet();
     final candidats = amis.where((a) => !dejaMembres.contains(a.id)).toList();
@@ -283,7 +283,7 @@ class _SheetChoixAmi extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
                 child: Text(
-                  'Tout votre cercle est déjà dans cette Table.',
+                  'Toutes vos relations sont déjà dans cette Table.',
                   style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
                 ),
               )

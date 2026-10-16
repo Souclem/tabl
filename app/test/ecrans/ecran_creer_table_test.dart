@@ -5,6 +5,11 @@ import 'package:app/services/services.dart';
 import 'package:app/ecrans/ecran_creer_table.dart';
 
 class _FauxTableService implements TableService {
+  @override
+  Future<Map<String, Set<String>>> membresActifsParTable(
+    List<String> tableIds,
+  ) async => {for (final id in tableIds) id: <String>{}};
+
   final List<({String nom, String? emoji, List<String> membres})> appelsCreer = [];
 
   @override
@@ -92,6 +97,19 @@ class _FauxTableService implements TableService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
   _FauxAbonnementService({this.amis = const []});
 
   final List<ProfilPublic> amis;
@@ -99,7 +117,8 @@ class _FauxAbonnementService implements AbonnementService {
   @override
   Future<List<ProfilPublic>> rechercher(String requete) async => [];
   @override
-  Future<void> suivre(String suiviId) async {}
+  Future<StatutAbonnement> suivre(String suiviId) async =>
+      StatutAbonnement.demandeEnvoyee;
   @override
   Future<void> arreterDeSuivre(String suiviId) async {}
   @override
@@ -111,7 +130,7 @@ class _FauxAbonnementService implements AbonnementService {
   @override
   Future<int> nombreDemandesEnAttente() async => 0;
   @override
-  Future<List<ProfilPublic>> mesAmis() async => amis;
+  Future<List<ProfilPublic>> mesRelations() async => amis;
 }
 
 /// Pousse EcranCreerTable sur une pile de navigation réelle (pour que

@@ -6,7 +6,7 @@ import 'package:network_image_mock/network_image_mock.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'package:app/ecrans/ecran_cercle.dart';
+import 'package:app/ecrans/ecran_abonnes.dart';
 import 'package:app/ecrans/ecran_commentaires.dart';
 import 'package:app/ecrans/ecran_creer_instant.dart';
 import 'package:app/ecrans/ecran_feed.dart';
@@ -51,8 +51,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
-    bool partagerAvecCercle = true,
-    List<String> tableIds = const [],
+    AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   }) => throw UnimplementedError();
 
   @override
@@ -63,16 +62,14 @@ class _FauxSouvenirService implements SouvenirService {
   }) => throw UnimplementedError();
 
   @override
-  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
-    String souvenirId,
-  ) => throw UnimplementedError();
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId) => throw UnimplementedError();
 
   @override
-  Future<List<String>> modifierPartage(
-    String souvenirId, {
-    required bool partagerAvecCercle,
-    required List<String> tableIds,
-  }) => throw UnimplementedError();
+  Future<List<String>> modifierAudience(
+    String souvenirId,
+    AudienceSouvenir audience,
+  ) => throw UnimplementedError();
 
   @override
   Future<List<Commentaire>> commentaires(String souvenirId) async => [];
@@ -87,14 +84,28 @@ class _FauxSouvenirService implements SouvenirService {
 }
 
 /// Faux [AbonnementService] : aucune méthode n'est appelée tant qu'on ne
-/// tape pas sur "Ajouter une connexion".
+/// tape pas sur "Trouver des personnes".
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
   @override
   Future<List<ProfilPublic>> rechercher(String requete) =>
       throw UnimplementedError();
 
   @override
-  Future<void> suivre(String suiviId) => throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) =>
+      throw UnimplementedError();
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -112,7 +123,7 @@ class _FauxAbonnementService implements AbonnementService {
   Future<int> nombreDemandesEnAttente() async => 0;
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async => [];
+  Future<List<ProfilPublic>> mesRelations() async => [];
 }
 
 SouvenirFeed _souvenirDeTest({
@@ -184,7 +195,7 @@ void _agrandirSurface(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('feed vide : état vide avec bouton "Ajouter une connexion"', (
+  testWidgets('feed vide : état vide avec bouton "Trouver des personnes"', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -198,11 +209,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Votre feed est encore vide.'), findsOneWidget);
-    expect(find.text('Ajouter une connexion'), findsOneWidget);
+    expect(find.text('Trouver des personnes'), findsOneWidget);
   });
 
   testWidgets(
-    'taper sur "Ajouter une connexion" ouvre l\'écran Cercle',
+    'taper sur "Trouver des personnes" ouvre l\'écran Cercle',
     (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -214,10 +225,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Ajouter une connexion'));
+      await tester.tap(find.text('Trouver des personnes'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(EcranCercle), findsOneWidget);
+      expect(find.byType(EcranAbonnes), findsOneWidget);
     },
   );
 

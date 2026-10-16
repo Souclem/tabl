@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
 import 'souvenir_feed.dart';
@@ -56,9 +57,9 @@ class SouvenirServiceSupabase implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
-    bool partagerAvecCercle = true,
-    List<String> tableIds = const [],
+    AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   }) async {
+    final cible = audience.normalisee();
     final cheminPhoto = await _deposerPhoto(photo);
     final cheminBoisson = boissonPhoto == null
         ? null
@@ -81,7 +82,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           'moment': maintenant.hour < 17 ? 'midi' : 'soir',
           'date_visite': _formaterDate(maintenant),
           'statut': 'publie',
-          'visibilite': partagerAvecCercle ? 'cercle' : 'prive',
+          'visibilite': cible.mode.valeur,
           'boisson_texte': boissonTexte,
           'boisson_photo_url': cheminBoisson,
         })
@@ -98,44 +99,65 @@ class SouvenirServiceSupabase implements SouvenirService {
           ]);
     }
 
-    return _associerTables(souvenirId, tableIds);
+    await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
+    return _associerTables(souvenirId, cible.tableIds.toList());
   }
 
   @override
-  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
-    String souvenirId,
-  ) async {
-    final souvenir = await _client
-        .from('souvenirs')
-        .select('visibilite')
-        .eq('id', souvenirId)
-        .single();
-    final associations = await _client
-        .from('associations_experience_table')
-        .select('table_id')
-        .eq('souvenir_id', souvenirId);
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId) async {
+    final resultats = await Future.wait<Object>([
+      _client
+          .from('souvenirs')
+          .select('visibilite')
+          .eq('id', souvenirId)
+          .single(),
+      _client
+          .from('associations_experience_table')
+          .select('table_id')
+          .eq('souvenir_id', souvenirId),
+      _client
+          .from('souvenirs_audience')
+          .select('profil_id')
+          .eq('souvenir_id', souvenirId),
+      _client
+          .from('souvenirs_amis_tagues')
+          .select('profil_id')
+          .eq('souvenir_id', souvenirId),
+    ]);
+    final souvenir = resultats[0] as Map<String, dynamic>;
+    Set<String> ids(Object lignes, String colonne) =>
+        (lignes as List).map((l) => l[colonne] as String).toSet();
 
+    final mode = ModeAudience.depuisValeur(souvenir['visibilite'] as String?);
     return (
-      partagerAvecCercle: souvenir['visibilite'] == 'cercle',
-      tableIds: (associations as List)
-          .map((l) => l['table_id'] as String)
-          .toList(),
+      audience: AudienceSouvenir(
+        mode: mode,
+        // Une ancienne publication "Tout le monde" peut encore être
+        // associée à des Tables : elles ne s'affichent qu'en "Seulement…".
+        tableIds: mode == ModeAudience.seulement
+            ? ids(resultats[1], 'table_id')
+            : const {},
+        personneIds: ids(resultats[2], 'profil_id'),
+      ),
+      amisTaguesIds: ids(resultats[3], 'profil_id'),
     );
   }
 
   @override
-  Future<List<String>> modifierPartage(
-    String souvenirId, {
-    required bool partagerAvecCercle,
-    required List<String> tableIds,
-  }) async {
-    // Changer la visibilité de base ne touche jamais la date d'origine
-    // ni ne recrée d'item Feed (règle 40-41, 65) : une simple mise à
-    // jour de colonne, RLS restreint déjà ça à l'auteur.
+  Future<List<String>> modifierAudience(
+    String souvenirId,
+    AudienceSouvenir audience,
+  ) async {
+    final cible = audience.normalisee();
+    // Une simple mise à jour de colonne : la date d'origine et la place
+    // dans le Feed ne bougent pas (règle 40-41, 65). RLS restreint déjà
+    // ça à l'auteur.
     await _client
         .from('souvenirs')
-        .update({'visibilite': partagerAvecCercle ? 'cercle' : 'prive'})
+        .update({'visibilite': cible.mode.valeur})
         .eq('id', souvenirId);
+    await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
 
     final actuelles = await _client
         .from('associations_experience_table')
@@ -144,9 +166,8 @@ class SouvenirServiceSupabase implements SouvenirService {
     final idsActuels = (actuelles as List)
         .map((l) => l['table_id'] as String)
         .toSet();
-    final idsVoulus = tableIds.toSet();
 
-    final aRetirer = idsActuels.difference(idsVoulus);
+    final aRetirer = idsActuels.difference(cible.tableIds);
     if (aRetirer.isNotEmpty) {
       await _client
           .from('associations_experience_table')
@@ -157,8 +178,25 @@ class SouvenirServiceSupabase implements SouvenirService {
 
     return _associerTables(
       souvenirId,
-      idsVoulus.difference(idsActuels).toList(),
+      cible.tableIds.difference(idsActuels).toList(),
     );
+  }
+
+  /// Remplace la liste des personnes choisies (autorisées ou exclues
+  /// selon le mode) par [personneIds].
+  Future<void> _ecrirePersonnesAudience(
+    String souvenirId,
+    Set<String> personneIds,
+  ) async {
+    await _client
+        .from('souvenirs_audience')
+        .delete()
+        .eq('souvenir_id', souvenirId);
+    if (personneIds.isEmpty) return;
+    await _client.from('souvenirs_audience').insert([
+      for (final profilId in personneIds)
+        {'souvenir_id': souvenirId, 'profil_id': profilId},
+    ]);
   }
 
   /// Associe [souvenirId] à chaque Table de [tableIds] (règle 26-28,
@@ -200,18 +238,33 @@ class SouvenirServiceSupabase implements SouvenirService {
       _souvenirsPublies(auteurId: auteurId);
 
   /// Requête commune au Feed et aux pages de profil : seule la
-  /// restriction à un auteur change, tout le reste (réactions,
+  /// restriction des auteurs change, tout le reste (réactions,
   /// commentaires, URLs signées) est résolu de la même façon.
   Future<List<SouvenirFeed>> _souvenirsPublies({String? auteurId}) async {
     var requete = _client
         .from('souvenirs')
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
-          'impressions, '
+          'impressions, visibilite, '
           'restaurants(nom, ville), profils!souvenirs_auteur_id_fkey(pseudo)',
         )
         .eq('statut', 'publie');
-    if (auteurId != null) requete = requete.eq('auteur_id', auteurId);
+    if (auteurId != null) {
+      requete = requete.eq('auteur_id', auteurId);
+    } else {
+      // La RLS laisse lire les posts de tous les profils publics : le
+      // Feed se limite à soi, aux personnes qu'on suit, et aux posts qui
+      // nous ont été adressés nommément ou via une Table ("Seulement…").
+      final suivis = await _client
+          .from('abonnements')
+          .select('suivi_id')
+          .eq('suiveur_id', _monId)
+          .eq('statut', 'accepte');
+      final auteurs = [_monId, ...suivis.map((l) => l['suivi_id'] as String)];
+      requete = requete.or(
+        'auteur_id.in.(${auteurs.join(',')}),visibilite.eq.seulement',
+      );
+    }
     final lignes = await requete
         .order('date_visite', ascending: false)
         .order('cree_le', ascending: false);
@@ -252,6 +305,8 @@ class SouvenirServiceSupabase implements SouvenirService {
         amisTagues: amisTagues[id] ?? const [],
         impressions: (l['impressions'] as List?)?.cast<String>() ?? const [],
         estAMoi: l['auteur_id'] == _monId,
+        audienceRestreinte:
+            l['auteur_id'] == _monId && l['visibilite'] != 'tout_le_monde',
       );
     }).toList();
   }

@@ -3,12 +3,29 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'package:app/ecrans/ecran_cercle.dart';
+import 'package:app/ecrans/ecran_abonnes.dart';
 
 /// Faux [AbonnementService] à état contrôlable : les demandes acceptées
 /// ou refusées disparaissent réellement de [demandesRecues], comme le
 /// ferait le vrai service — pour tester le rafraîchissement après action.
 class _FauxAbonnementService implements AbonnementService {
+  List<ProfilPublic> abonnes = const [];
+  List<ProfilPublic> abonnements = const [];
+
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async =>
+      (abonnes: abonnes, abonnements: abonnements);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
   _FauxAbonnementService({
     this._resultatsRecherche = const [],
     List<DemandeAbonnement> demandes = const [],
@@ -29,8 +46,9 @@ class _FauxAbonnementService implements AbonnementService {
   }
 
   @override
-  Future<void> suivre(String suiviId) async {
+  Future<StatutAbonnement> suivre(String suiviId) async {
     suivisAppeles.add(suiviId);
+    return StatutAbonnement.demandeEnvoyee;
   }
 
   @override
@@ -55,7 +73,7 @@ class _FauxAbonnementService implements AbonnementService {
   Future<int> nombreDemandesEnAttente() async => _demandes.length;
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async => [];
+  Future<List<ProfilPublic>> mesRelations() async => [];
 }
 
 void main() {
@@ -67,7 +85,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranCercle(abonnementService: service)),
+      MaterialApp(home: EcranAbonnes(abonnementService: service)),
     );
     await tester.pumpAndSettle();
 
@@ -83,7 +101,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranCercle(abonnementService: service)),
+      MaterialApp(home: EcranAbonnes(abonnementService: service)),
     );
     await tester.pumpAndSettle();
 
@@ -100,7 +118,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranCercle(abonnementService: service)),
+      MaterialApp(home: EcranAbonnes(abonnementService: service)),
     );
     await tester.pumpAndSettle();
 
@@ -134,7 +152,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranCercle(abonnementService: service)),
+        MaterialApp(home: EcranAbonnes(abonnementService: service)),
       );
       await tester.pumpAndSettle();
 
@@ -168,7 +186,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranCercle(abonnementService: service)),
+        MaterialApp(home: EcranAbonnes(abonnementService: service)),
       );
       await tester.pumpAndSettle();
 
@@ -202,7 +220,7 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranCercle(abonnementService: service)),
+        MaterialApp(home: EcranAbonnes(abonnementService: service)),
       );
       await tester.pumpAndSettle();
 
@@ -227,7 +245,7 @@ void main() {
     final service = _FauxAbonnementService(erreurRecherche: true);
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranCercle(abonnementService: service)),
+      MaterialApp(home: EcranAbonnes(abonnementService: service)),
     );
     await tester.pumpAndSettle();
 
@@ -239,5 +257,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(messageErreurGenerique), findsOneWidget);
+  });
+
+  testWidgets('onglets Abonnés / Abonnements, "Suivre en retour"', (
+    tester,
+  ) async {
+    final service = _FauxAbonnementService()
+      ..abonnes = const [
+        ProfilPublic(id: 'a', pseudo: 'emma', statut: StatutAbonnement.aucun),
+        ProfilPublic(id: 'b', pseudo: 'lucas', statut: StatutAbonnement.abonne),
+      ]
+      ..abonnements = const [
+        ProfilPublic(id: 'c', pseudo: 'thomas', statut: StatutAbonnement.abonne),
+      ];
+    await tester.pumpWidget(
+      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Abonnés · 2'), findsOneWidget);
+    expect(find.text('emma'), findsOneWidget);
+    // Un seul "Suivre en retour" : lucas est déjà suivi.
+    expect(find.text('Suivre en retour'), findsOneWidget);
+    expect(find.text('thomas'), findsNothing);
+
+    await tester.tap(find.text('Abonnements · 1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('thomas'), findsOneWidget);
+    expect(find.text('emma'), findsNothing);
   });
 }

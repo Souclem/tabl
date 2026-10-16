@@ -4,26 +4,29 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-/// Écran "Votre cercle" : chercher quelqu'un par pseudo, demander à le
-/// suivre, répondre aux demandes reçues.
+/// Écran "Abonnés" : répondre aux demandes reçues, voir ses abonnés et
+/// ses abonnements (suivi asymétrique type Instagram), et trouver des
+/// personnes par pseudo — la recherche remplace les deux listes tant
+/// qu'elle n'est pas vide.
 ///
-/// Volontairement minimal — pas de suggestions "amis en commun" ni
-/// d'invitation par lien pour l'instant (voir la maquette Claude Design
-/// pour la version complète visée, ajoutée plus tard).
-class EcranCercle extends StatefulWidget {
-  const EcranCercle({super.key, required this.abonnementService});
+/// Pas encore de suggestions ni d'invitation par lien.
+class EcranAbonnes extends StatefulWidget {
+  const EcranAbonnes({super.key, required this.abonnementService});
 
   final AbonnementService abonnementService;
 
   @override
-  State<EcranCercle> createState() => _EcranCercleState();
+  State<EcranAbonnes> createState() => _EcranAbonnesState();
 }
 
-class _EcranCercleState extends State<EcranCercle> {
+class _EcranAbonnesState extends State<EcranAbonnes> {
   final _recherche = TextEditingController();
 
   List<DemandeAbonnement> _demandes = [];
   List<ProfilPublic> _resultats = [];
+  List<ProfilPublic> _abonnes = [];
+  List<ProfilPublic> _abonnements = [];
+  bool _ongletAbonnes = true;
   bool _chargementDemandes = true;
   final Set<String> _idsEnCours = {};
   Timer? _debounceRecherche;
@@ -44,6 +47,8 @@ class _EcranCercleState extends State<EcranCercle> {
   /// Attend une courte pause dans la frappe avant de chercher : sinon
   /// chaque caractère tapé déclenche un aller-retour réseau séparé.
   void _rechercherAvecDebounce(String requete) {
+    // Bascule tout de suite entre listes et résultats de recherche.
+    setState(() {});
     _debounceRecherche?.cancel();
     _debounceRecherche = Timer(
       const Duration(milliseconds: 350),
@@ -54,9 +59,19 @@ class _EcranCercleState extends State<EcranCercle> {
   Future<void> _chargerDemandes() async {
     setState(() => _chargementDemandes = true);
     try {
-      final demandes = await widget.abonnementService.demandesRecues();
+      final resultats = await Future.wait<Object>([
+        widget.abonnementService.demandesRecues(),
+        widget.abonnementService.abonnesEtAbonnements(),
+      ]);
       if (!mounted) return;
-      setState(() => _demandes = demandes);
+      final listes =
+          resultats[1]
+              as ({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements});
+      setState(() {
+        _demandes = resultats[0] as List<DemandeAbonnement>;
+        _abonnes = listes.abonnes;
+        _abonnements = listes.abonnements;
+      });
     } catch (_) {
       if (!mounted) return;
       afficherMessage(context, messageErreurGenerique);
@@ -77,14 +92,23 @@ class _EcranCercleState extends State<EcranCercle> {
   }
 
   Future<void> _suivre(ProfilPublic profil) => _agir(profil.id, () async {
-    await widget.abonnementService.suivre(profil.id);
-    _remplacerResultat(profil.id, StatutAbonnement.demandeEnvoyee);
+    final statut = await widget.abonnementService.suivre(profil.id);
+    _remplacerResultat(profil.id, statut);
+    await _chargerDemandes();
   });
 
   Future<void> _arreterDeSuivre(ProfilPublic profil) =>
       _agir(profil.id, () async {
         await widget.abonnementService.arreterDeSuivre(profil.id);
         _remplacerResultat(profil.id, StatutAbonnement.aucun);
+        await _chargerDemandes();
+      });
+
+  /// Retire un abonné : même opération que refuser sa demande.
+  Future<void> _retirerAbonne(ProfilPublic profil) =>
+      _agir(profil.id, () async {
+        await widget.abonnementService.refuserDemande(profil.id);
+        await _chargerDemandes();
       });
 
   Future<void> _accepter(DemandeAbonnement demande) =>
@@ -142,14 +166,14 @@ class _EcranCercleState extends State<EcranCercle> {
                 children: [
                   TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
                   const SizedBox(width: TablTokens.espaceM),
-                  Text('Votre cercle', style: TablTokens.titre),
+                  Text('Abonnés', style: TablTokens.titre),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(TablTokens.espaceL),
               child: TablChampTexte(
-                libelle: 'Rechercher',
+                libelle: 'Trouver des personnes',
                 controleur: _recherche,
                 indication: 'Un pseudo',
                 iconePrefixe: Icons.search_rounded,
@@ -190,13 +214,69 @@ class _EcranCercleState extends State<EcranCercle> {
                       ),
                     const SizedBox(height: TablTokens.espaceL),
                   ],
-                  for (final profil in _resultats)
-                    _LigneProfil(
-                      profil: profil,
-                      enCours: _idsEnCours.contains(profil.id),
-                      onSuivre: () => _suivre(profil),
-                      onArreterDeSuivre: () => _arreterDeSuivre(profil),
+                  if (_recherche.text.trim().isNotEmpty)
+                    for (final profil in _resultats)
+                      _LigneProfil(
+                        profil: profil,
+                        enCours: _idsEnCours.contains(profil.id),
+                        onSuivre: () => _suivre(profil),
+                        onArreterDeSuivre: () => _arreterDeSuivre(profil),
+                      )
+                  else ...[
+                    SegmentedButton<bool>(
+                      segments: [
+                        ButtonSegment(
+                          value: true,
+                          label: Text('Abonnés · ${_abonnes.length}'),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text('Abonnements · ${_abonnements.length}'),
+                        ),
+                      ],
+                      selected: {_ongletAbonnes},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (s) =>
+                          setState(() => _ongletAbonnes = s.first),
+                      style: SegmentedButton.styleFrom(
+                        backgroundColor: TablTokens.surface,
+                        selectedBackgroundColor: TablTokens.primaire,
+                        foregroundColor: TablTokens.texte,
+                        selectedForegroundColor: TablTokens.texteSurPrimaire,
+                      ),
                     ),
+                    const SizedBox(height: TablTokens.espaceS),
+                    if (_ongletAbonnes)
+                      for (final profil in _abonnes)
+                        _LigneAbonne(
+                          profil: profil,
+                          enCours: _idsEnCours.contains(profil.id),
+                          onSuivreEnRetour: () => _suivre(profil),
+                          onRetirer: () => _retirerAbonne(profil),
+                        )
+                    else
+                      for (final profil in _abonnements)
+                        _LigneProfil(
+                          profil: profil,
+                          enCours: _idsEnCours.contains(profil.id),
+                          onSuivre: () => _suivre(profil),
+                          onArreterDeSuivre: () => _arreterDeSuivre(profil),
+                        ),
+                    if (!_chargementDemandes &&
+                        (_ongletAbonnes ? _abonnes : _abonnements).isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: TablTokens.espaceL,
+                        ),
+                        child: Text(
+                          _ongletAbonnes
+                              ? 'Personne ne vous suit encore.'
+                              : 'Vous ne suivez personne pour le moment.',
+                          textAlign: TextAlign.center,
+                          style: TablTokens.legende,
+                        ),
+                      ),
+                  ],
                   const SizedBox(height: TablTokens.espaceL),
                 ],
               ),
@@ -243,6 +323,49 @@ class _LigneDemande extends StatelessWidget {
             ),
             child: const Text('Accepter'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un abonné : "Suivre en retour" si je ne le suis pas encore, et
+/// "Retirer" pour qu'il ne me suive plus.
+class _LigneAbonne extends StatelessWidget {
+  const _LigneAbonne({
+    required this.profil,
+    required this.enCours,
+    required this.onSuivreEnRetour,
+    required this.onRetirer,
+  });
+
+  final ProfilPublic profil;
+  final bool enCours;
+  final VoidCallback onSuivreEnRetour;
+  final VoidCallback onRetirer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
+      child: Row(
+        children: [
+          Expanded(child: Text(profil.pseudo, style: TablTokens.corps)),
+          TextButton(
+            onPressed: enCours ? null : onRetirer,
+            child: const Text('Retirer'),
+          ),
+          if (profil.statut == StatutAbonnement.aucun) ...[
+            const SizedBox(width: TablTokens.espaceXs),
+            FilledButton(
+              onPressed: enCours ? null : onSuivreEnRetour,
+              style: FilledButton.styleFrom(
+                backgroundColor: TablTokens.primaire,
+                foregroundColor: TablTokens.texteSurPrimaire,
+              ),
+              child: const Text('Suivre en retour'),
+            ),
+          ],
         ],
       ),
     );

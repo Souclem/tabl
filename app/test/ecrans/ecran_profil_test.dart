@@ -23,13 +23,58 @@ class _FauxSouvenirService implements SouvenirService {
   @override
   Future<void> basculerReaction(String souvenirId, {required bool reagir}) async {}
 
+  final List<AudienceSouvenir> audiencesModifiees = [];
+
+  @override
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId) async =>
+      (audience: AudienceSouvenir.toutLeMonde, amisTaguesIds: <String>{});
+
+  @override
+  Future<List<String>> modifierAudience(
+    String souvenirId,
+    AudienceSouvenir audience,
+  ) async {
+    audiencesModifiees.add(audience);
+    return const [];
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  final List<bool> reglagesPrive = [];
+
   @override
   Future<int> nombreDemandesEnAttente() async => 0;
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async => reglagesPrive.add(prive);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {'sarah-id'};
+
+  @override
+  Future<List<ProfilPublic>> mesRelations() async => const [
+    ProfilPublic(id: 'sarah-id', pseudo: 'sarah', statut: StatutAbonnement.abonne),
+  ];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class _FauxTableService implements TableService {
+  @override
+  Future<List<ResumeTable>> mesTables() async => [];
+
+  @override
+  Future<Map<String, Set<String>>> membresActifsParTable(
+    List<String> tableIds,
+  ) async => {};
 
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
@@ -61,8 +106,9 @@ SouvenirFeed _monSouvenir(String id, String restaurant) {
 
 Future<_FauxSouvenirService> _ouvrirProfil(
   WidgetTester tester,
-  List<SouvenirFeed> souvenirs,
-) async {
+  List<SouvenirFeed> souvenirs, {
+  _FauxAbonnementService? abonnementService,
+}) async {
   final service = _FauxSouvenirService(souvenirs);
   await mockNetworkImagesFor(() async {
     await tester.pumpWidget(
@@ -70,9 +116,10 @@ Future<_FauxSouvenirService> _ouvrirProfil(
         theme: TablTheme.sombre(),
         home: EcranProfil(
           authService: _FauxAuthService(),
-          abonnementService: _FauxAbonnementService(),
+          abonnementService: abonnementService ?? _FauxAbonnementService(),
           souvenirService: service,
           utilisateur: _moi,
+          tableService: _FauxTableService(),
         ),
       ),
     );
@@ -98,13 +145,52 @@ void main() {
     expect(find.text('Enregistrer'), findsNothing);
   });
 
-  testWidgets('le menu "⋯" propose "Modifier le partage"', (tester) async {
-    await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+  testWidgets('"⋯" → "Qui peut voir" modifie l\'audience sans changer de page', (
+    tester,
+  ) async {
+    final service = await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
 
     await tester.tap(find.byTooltip('Options'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Qui peut voir'));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Modifier le partage'), findsOneWidget);
+    expect(find.text('Qui peut voir ce moment ?'), findsOneWidget);
+    expect(find.text('La personne qui vous suit'), findsOneWidget);
+
+    await tester.tap(find.text('Seulement…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('sarah'));
+    await tester.pumpAndSettle();
+    expect(find.text('Visible par 1 personne'), findsOneWidget);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+
+    final audience = service.audiencesModifiees.single;
+    expect(audience.mode, ModeAudience.seulement);
+    expect(audience.personneIds, {'sarah-id'});
+    expect(find.text('Audience mise à jour.'), findsOneWidget);
+  });
+
+  testWidgets('passer le profil en public demande confirmation', (
+    tester,
+  ) async {
+    final abonnements = _FauxAbonnementService();
+    await _ouvrirProfil(tester, [], abonnementService: abonnements);
+
+    await tester.ensureVisible(find.text('Profil privé'));
+    await tester.tap(find.text('Profil privé'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rendre votre profil public ?'), findsOneWidget);
+
+    await tester.tap(find.text('Rendre public'));
+    await tester.pumpAndSettle();
+
+    expect(abonnements.reglagesPrive, [false]);
+    expect(
+      find.textContaining('Tous les utilisateurs de Tabl peuvent voir'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('aucune publication : message dédié', (tester) async {

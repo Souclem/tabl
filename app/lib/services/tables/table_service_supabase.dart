@@ -29,6 +29,24 @@ class TableServiceSupabase implements TableService {
   String get _monId => _client.auth.currentSession!.user.id;
 
   @override
+  Future<Map<String, Set<String>>> membresActifsParTable(
+    List<String> tableIds,
+  ) async {
+    if (tableIds.isEmpty) return {};
+    final lignes = await _client
+        .from('membres_table')
+        .select('table_id, profil_id')
+        .inFilter('table_id', tableIds)
+        .eq('statut', 'active')
+        .neq('profil_id', _monId);
+    final membres = <String, Set<String>>{for (final id in tableIds) id: {}};
+    for (final l in lignes) {
+      membres[l['table_id'] as String]!.add(l['profil_id'] as String);
+    }
+    return membres;
+  }
+
+  @override
   Future<List<ResumeTable>> mesTables() async {
     final mesMembership = await _client
         .from('membres_table')

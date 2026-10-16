@@ -93,6 +93,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       jaiReagi: souvenir.jaiReagi,
       libelleReactions: libelleReactionsSouvenir(souvenir),
       enregistre: enregistre,
+      audienceRestreinte: souvenir.audienceRestreinte,
       onReagir: () => basculerReaction(souvenir),
       onCommenter: () => ouvrirCommentaires(souvenir),
       onOuvrirLieu: onOuvrirLieu,

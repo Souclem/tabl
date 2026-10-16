@@ -180,7 +180,7 @@ class _EcranInscriptionState extends State<EcranInscription> {
   Widget build(BuildContext context) {
     return EnveloppeFormulaire(
       titre: 'Créer un compte',
-      sousTitre: 'Tabl est privé : seuls tes amis voient ce que tu publies.',
+      sousTitre: 'Tabl est privé par défaut : tu choisis qui voit ce que tu publies.',
       onRetour: () => revenirVersAccueilOuSecours(
         context,
         widget.authService,

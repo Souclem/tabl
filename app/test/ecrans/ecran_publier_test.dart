@@ -40,7 +40,6 @@ class _FauxSouvenirService implements SouvenirService {
 
   final List<Map<String, Object?>> appelsPublier = [];
   final List<Map<String, Object?>> appelsBrouillon = [];
-  final List<Map<String, Object?>> appelsModifierPartage = [];
 
   @override
   Future<String> enregistrerBrouillon({
@@ -68,8 +67,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
-    bool partagerAvecCercle = true,
-    List<String> tableIds = const [],
+    AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   }) async {
     if (erreur) throw Exception('erreur réseau');
     appelsPublier.add({
@@ -82,30 +80,20 @@ class _FauxSouvenirService implements SouvenirService {
       'impressions': impressions,
       'boissonTexte': boissonTexte,
       'boissonPhoto': boissonPhoto,
-      'partagerAvecCercle': partagerAvecCercle,
-      'tableIds': tableIds,
+      'audience': audience,
     });
-    return tableIds.where(tablesEnEchec.contains).toList();
+    return audience.tableIds.where(tablesEnEchec.contains).toList();
   }
 
   @override
-  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId) => throw UnimplementedError();
+
+  @override
+  Future<List<String>> modifierAudience(
     String souvenirId,
+    AudienceSouvenir audience,
   ) => throw UnimplementedError();
-
-  @override
-  Future<List<String>> modifierPartage(
-    String souvenirId, {
-    required bool partagerAvecCercle,
-    required List<String> tableIds,
-  }) async {
-    appelsModifierPartage.add({
-      'souvenirId': souvenirId,
-      'partagerAvecCercle': partagerAvecCercle,
-      'tableIds': tableIds,
-    });
-    return const [];
-  }
 
   @override
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
@@ -130,18 +118,32 @@ class _FauxSouvenirService implements SouvenirService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
   _FauxAbonnementService({this.amis = const []});
 
   final List<ProfilPublic> amis;
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async => amis;
+  Future<List<ProfilPublic>> mesRelations() async => amis;
 
   @override
   Future<List<ProfilPublic>> rechercher(String requete) =>
       throw UnimplementedError();
   @override
-  Future<void> suivre(String suiviId) => throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) =>
+      throw UnimplementedError();
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
   @override
@@ -158,6 +160,11 @@ class _FauxAbonnementService implements AbonnementService {
 /// composer (megaprompt Bloc 5, règle 19 — Tables où l'utilisateur a
 /// une adhésion active), le reste n'a pas de rôle dans ces tests.
 class _FauxTableService implements TableService {
+  @override
+  Future<Map<String, Set<String>>> membresActifsParTable(
+    List<String> tableIds,
+  ) async => {for (final id in tableIds) id: <String>{}};
+
   _FauxTableService({this.tables = const []});
 
   final List<ResumeTable> tables;
@@ -322,6 +329,49 @@ Future<void> _avancerJusquauFinaliser(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Ouvre la feuille "Qui peut voir ?", choisit [mode], coche [choix]
+/// (Tables ou personnes) puis valide.
+Future<void> _choisirAudience(
+  WidgetTester tester,
+  String mode, {
+  List<String> choix = const [],
+}) async {
+  await tester.ensureVisible(find.text('Qui peut voir'));
+  await tester.tap(find.text('Qui peut voir'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(mode));
+  await tester.pumpAndSettle();
+  for (final libelle in choix) {
+    final puce = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.text(libelle),
+    );
+    await tester.ensureVisible(puce);
+    await tester.tap(puce);
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(find.text('Enregistrer'));
+  await tester.tap(find.text('Enregistrer'));
+  await tester.pumpAndSettle();
+}
+
+AudienceSouvenir _audiencePubliee(_FauxSouvenirService service) =>
+    service.appelsPublier.single['audience']! as AudienceSouvenir;
+
+const _sarah = ProfilPublic(
+  id: 'ami-1',
+  pseudo: 'sarah',
+  statut: StatutAbonnement.abonne,
+);
+
+const _marbella = ResumeTable(
+  id: 'table-1',
+  nom: 'Marbella',
+  nombreMembres: 3,
+  etatTexte: 'Rien de nouveau',
+  actionRequise: false,
+);
+
 void main() {
   setUp(() {
     ImagePickerPlatform.instance = _FauxImagePickerPlatform(
@@ -438,8 +488,11 @@ void main() {
       expect(appel['nomRestaurant'], 'Le Comptoir');
       expect(appel['ville'], 'Paris');
       expect(appel['emotion'], Emotion.inoubliable);
-      // Partage avec le cercle par défaut.
-      expect(appel['partagerAvecCercle'], isTrue);
+      // "Tout le monde" par défaut.
+      expect(
+        (appel['audience']! as AudienceSouvenir).mode,
+        ModeAudience.toutLeMonde,
+      );
 
       // L'animation de publication (~1,5 s) enchaîne automatiquement.
       expect(find.text('Moment ajouté.'), findsNothing);
@@ -454,22 +507,91 @@ void main() {
     },
   );
 
-  testWidgets('visibilité "Garder pour moi" transmise à la publication', (
+  testWidgets('"Seulement…" une personne : transmis à la publication', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirEcranPublier(tester, service);
+    await _ouvrirEcranPublier(
+      tester,
+      service,
+      abonnementService: _FauxAbonnementService(amis: const [_sarah]),
+    );
     await _avancerJusquauFinaliser(tester);
 
     await tester.tap(find.text('🙂'));
-    await tester.ensureVisible(find.text('Garder pour moi'));
-    await tester.tap(find.text('Garder pour moi'));
     await tester.pumpAndSettle();
+    expect(find.text('Tout le monde'), findsOneWidget);
+
+    await _choisirAudience(tester, 'Seulement…', choix: ['sarah']);
+    expect(find.text('Seulement sarah'), findsOneWidget);
+
     await tester.ensureVisible(find.text('Garder ce moment.'));
     await tester.tap(find.text('Garder ce moment.'));
     await tester.pumpAndSettle();
 
-    expect(service.appelsPublier.single['partagerAvecCercle'], isFalse);
+    final audience = _audiencePubliee(service);
+    expect(audience.mode, ModeAudience.seulement);
+    expect(audience.personneIds, {'ami-1'});
+  });
+
+  testWidgets('"Seulement…" sans rien cocher : impossible d\'enregistrer', (
+    tester,
+  ) async {
+    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
+    await _avancerJusquauFinaliser(tester);
+
+    await tester.ensureVisible(find.text('Qui peut voir'));
+    await tester.tap(find.text('Qui peut voir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Seulement…'));
+    await tester.pumpAndSettle();
+
+    final bouton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Enregistrer'),
+    );
+    expect(bouton.onPressed, isNull);
+  });
+
+  testWidgets('"Tout le monde sauf…" : la personne exclue est transmise', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrirEcranPublier(
+      tester,
+      service,
+      abonnementService: _FauxAbonnementService(amis: const [_sarah]),
+    );
+    await _avancerJusquauFinaliser(tester);
+
+    await tester.tap(find.text('🙂'));
+    await _choisirAudience(tester, 'Tout le monde sauf…', choix: ['sarah']);
+    expect(find.text('Tout le monde sauf 1 personne'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Garder ce moment.'));
+    await tester.tap(find.text('Garder ce moment.'));
+    await tester.pumpAndSettle();
+
+    final audience = _audiencePubliee(service);
+    expect(audience.mode, ModeAudience.sauf);
+    expect(audience.personneIds, {'ami-1'});
+  });
+
+  testWidgets('ami tagué hors audience : avertissement sous "Qui peut voir"', (
+    tester,
+  ) async {
+    // Profil privé et sarah ne fait pas partie des abonnés : "Tout le
+    // monde" ne l'inclut pas.
+    await _ouvrirEcranPublier(
+      tester,
+      _FauxSouvenirService(),
+      abonnementService: _FauxAbonnementService(amis: const [_sarah]),
+    );
+    await _avancerJusquauFinaliser(tester);
+
+    await tester.tap(find.text('sarah'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('sarah ne verra pas ce moment.'), findsOneWidget);
   });
 
   testWidgets(
@@ -497,15 +619,7 @@ void main() {
 
   testWidgets('taguer un ami l\'inclut dans la publication', (tester) async {
     final service = _FauxSouvenirService();
-    final abonnementService = _FauxAbonnementService(
-      amis: const [
-        ProfilPublic(
-          id: 'ami-1',
-          pseudo: 'sarah',
-          statut: StatutAbonnement.abonne,
-        ),
-      ],
-    );
+    final abonnementService = _FauxAbonnementService(amis: const [_sarah]);
     await _ouvrirEcranPublier(
       tester,
       service,
@@ -544,79 +658,26 @@ void main() {
   });
 
   testWidgets(
-    'sélectionner une Table l\'inclut dans la publication et le résumé '
-    '(megaprompt Bloc 5)',
+    '"Seulement…" une Table : transmise à la publication (megaprompt Bloc 5)',
     (tester) async {
       final service = _FauxSouvenirService();
-      final tableService = _FauxTableService(
-        tables: const [
-          ResumeTable(
-            id: 'table-1',
-            nom: 'Marbella',
-            nombreMembres: 3,
-            etatTexte: 'Rien de nouveau',
-            actionRequise: false,
-          ),
-        ],
+      await _ouvrirEcranPublier(
+        tester,
+        service,
+        tableService: _FauxTableService(tables: const [_marbella]),
       );
-      await _ouvrirEcranPublier(tester, service, tableService: tableService);
       await _avancerJusquauFinaliser(tester);
-      await tester.pumpAndSettle();
 
       await tester.tap(find.text('🙂'));
-      await tester.pumpAndSettle();
-      // Par défaut (cercle, aucune Table) : jamais de jargon "audience".
-      expect(find.text('Visible par votre cercle.'), findsOneWidget);
-
-      await tester.ensureVisible(find.text('Marbella'));
-      await tester.tap(find.text('Marbella'));
-      await tester.pumpAndSettle();
-
+      await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
       // Règle 13 : le résumé nomme la Table, jamais "audience"/"grant".
-      expect(
-        find.text('Visible par votre cercle et les membres de Marbella.'),
-        findsOneWidget,
-      );
+      expect(find.text('Seulement Marbella'), findsOneWidget);
 
       await tester.ensureVisible(find.text('Garder ce moment.'));
       await tester.tap(find.text('Garder ce moment.'));
       await tester.pumpAndSettle();
 
-      expect(service.appelsPublier.single['tableIds'], ['table-1']);
-    },
-  );
-
-  testWidgets(
-    'Table + "Garder pour moi" : résumé jamais "Personnel" (règle 14)',
-    (tester) async {
-      final service = _FauxSouvenirService();
-      final tableService = _FauxTableService(
-        tables: const [
-          ResumeTable(
-            id: 'table-1',
-            nom: 'Famille',
-            nombreMembres: 4,
-            etatTexte: 'Rien de nouveau',
-            actionRequise: false,
-          ),
-        ],
-      );
-      await _ouvrirEcranPublier(tester, service, tableService: tableService);
-      await _avancerJusquauFinaliser(tester);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('🙂'));
-      await tester.ensureVisible(find.text('Garder pour moi'));
-      await tester.tap(find.text('Garder pour moi'));
-      await tester.ensureVisible(find.text('Famille'));
-      await tester.tap(find.text('Famille'));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('Visible uniquement par les membres de Famille.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Personnel'), findsNothing);
+      expect(_audiencePubliee(service).tableIds, {'table-1'});
     },
   );
 
@@ -625,25 +686,15 @@ void main() {
     '(règle 51)',
     (tester) async {
       final service = _FauxSouvenirService(tablesEnEchec: const ['table-1']);
-      final tableService = _FauxTableService(
-        tables: const [
-          ResumeTable(
-            id: 'table-1',
-            nom: 'Marbella',
-            nombreMembres: 3,
-            etatTexte: 'Rien de nouveau',
-            actionRequise: false,
-          ),
-        ],
+      await _ouvrirEcranPublier(
+        tester,
+        service,
+        tableService: _FauxTableService(tables: const [_marbella]),
       );
-      await _ouvrirEcranPublier(tester, service, tableService: tableService);
       await _avancerJusquauFinaliser(tester);
-      await tester.pumpAndSettle();
 
       await tester.tap(find.text('🙂'));
-      await tester.ensureVisible(find.text('Marbella'));
-      await tester.tap(find.text('Marbella'));
-      await tester.pumpAndSettle();
+      await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
       await tester.ensureVisible(find.text('Garder ce moment.'));
       await tester.tap(find.text('Garder ce moment.'));
       await tester.pumpAndSettle();

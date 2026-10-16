@@ -50,11 +50,25 @@ class _FauxAuthService implements AuthService {
 
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async => {};
+
+  @override
+  Future<bool> monProfilEstPrive() async => true;
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {}
+
+  @override
   Future<List<ProfilPublic>> rechercher(String requete) =>
       throw UnimplementedError();
 
   @override
-  Future<void> suivre(String suiviId) => throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) =>
+      throw UnimplementedError();
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -76,7 +90,7 @@ class _FauxAbonnementService implements AbonnementService {
   Future<int> nombreDemandesEnAttente() async => 0;
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async => [];
+  Future<List<ProfilPublic>> mesRelations() async => [];
 }
 
 class _FauxSouvenirService implements SouvenirService {
@@ -90,9 +104,8 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> amisTaguesIds = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
-    bool partagerAvecCercle = true,
+    AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> impressions = const [],
-    List<String> tableIds = const [],
   }) => throw UnimplementedError();
 
   @override
@@ -103,16 +116,14 @@ class _FauxSouvenirService implements SouvenirService {
   }) => throw UnimplementedError();
 
   @override
-  Future<({bool partagerAvecCercle, List<String> tableIds})> partageActuel(
-    String souvenirId,
-  ) => throw UnimplementedError();
+  Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
+  audienceActuelle(String souvenirId) => throw UnimplementedError();
 
   @override
-  Future<List<String>> modifierPartage(
-    String souvenirId, {
-    required bool partagerAvecCercle,
-    required List<String> tableIds,
-  }) => throw UnimplementedError();
+  Future<List<String>> modifierAudience(
+    String souvenirId,
+    AudienceSouvenir audience,
+  ) => throw UnimplementedError();
 
 
   // Invoquée incidemment dès que EcranPrincipal (donc EcranFeed) est

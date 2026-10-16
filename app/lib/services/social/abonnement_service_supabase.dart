@@ -71,11 +71,24 @@ class AbonnementServiceSupabase implements AbonnementService {
   }
 
   @override
-  Future<void> suivre(String suiviId) async {
+  Future<StatutAbonnement> suivre(String suiviId) async {
+    final profil = await _client
+        .from('profils')
+        .select('est_prive')
+        .eq('id', suiviId)
+        .single();
+    final immediat = profil['est_prive'] == false;
+    // La policy d'insertion n'accepte 'accepte' que vers un profil
+    // public : si le profil vient de repasser en privé entre-temps,
+    // l'insertion échoue plutôt que de contourner son accord.
     await _client.from('abonnements').insert({
       'suiveur_id': _monId,
       'suivi_id': suiviId,
+      'statut': immediat ? 'accepte' : 'en_attente',
     });
+    return immediat
+        ? StatutAbonnement.abonne
+        : StatutAbonnement.demandeEnvoyee;
   }
 
   @override
@@ -142,7 +155,7 @@ class AbonnementServiceSupabase implements AbonnementService {
   }
 
   @override
-  Future<List<ProfilPublic>> mesAmis() async {
+  Future<List<ProfilPublic>> mesRelations() async {
     final lignes = await _client
         .from('abonnements')
         .select('suiveur_id, suivi_id, profils_suiveur:profils!suiveur_id(pseudo), '
@@ -174,5 +187,93 @@ class AbonnementServiceSupabase implements AbonnementService {
           ),
         )
         .toList();
+  }
+
+  @override
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async {
+    final lignes = await _client
+        .from('abonnements')
+        .select('suiveur_id, suivi_id, statut')
+        .or('suiveur_id.eq.$_monId,suivi_id.eq.$_monId');
+
+    final abonnesIds = <String>[];
+    final abonnementsIds = <String>[];
+    final monStatutVers = <String, StatutAbonnement>{};
+    for (final l in lignes) {
+      final suiveurId = l['suiveur_id'] as String;
+      final suiviId = l['suivi_id'] as String;
+      final accepte = l['statut'] == 'accepte';
+      if (suiveurId == _monId) {
+        monStatutVers[suiviId] = accepte
+            ? StatutAbonnement.abonne
+            : StatutAbonnement.demandeEnvoyee;
+        if (accepte) abonnementsIds.add(suiviId);
+      } else if (accepte) {
+        abonnesIds.add(suiveurId);
+      }
+    }
+
+    final ids = {...abonnesIds, ...abonnementsIds}.toList();
+    if (ids.isEmpty) return (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+    final profils = await _client
+        .from('profils')
+        .select('id, pseudo')
+        .inFilter('id', ids);
+    final pseudos = {
+      for (final p in profils) p['id'] as String: p['pseudo'] as String,
+    };
+
+    List<ProfilPublic> liste(List<String> ids) {
+      final resultat = [
+        for (final id in ids)
+          if (pseudos[id] != null)
+            ProfilPublic(
+              id: id,
+              pseudo: pseudos[id]!,
+              statut: monStatutVers[id] ?? StatutAbonnement.aucun,
+            ),
+      ];
+      resultat.sort(
+        (a, b) => a.pseudo.toLowerCase().compareTo(b.pseudo.toLowerCase()),
+      );
+      return resultat;
+    }
+
+    return (abonnes: liste(abonnesIds), abonnements: liste(abonnementsIds));
+  }
+
+  @override
+  Future<Set<String>> mesAbonnesIds() async {
+    final lignes = await _client
+        .from('abonnements')
+        .select('suiveur_id')
+        .eq('suivi_id', _monId)
+        .eq('statut', 'accepte');
+    return lignes.map((l) => l['suiveur_id'] as String).toSet();
+  }
+
+  @override
+  Future<bool> monProfilEstPrive() async {
+    final profil = await _client
+        .from('profils')
+        .select('est_prive')
+        .eq('id', _monId)
+        .single();
+    return profil['est_prive'] as bool? ?? true;
+  }
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {
+    await _client
+        .from('profils')
+        .update({'est_prive': prive})
+        .eq('id', _monId);
+    if (prive) return;
+    await _client
+        .from('abonnements')
+        .update({'statut': 'accepte'})
+        .eq('suivi_id', _monId)
+        .eq('statut', 'en_attente');
   }
 }

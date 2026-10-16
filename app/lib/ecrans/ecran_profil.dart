@@ -4,9 +4,9 @@ import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
 import 'ecran_accueil.dart';
-import 'ecran_cercle.dart';
-import 'ecran_modifier_partage.dart';
+import 'ecran_abonnes.dart';
 import 'ecran_tables.dart';
+import 'feuille_audience.dart';
 
 /// Onglet Profil : identité de l'utilisateur, ses propres publications
 /// (présentées comme dans le Feed, via le même [TablPublication]), accès
@@ -59,22 +59,82 @@ class _EcranProfilState extends State<EcranProfil>
     });
   }
 
+  // `null` tant que le réglage n'est pas chargé : l'interrupteur reste
+  // masqué plutôt que d'afficher une valeur fausse.
+  bool? _profilPrive;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargerConfidentialite();
+  }
+
+  Future<void> _chargerConfidentialite() async {
+    try {
+      final prive = await widget.abonnementService.monProfilEstPrive();
+      if (mounted) setState(() => _profilPrive = prive);
+    } catch (e) {
+      debugPrint('EcranProfil: confidentialité : $e');
+    }
+  }
+
+  Future<void> _basculerProfilPrive(bool prive) async {
+    if (!prive) {
+      final confirme = await showDialog<bool>(
+        context: context,
+        builder: (contexteDialogue) => AlertDialog(
+          backgroundColor: TablTokens.surface,
+          title: const Text('Rendre votre profil public ?'),
+          content: const Text(
+            'Tous les utilisateurs de Tabl pourront voir vos moments '
+            'partagés avec "Tout le monde" et vous suivre sans demande. '
+            'Les demandes en attente seront acceptées.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(contexteDialogue).pop(false),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(contexteDialogue).pop(true),
+              child: const Text('Rendre public'),
+            ),
+          ],
+        ),
+      );
+      if (confirme != true || !mounted) return;
+    }
+    final avant = _profilPrive;
+    setState(() => _profilPrive = prive);
+    try {
+      await widget.abonnementService.definirProfilPrive(prive);
+      if (!mounted) return;
+      setState(() {
+        _nombreDemandes = widget.abonnementService.nombreDemandesEnAttente();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _profilPrive = avant);
+      afficherMessage(context, messageErreurGenerique);
+    }
+  }
+
   TableService get _tableService =>
       widget.tableService ?? TableServiceSupabase(TablBackend.client);
 
   // Recalculé seulement à la création de l'état et au retour de l'écran
-  // Cercle (voir _allerVersCercle) — jamais à chaque reconstruction, sans
+  // Cercle (voir _allerVersAbonnes) — jamais à chaque reconstruction, sans
   // quoi un changement d'onglet dans l'IndexedStack parent ou toute autre
   // reconstruction sans rapport relancerait la requête et ferait
   // clignoter le badge à 0 le temps qu'elle reparte.
   late Future<int> _nombreDemandes =
       widget.abonnementService.nombreDemandesEnAttente();
 
-  Future<void> _allerVersCercle() async {
+  Future<void> _allerVersAbonnes() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
-            EcranCercle(abonnementService: widget.abonnementService),
+            EcranAbonnes(abonnementService: widget.abonnementService),
       ),
     );
     if (!mounted) return;
@@ -104,10 +164,10 @@ class _EcranProfilState extends State<EcranProfil>
           children: [
             ListTile(
               leading: const Icon(Icons.visibility_outlined),
-              title: const Text('Modifier le partage'),
+              title: const Text('Qui peut voir'),
               onTap: () {
                 Navigator.of(contexteSheet).pop();
-                _modifierPartage(souvenir);
+                _modifierAudience(souvenir);
               },
             ),
           ],
@@ -116,18 +176,42 @@ class _EcranProfilState extends State<EcranProfil>
     );
   }
 
-  Future<void> _modifierPartage(SouvenirFeed souvenir) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranModifierPartage(
-          souvenirId: souvenir.id,
-          souvenirService: widget.souvenirService,
-          tableService: _tableService,
-        ),
-      ),
-    );
+  Future<void> _modifierAudience(SouvenirFeed souvenir) async {
+    final ({AudienceSouvenir audience, Set<String> amisTaguesIds}) actuelle;
+    try {
+      actuelle = await widget.souvenirService.audienceActuelle(souvenir.id);
+    } catch (_) {
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+      return;
+    }
     if (!mounted) return;
-    recharger();
+    final choisie = await ouvrirFeuilleAudience(
+      context,
+      audienceInitiale: actuelle.audience,
+      abonnementService: widget.abonnementService,
+      tableService: _tableService,
+      amisTaguesIds: actuelle.amisTaguesIds,
+    );
+    if (choisie == null || !mounted) return;
+    try {
+      final tablesEnEchec = await widget.souvenirService.modifierAudience(
+        souvenir.id,
+        choisie,
+      );
+      if (!mounted) return;
+      afficherMessage(
+        context,
+        tablesEnEchec.isEmpty
+            ? 'Audience mise à jour.'
+            : 'Mise à jour, mais impossible de partager avec '
+                  '${tablesEnEchec.length} Table${tablesEnEchec.length > 1 ? 's' : ''}.',
+      );
+      recharger();
+    } catch (_) {
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+    }
   }
 
   void _bientotDisponible() {
@@ -214,6 +298,11 @@ class _EcranProfilState extends State<EcranProfil>
                             onOuvrirLieu: _bientotDisponible,
                             onOptions: () => _ouvrirOptions(souvenir),
                           ),
+                      if (_profilPrive != null)
+                        _InterrupteurProfilPrive(
+                          prive: _profilPrive!,
+                          onChange: _basculerProfilPrive,
+                        ),
                       Padding(
                         padding: const EdgeInsets.all(TablTokens.espaceL),
                         child: TablBouton(
@@ -238,9 +327,9 @@ class _EcranProfilState extends State<EcranProfil>
                     onPresse: _allerVersTables,
                   ),
                   const SizedBox(width: TablTokens.espaceS),
-                  _BoutonCercle(
+                  _BoutonAbonnes(
                     nombreDemandes: _nombreDemandes,
-                    onPresse: _allerVersCercle,
+                    onPresse: _allerVersAbonnes,
                   ),
                 ],
               ),
@@ -318,6 +407,33 @@ class _EnTeteProfil extends StatelessWidget {
   }
 }
 
+class _InterrupteurProfilPrive extends StatelessWidget {
+  const _InterrupteurProfilPrive({required this.prive, required this.onChange});
+
+  final bool prive;
+  final ValueChanged<bool> onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
+      child: SwitchListTile.adaptive(
+        value: prive,
+        onChanged: onChange,
+        activeTrackColor: TablTokens.primaire,
+        title: Text('Profil privé', style: TablTokens.corps),
+        subtitle: Text(
+          prive
+              ? 'Seules les personnes que vous acceptez voient vos moments.'
+              : 'Tous les utilisateurs de Tabl peuvent voir vos moments '
+                    'et vous suivre.',
+          style: TablTokens.legende,
+        ),
+      ),
+    );
+  }
+}
+
 class _MessageListe extends StatelessWidget {
   const _MessageListe({required this.texte});
 
@@ -336,7 +452,7 @@ class _MessageListe extends StatelessWidget {
   }
 }
 
-/// Icône ronde simple, même habillage que [_BoutonCercle] mais sans
+/// Icône ronde simple, même habillage que [_BoutonAbonnes] mais sans
 /// badge — pour "Vos Tables".
 class _BoutonIcone extends StatelessWidget {
   const _BoutonIcone({
@@ -368,8 +484,8 @@ class _BoutonIcone extends StatelessWidget {
 
 /// Icône vers l'écran Cercle, avec un badge si des demandes de suivi
 /// sont en attente.
-class _BoutonCercle extends StatelessWidget {
-  const _BoutonCercle({required this.nombreDemandes, required this.onPresse});
+class _BoutonAbonnes extends StatelessWidget {
+  const _BoutonAbonnes({required this.nombreDemandes, required this.onPresse});
 
   final Future<int> nombreDemandes;
   final VoidCallback onPresse;

@@ -87,7 +87,7 @@ class _EcranExplorerState extends State<EcranExplorer> {
       final resultats = await Future.wait([
         widget.raccourcisVillesService.mesVilles(),
         widget.entitlementService.aReseauEtendu(),
-        widget.abonnementService.mesAmis(),
+        widget.abonnementService.mesRelations(),
       ]);
       final mesVilles = resultats[0] as List<String>;
       final estPremium = resultats[1] as bool;
@@ -289,7 +289,7 @@ class _EcranExplorerState extends State<EcranExplorer> {
           ),
           const SizedBox(height: TablTokens.espaceS),
           TablSegmentModeCarte(
-            options: const ['Ma carte', 'Envies', 'Le cercle'],
+            options: const ['Ma carte', 'Envies', 'Réseau'],
             selectionne: ModeCarte.values.indexOf(_mode),
             onSelection: (i) => _changerMode(ModeCarte.values[i]),
           ),
@@ -505,7 +505,7 @@ class _EcranExplorerState extends State<EcranExplorer> {
         if (index == 0) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: TablTokens.espaceS),
-            child: Text('Dans votre cercle', style: TablTokens.sousTitre),
+            child: Text('Dans votre réseau', style: TablTokens.sousTitre),
           );
         }
         final r = _restaurants[index - 1];
@@ -564,7 +564,7 @@ class _EcranExplorerState extends State<EcranExplorer> {
       nom: r.nom,
       sousTitreLieu: r.quartier == null ? r.ville : '${r.quartier} · ${r.ville}',
       procheDirectResume: r.procheDirectResume,
-      recurrenceResume: r.aDeLaRecurrence ? '★ ${r.procheDirectResume.isEmpty ? "Votre cercle revient ici" : "2 y sont retournés"}' : '',
+      recurrenceResume: r.aDeLaRecurrence ? '★ ${r.procheDirectResume.isEmpty ? "Votre réseau revient ici" : "2 y sont retournés"}' : '',
       emotionsRepresentatives: r.emotionsRepresentatives,
       reseauEtenduResume: r.reseauEtenduCompte == null || r.reseauEtenduCompte == 0
           ? ''
@@ -730,7 +730,7 @@ class _EcranExplorerState extends State<EcranExplorer> {
               Text('Réseau étendu', style: TablTokens.sousTitre),
               SizedBox(height: TablTokens.espaceS),
               Text(
-                'Découvrez ce que le réseau de confiance de votre cercle '
+                'Découvrez ce que le réseau de confiance de vos abonnements '
                 'connaît, toujours de façon anonyme — réservé aux comptes '
                 'Premium.',
                 style: TablTokens.corps,

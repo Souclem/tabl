@@ -3,7 +3,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
-import 'ecran_cercle.dart';
+import 'ecran_abonnes.dart';
 import 'ecran_creer_instant.dart';
 import 'ecran_viewer_instants.dart';
 
@@ -203,11 +203,11 @@ class _EcranFeedState extends State<EcranFeed>
     _chargerSignaux(souvenirs!);
   }
 
-  void _allerVersCercle() {
+  void _allerVersAbonnes() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
-            EcranCercle(abonnementService: widget.abonnementService),
+            EcranAbonnes(abonnementService: widget.abonnementService),
       ),
     );
   }
@@ -267,7 +267,7 @@ class _EcranFeedState extends State<EcranFeed>
           children: [
             _BarreSuperieure(
               futurDemandes: _futurDemandes,
-              onAjouterAmis: _allerVersCercle,
+              onAjouterAmis: _allerVersAbonnes,
               onNotifications: _bientotDisponible,
               onPeriode: _bientotDisponible,
             ),
@@ -305,7 +305,7 @@ class _EcranFeedState extends State<EcranFeed>
                   // volontaire).
                   final souvenirs = this.souvenirs ??= snapshot.data!;
                   if (souvenirs.isEmpty) {
-                    return _EtatVide(onAjouterAmis: _allerVersCercle);
+                    return _EtatVide(onAjouterAmis: _allerVersAbonnes);
                   }
                   _chargerSignaux(souvenirs);
 
@@ -494,7 +494,7 @@ class _EtatVide extends StatelessWidget {
               style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
             ),
             const SizedBox(height: TablTokens.espaceXl),
-            TablBouton(libelle: 'Ajouter une connexion', onPresse: onAjouterAmis),
+            TablBouton(libelle: 'Trouver des personnes', onPresse: onAjouterAmis),
           ],
         ),
       ),

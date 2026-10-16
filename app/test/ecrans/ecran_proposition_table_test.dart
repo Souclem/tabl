@@ -5,6 +5,11 @@ import 'package:app/services/services.dart';
 import 'package:app/ecrans/ecran_proposition_table.dart';
 
 class _FauxTableService implements TableService {
+  @override
+  Future<Map<String, Set<String>>> membresActifsParTable(
+    List<String> tableIds,
+  ) async => {for (final id in tableIds) id: <String>{}};
+
   _FauxTableService(this.detail);
 
   DetailProposition detail;

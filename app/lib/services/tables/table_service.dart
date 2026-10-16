@@ -20,6 +20,10 @@ abstract interface class TableService {
   /// Tables où j'ai été invité mais n'ai pas encore répondu (règle 54).
   Future<List<ResumeTable>> mesInvitations();
 
+  /// Membres actifs de chacune des [tableIds], moi exclu — pour compter
+  /// qui verra une publication partagée "Seulement" avec ces Tables.
+  Future<Map<String, Set<String>>> membresActifsParTable(List<String> tableIds);
+
   /// Crée une Table : moi-même comme premier membre actif/admin, les
   /// [membresInvitesIds] comme invités en attente (règle 50 — flow
   /// minimal, rien d'autre requis).
