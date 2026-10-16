@@ -132,6 +132,8 @@ class _FauxSouvenirService implements SouvenirService {
   // monté — pas ce que ces tests vérifient, donc une vraie valeur plutôt
   // qu'un throw.
   @override
+  Future<List<SouvenirFeed>> souvenirsDe(String auteurId) async => [];
+  @override
   Future<List<SouvenirFeed>> feed() async => [];
   @override
   Future<void> basculerReaction(String souvenirId, {required bool reagir}) =>

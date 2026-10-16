@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'actions_publications.dart';
 import 'ecran_accueil.dart';
 import 'ecran_cercle.dart';
+import 'ecran_modifier_partage.dart';
 import 'ecran_tables.dart';
 
-/// Onglet Profil : identité de l'utilisateur, accès au cercle et
-/// déconnexion.
-///
-/// Volontairement minimal pour l'instant — stats, souvenirs et historique
-/// viendront une fois les données réelles disponibles (voir maquette
-/// Claude Design pour la version complète visée).
+/// Onglet Profil : identité de l'utilisateur, ses propres publications
+/// (présentées comme dans le Feed, via le même [TablPublication]), accès
+/// au cercle, aux Tables et déconnexion.
 class EcranProfil extends StatefulWidget {
   const EcranProfil({
     super.key,
@@ -37,8 +36,31 @@ class EcranProfil extends StatefulWidget {
   State<EcranProfil> createState() => _EcranProfilState();
 }
 
-class _EcranProfilState extends State<EcranProfil> {
+class _EcranProfilState extends State<EcranProfil>
+    with ActionsPublications<EcranProfil> {
   bool _enCours = false;
+
+  // Même principe que le Feed : chargé une fois (l'écran vit dans
+  // l'IndexedStack de EcranPrincipal), rechargé seulement sur demande
+  // (tirer vers le bas, retour des commentaires ou du partage).
+  late Future<List<SouvenirFeed>> _futurSouvenirs = _chargerSouvenirs();
+
+  Future<List<SouvenirFeed>> _chargerSouvenirs() =>
+      widget.souvenirService.souvenirsDe(widget.utilisateur.id);
+
+  @override
+  SouvenirService get souvenirService => widget.souvenirService;
+
+  @override
+  void recharger() {
+    setState(() {
+      _futurSouvenirs = _chargerSouvenirs();
+      souvenirs = null;
+    });
+  }
+
+  TableService get _tableService =>
+      widget.tableService ?? TableServiceSupabase(TablBackend.client);
 
   // Recalculé seulement à la création de l'état et au retour de l'écran
   // Cercle (voir _allerVersCercle) — jamais à chaque reconstruction, sans
@@ -65,11 +87,51 @@ class _EcranProfilState extends State<EcranProfil> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => EcranTables(
-          tableService: widget.tableService ?? TableServiceSupabase(TablBackend.client),
+          tableService: _tableService,
           abonnementService: widget.abonnementService,
         ),
       ),
     );
+  }
+
+  void _ouvrirOptions(SouvenirFeed souvenir) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      builder: (contexteSheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: const Text('Modifier le partage'),
+              onTap: () {
+                Navigator.of(contexteSheet).pop();
+                _modifierPartage(souvenir);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _modifierPartage(SouvenirFeed souvenir) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranModifierPartage(
+          souvenirId: souvenir.id,
+          souvenirService: widget.souvenirService,
+          tableService: _tableService,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    recharger();
+  }
+
+  void _bientotDisponible() {
+    afficherMessage(context, 'Bientôt disponible.');
   }
 
   Future<void> _seDeconnecter() async {
@@ -99,51 +161,71 @@ class _EcranProfilState extends State<EcranProfil> {
       body: SafeArea(
         child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(TablTokens.espaceL),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: TablTokens.espaceXl),
-                  Center(
-                    child: Container(
-                      width: 90,
-                      height: 90,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: TablTokens.surface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        widget.utilisateur.pseudo.isNotEmpty
-                            ? widget.utilisateur.pseudo[0].toUpperCase()
-                            : '?',
-                        style: TablTokens.grandTitre,
-                      ),
+            FutureBuilder<List<SouvenirFeed>>(
+              future: _futurSouvenirs,
+              builder: (context, snapshot) {
+                final termine =
+                    snapshot.connectionState == ConnectionState.done;
+                if (termine && snapshot.hasError) {
+                  debugPrint(
+                    'EcranProfil: ${snapshot.error}\n${snapshot.stackTrace}',
+                  );
+                }
+                final mesSouvenirs = termine && !snapshot.hasError
+                    ? (souvenirs ??= snapshot.data!)
+                    : null;
+                return RefreshIndicator(
+                  color: TablTokens.primaire,
+                  onRefresh: () async {
+                    recharger();
+                    await _futurSouvenirs;
+                  },
+                  child: ListView(
+                    // La barre de navigation flotte par-dessus (voir
+                    // EcranPrincipal) : marge basse identique au Feed.
+                    padding: const EdgeInsets.only(
+                      bottom: TablTokens.espaceXxl + TablTokens.espaceL,
                     ),
+                    children: [
+                      _EnTeteProfil(
+                        utilisateur: widget.utilisateur,
+                        nombrePublications: mesSouvenirs?.length,
+                      ),
+                      if (!termine)
+                        const Padding(
+                          padding: EdgeInsets.all(TablTokens.espaceXl),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: TablTokens.primaire,
+                            ),
+                          ),
+                        )
+                      else if (mesSouvenirs == null)
+                        _MessageListe(texte: messageErreurGenerique)
+                      else if (mesSouvenirs.isEmpty)
+                        const _MessageListe(
+                          texte: "Vous n'avez encore rien publié.",
+                        )
+                      else
+                        for (final souvenir in mesSouvenirs)
+                          construirePublication(
+                            souvenir,
+                            contexte: ContextePublication.profilPerso,
+                            onOuvrirLieu: _bientotDisponible,
+                            onOptions: () => _ouvrirOptions(souvenir),
+                          ),
+                      Padding(
+                        padding: const EdgeInsets.all(TablTokens.espaceL),
+                        child: TablBouton(
+                          libelle: 'Se déconnecter',
+                          enCours: _enCours,
+                          onPresse: _seDeconnecter,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: TablTokens.espaceM),
-                  Text(
-                    widget.utilisateur.pseudo,
-                    textAlign: TextAlign.center,
-                    style: TablTokens.titre,
-                  ),
-                  const SizedBox(height: TablTokens.espaceXs),
-                  Text(
-                    widget.utilisateur.email,
-                    textAlign: TextAlign.center,
-                    style: TablTokens.corps.copyWith(
-                      color: TablTokens.texteDoux,
-                    ),
-                  ),
-                  const SizedBox(height: TablTokens.espaceXxl),
-                  TablBouton(
-                    libelle: 'Se déconnecter',
-                    enCours: _enCours,
-                    onPresse: _seDeconnecter,
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Positioned(
               top: TablTokens.espaceS,
@@ -165,6 +247,90 @@ class _EcranProfilState extends State<EcranProfil> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Haut du profil : avatar, pseudo, e-mail et nombre de publications.
+class _EnTeteProfil extends StatelessWidget {
+  const _EnTeteProfil({
+    required this.utilisateur,
+    required this.nombrePublications,
+  });
+
+  final Utilisateur utilisateur;
+
+  /// `null` tant que la liste n'est pas chargée.
+  final int? nombrePublications;
+
+  @override
+  Widget build(BuildContext context) {
+    final nombre = nombrePublications;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceL,
+        TablTokens.espaceXxl,
+        TablTokens.espaceL,
+        TablTokens.espaceXl,
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: TablTokens.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              utilisateur.pseudo.isNotEmpty
+                  ? utilisateur.pseudo[0].toUpperCase()
+                  : '?',
+              style: TablTokens.grandTitre,
+            ),
+          ),
+          const SizedBox(height: TablTokens.espaceM),
+          Text(
+            utilisateur.pseudo,
+            textAlign: TextAlign.center,
+            style: TablTokens.titre,
+          ),
+          const SizedBox(height: TablTokens.espaceXs),
+          Text(
+            utilisateur.email,
+            textAlign: TextAlign.center,
+            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+          ),
+          if (nombre != null) ...[
+            const SizedBox(height: TablTokens.espaceM),
+            Text(
+              nombre == 0
+                  ? 'Aucun moment'
+                  : '$nombre moment${nombre > 1 ? 's' : ''}',
+              style: TablTokens.legende,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageListe extends StatelessWidget {
+  const _MessageListe({required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(TablTokens.espaceXl),
+      child: Text(
+        texte,
+        textAlign: TextAlign.center,
+        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
       ),
     );
   }

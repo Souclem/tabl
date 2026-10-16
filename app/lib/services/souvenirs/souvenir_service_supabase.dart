@@ -193,15 +193,26 @@ class SouvenirServiceSupabase implements SouvenirService {
   }
 
   @override
-  Future<List<SouvenirFeed>> feed() async {
-    final lignes = await _client
+  Future<List<SouvenirFeed>> feed() => _souvenirsPublies();
+
+  @override
+  Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
+      _souvenirsPublies(auteurId: auteurId);
+
+  /// Requête commune au Feed et aux pages de profil : seule la
+  /// restriction à un auteur change, tout le reste (réactions,
+  /// commentaires, URLs signées) est résolu de la même façon.
+  Future<List<SouvenirFeed>> _souvenirsPublies({String? auteurId}) async {
+    var requete = _client
         .from('souvenirs')
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, '
           'restaurants(nom, ville), profils!souvenirs_auteur_id_fkey(pseudo)',
         )
-        .eq('statut', 'publie')
+        .eq('statut', 'publie');
+    if (auteurId != null) requete = requete.eq('auteur_id', auteurId);
+    final lignes = await requete
         .order('date_visite', ascending: false)
         .order('cree_le', ascending: false);
 

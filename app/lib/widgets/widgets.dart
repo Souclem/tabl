@@ -36,6 +36,7 @@ export 'instants/transition_ensuite.dart';
 export 'lien_bas_de_page.dart';
 export 'logo.dart';
 export 'messages.dart';
+export 'publication.dart';
 export 'selecteur_emotion.dart';
 export 'separateur_texte.dart';
 export 'tables/bulle_message_organisation.dart';

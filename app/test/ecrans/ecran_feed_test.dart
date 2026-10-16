@@ -26,6 +26,9 @@ class _FauxSouvenirService implements SouvenirService {
   final List<(String, bool)> appelsReaction = [];
 
   @override
+  Future<List<SouvenirFeed>> souvenirsDe(String auteurId) async =>
+      souvenirs.where((s) => s.estAMoi).toList();
+  @override
   Future<List<SouvenirFeed>> feed() async {
     if (erreur) throw Exception('erreur réseau');
     return souvenirs;

@@ -75,6 +75,11 @@ abstract interface class SouvenirService {
   /// service n'a rien à filtrer lui-même), du plus récent au plus ancien.
   Future<List<SouvenirFeed>> feed();
 
+  /// Les souvenirs publiés d'un seul auteur, même ordre que [feed] —
+  /// pour une page de profil. La RLS reste seule juge : sur le profil de
+  /// quelqu'un qu'on ne suit pas, la liste revient simplement vide.
+  Future<List<SouvenirFeed>> souvenirsDe(String auteurId);
+
   /// Ajoute sa réaction ("j'aime") si [reagir] est vrai, la retire sinon.
   Future<void> basculerReaction(String souvenirId, {required bool reagir});
 

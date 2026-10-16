@@ -29,6 +29,7 @@ export 'social/abonnement_service_supabase.dart';
 export 'social/profil_public.dart';
 export 'souvenirs/commentaire.dart';
 export 'souvenirs/emotion.dart';
+export 'souvenirs/presentation_souvenir.dart';
 export 'souvenirs/souvenir_feed.dart';
 export 'souvenirs/souvenir_service.dart';
 export 'souvenirs/souvenir_service_supabase.dart';

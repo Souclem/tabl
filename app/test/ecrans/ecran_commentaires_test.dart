@@ -55,6 +55,9 @@ class _FauxSouvenirService implements SouvenirService {
       throw UnimplementedError();
 
   @override
+  Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
+      throw UnimplementedError();
+  @override
   Future<List<SouvenirFeed>> feed() => throw UnimplementedError();
 
   @override
