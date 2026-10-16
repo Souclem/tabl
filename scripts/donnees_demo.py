@@ -355,6 +355,9 @@ def photos() -> None:
         sys.exit("Aucune photo récupérée (Openverse indisponible ?).")
     print("Téléversement…")
     photos_demo.televerser("portrait", "avatars")
+    photos_demo.miniatures("portrait")
+    # `demo/` existe déjà : le dossier local `mini` y devient `demo/mini/`.
+    photos_demo.televerser(photos_demo.DOSSIER_MINIATURES, "avatars")
     photos_demo.televerser("plat", "souvenirs")
     dossier = photos_demo.DOSSIER_STOCKAGE
 

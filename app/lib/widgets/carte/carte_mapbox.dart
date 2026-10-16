@@ -103,11 +103,54 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
 
   /// Bulles déjà dessinées et ajoutées au style (par identifiant).
   final Set<String> _bullesAjoutees = {};
-  final Map<String, Future<Uint8List?>> _photos = {};
+
+  /// Bulles en cours de préparation : une même bulle n'est jamais
+  /// préparée deux fois en parallèle.
+  final Map<String, Future<void>> _bullesEnCours = {};
+
+  /// Le dernier GeoJSON demandé : une préparation terminée après un
+  /// nouveau déplacement ne remet pas à jour avec des données périmées.
+  String _dernierGeojson = '';
+
+  /// Photos téléchargées en même temps, au plus.
+  static const _telechargementsSimultanes = 8;
+
+  // Animation d'apparition / disparition : Mapbox n'anime pas un
+  // changement de données, on la joue donc image par image en faisant
+  // varier deux propriétés de chaque lieu, lues par les couches.
+  static const _dureeAnimation = Duration(milliseconds: 260);
+  static const _imagesAnimation = 9;
+  static const List<Object> _opaciteExpression = [
+    'coalesce',
+    ['get', 'opacite'],
+    1.0,
+  ];
+  static const List<Object> _echelleExpression = [
+    'coalesce',
+    ['get', 'echelle'],
+    1.0,
+  ];
+
+  /// Les lieux actuellement à l'écran, par identifiant d'affichage.
+  Map<String, Map<String, dynamic>> _affiches = {};
+
+  /// Incrémenté à chaque nouvelle mise à jour : une animation en cours
+  /// s'arrête dès qu'une plus récente commence.
+  int _generation = 0;
 
   MapboxMap? _carte;
   bool _styleCharge = false;
   Timer? _attenteCamera;
+
+  /// Position de départ, créée une seule fois : un nouvel objet à chaque
+  /// reconstruction pourrait ramener la carte à son point de départ et
+  /// annuler un zoom ou un recentrage.
+  late final _vueInitiale = CameraViewportState(
+    center: Point(
+      coordinates: Position(widget.longitudeInitiale, widget.latitudeInitiale),
+    ),
+    zoom: widget.zoomInitial,
+  );
 
   @override
   void dispose() {
@@ -166,12 +209,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       false,
     );
 
-    await carte.addSource(
-      GeoJsonSource(
-        id: _source,
-        data: await _avecBulles(widget.geojsonLieux),
-      ),
-    );
+    await carte.addSource(GeoJsonSource(id: _source));
     await carte.addLayer(
       CircleLayer(
         id: _couche,
@@ -188,10 +226,14 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         // Lieu de mon réseau : marqueur plein ; restaurant où personne
         // n'est allé : petit point, pour en voir beaucoup sans surcharge.
         circleRadiusExpression: [
-          'case',
-          ['get', 'reseau'],
-          7.0,
-          4.0,
+          '*',
+          [
+            'case',
+            ['get', 'reseau'],
+            7.0,
+            4.0,
+          ],
+          _echelleExpression,
         ],
         circleStrokeColor: TablTokens.fond.toARGB32(),
         circleStrokeWidthExpression: [
@@ -200,6 +242,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
           2.0,
           1.0,
         ],
+        circleOpacityExpression: _opaciteExpression,
+        circleStrokeOpacityExpression: _opaciteExpression,
       ),
     );
     await carte.addLayer(
@@ -212,6 +256,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         iconAllowOverlap: true,
         iconIgnorePlacement: true,
         iconEmissiveStrength: 1,
+        iconOpacityExpression: _opaciteExpression,
+        iconSizeExpression: _echelleExpression,
       ),
     );
     for (final couche in [_couche, _coucheBulles]) {
@@ -224,6 +270,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     }
 
     _styleCharge = true;
+    _mettreAJour(_source, widget.geojsonLieux);
     _signalerZone();
   }
 
@@ -257,37 +304,131 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     }
   }
 
+  /// Affiche tout de suite les lieux — en simples marqueurs dorés tant
+  /// que leur bulle photo n'est pas prête —, prépare en parallèle les
+  /// bulles manquantes, puis remet à jour dès qu'elles le sont.
   Future<void> _mettreAJour(String sourceId, String geojson) async {
-    final complet = await _avecBulles(geojson);
-    final source = await _carte?.getSource(sourceId);
-    if (source is GeoJsonSource) await source.updateGeoJSON(complet);
+    _dernierGeojson = geojson;
+    final donnees = jsonDecode(geojson) as Map<String, dynamic>;
+    await _pousser(sourceId, donnees);
+
+    final manquantes = <String, ({String photo, int autres})>{};
+    for (final lieu in _lieux(donnees)) {
+      final bulle = _bulleDe(lieu);
+      if (bulle != null && !_bullesAjoutees.contains(bulle.id)) {
+        manquantes[bulle.id] = (photo: bulle.photo, autres: bulle.autres);
+      }
+    }
+    if (manquantes.isEmpty) return;
+
+    final aPreparer = manquantes.entries.toList();
+    for (var debut = 0; debut < aPreparer.length; debut += _telechargementsSimultanes) {
+      await Future.wait([
+        for (final bulle in aPreparer.skip(debut).take(_telechargementsSimultanes))
+          _bullesEnCours.putIfAbsent(
+            bulle.key,
+            () => _preparerBulle(bulle.key, bulle.value.photo, bulle.value.autres),
+          ),
+      ]);
+      // Montrer les bulles au fur et à mesure, sauf si la carte a bougé
+      // entre-temps (une autre mise à jour a pris le relais).
+      if (_dernierGeojson != geojson) return;
+      await _pousser(sourceId, donnees);
+    }
   }
 
-  /// Dessine (une seule fois chacune) les bulles photo des lieux qui en
-  /// ont une, les ajoute au style, et renvoie le GeoJSON avec, pour ces
-  /// lieux, le nom de leur bulle (`bulle`). Une photo qui ne charge pas
-  /// laisse le lieu en simple marqueur doré.
-  Future<String> _avecBulles(String geojson) async {
-    final carte = _carte;
-    if (carte == null) return geojson;
-    final donnees = jsonDecode(geojson) as Map<String, dynamic>;
-    for (final lieu in (donnees['features'] as List).cast<Map<String, dynamic>>()) {
-      final proprietes = lieu['properties'] as Map<String, dynamic>;
-      final photo = proprietes['photo'] as String?;
-      if (photo == null) continue;
-      final autres = (proprietes['autres'] as num?)?.toInt() ?? 0;
-      final id = 'bulle-${photo.hashCode}-$autres';
-      if (!_bullesAjoutees.contains(id)) {
-        final octets = await _photos.putIfAbsent(photo, () => _telecharger(photo));
-        if (octets == null) continue;
-        final image = await _dessinerBulle(octets, autres);
-        if (image == null) continue;
-        await carte.addImage(id, _echelle, image);
-        _bullesAjoutees.add(id);
+  static List<Map<String, dynamic>> _lieux(Map<String, dynamic> donnees) =>
+      (donnees['features'] as List).cast<Map<String, dynamic>>();
+
+  static ({String id, String photo, int autres})? _bulleDe(
+    Map<String, dynamic> lieu,
+  ) {
+    final proprietes = lieu['properties'] as Map<String, dynamic>;
+    final photo = proprietes['photo'] as String?;
+    if (photo == null) return null;
+    final autres = (proprietes['autres'] as num?)?.toInt() ?? 0;
+    return (id: 'bulle-${photo.hashCode}-$autres', photo: photo, autres: autres);
+  }
+
+  /// Envoie les lieux à la carte, avec leur bulle pour ceux dont elle est
+  /// prête (propriété `bulle`) ; les autres restent des marqueurs dorés.
+  /// Les lieux qui arrivent apparaissent en fondu en grandissant, ceux qui
+  /// partent s'effacent ; un point qui devient bulle fait un fondu enchaîné
+  /// (ce n'est plus le même marqueur à l'écran).
+  Future<void> _pousser(String sourceId, Map<String, dynamic> donnees) async {
+    final cibles = <String, Map<String, dynamic>>{};
+    for (final lieu in _lieux(donnees)) {
+      final bulle = _bulleDe(lieu);
+      final proprietes = Map<String, dynamic>.of(
+        lieu['properties'] as Map<String, dynamic>,
+      );
+      final pret = bulle != null && _bullesAjoutees.contains(bulle.id);
+      if (pret) {
+        proprietes['bulle'] = bulle.id;
+      } else {
+        proprietes.remove('bulle');
       }
-      proprietes['bulle'] = id;
+      final cle = '${proprietes['cle']}|${pret ? bulle.id : ''}';
+      cibles[cle] = {...lieu, 'properties': proprietes};
     }
-    return jsonEncode(donnees);
+
+    final generation = ++_generation;
+    final entrants = {for (final c in cibles.keys) if (!_affiches.containsKey(c)) c};
+    final sortants = {for (final c in _affiches.keys) if (!cibles.containsKey(c)) c};
+    final depart = _affiches;
+    _affiches = cibles;
+
+    final source = await _carte?.getSource(sourceId);
+    if (source is! GeoJsonSource) return;
+    if (entrants.isEmpty && sortants.isEmpty) {
+      await source.updateGeoJSON(_collection(cibles.values));
+      return;
+    }
+
+    final pause = _dureeAnimation ~/ _imagesAnimation;
+    for (var image = 1; image <= _imagesAnimation; image++) {
+      if (generation != _generation) return;
+      // Démarrage rapide, arrivée douce.
+      final t = Curves.easeOutCubic.transform(image / _imagesAnimation);
+      await source.updateGeoJSON(
+        _collection([
+          for (final MapEntry(key: cle, value: lieu) in cibles.entries)
+            entrants.contains(cle) ? _avec(lieu, t, 0.6 + 0.4 * t) : lieu,
+          for (final cle in sortants)
+            _avec(depart[cle]!, 1 - t, 1 - 0.4 * t),
+        ]),
+      );
+      if (image < _imagesAnimation) await Future<void>.delayed(pause);
+    }
+  }
+
+  static Map<String, dynamic> _avec(
+    Map<String, dynamic> lieu,
+    double opacite,
+    double echelle,
+  ) => {
+    ...lieu,
+    'properties': {
+      ...lieu['properties'] as Map<String, dynamic>,
+      'opacite': opacite,
+      'echelle': echelle,
+    },
+  };
+
+  static String _collection(Iterable<Map<String, dynamic>> lieux) =>
+      jsonEncode({'type': 'FeatureCollection', 'features': lieux.toList()});
+
+  /// Télécharge la photo, dessine la bulle et l'ajoute au style. Une
+  /// photo qui ne charge pas laisse simplement le marqueur doré.
+  Future<void> _preparerBulle(String id, String photo, int autres) async {
+    final carte = _carte;
+    if (carte == null) return;
+    final octets = await _telecharger(photo);
+    if (octets == null) return;
+    final image = await _dessinerBulle(octets, autres);
+    if (image == null) return;
+    await carte.addImage(id, _echelle, image);
+    _bullesAjoutees.add(id);
   }
 
   static Future<Uint8List?> _telecharger(String url) async {
@@ -374,15 +515,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     return MapWidget(
       key: const ValueKey('tabl-carte'),
       styleUri: MapboxStyles.STANDARD,
-      viewport: CameraViewportState(
-        center: Point(
-          coordinates: Position(
-            widget.longitudeInitiale,
-            widget.latitudeInitiale,
-          ),
-        ),
-        zoom: widget.zoomInitial,
-      ),
+      viewport: _vueInitiale,
       onMapCreated: _creee,
       onStyleLoadedListener: _styleChargeListener,
       onCameraChangeListener: (_) => _cameraBouge(),

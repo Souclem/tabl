@@ -69,6 +69,7 @@ class CarteServiceSupabase implements CarteService {
           auteurPhotoUrl: urlPhotoProfil(
             _client,
             auteur?['photo_url'] as String?,
+            miniature: true,
           ),
               estMoi: s['auteur_id'] == _monId,
               moment: s['moment'] as String? ?? '',

@@ -152,3 +152,25 @@ def photos_en_cache(sorte: str) -> list[str]:
     if not os.path.isdir(dossier):
         return []
     return sorted(f for f in os.listdir(dossier) if f.endswith(".jpg"))
+
+
+# Miniatures des portraits : taille exacte d'une bulle de la carte sur un
+# écran Retina (44 pt × 3), pour la carte et les petits avatars. Même nom
+# que l'original, dans un sous-dossier `mini/` à côté de lui : l'app en
+# déduit le chemin (voir `urlPhotoProfil`).
+TAILLE_MINIATURE = 132
+DOSSIER_MINIATURES = "mini"
+
+
+def miniatures(sorte: str) -> int:
+    source = os.path.join(DOSSIER, sorte)
+    cible = os.path.join(DOSSIER, DOSSIER_MINIATURES)
+    os.makedirs(cible, exist_ok=True)
+    for ancien in os.listdir(cible):
+        os.remove(os.path.join(cible, ancien))
+    noms = photos_en_cache(sorte)
+    for nom in noms:
+        image = Image.open(os.path.join(source, nom)).convert("RGB")
+        image.thumbnail((TAILLE_MINIATURE, TAILLE_MINIATURE))
+        image.save(os.path.join(cible, nom), quality=72, optimize=True)
+    return len(noms)
