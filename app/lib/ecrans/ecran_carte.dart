@@ -271,7 +271,14 @@ class _EcranCarteState extends State<EcranCarte> {
       ..._annuaire,
     ].where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
+    final autreLieu = _selection != null && _selection!.cle != cle;
     setState(() => _selection = lieu);
+    // Un autre lieu touché, feuille déjà ouverte : on garde la même
+    // feuille (son contrôleur ne peut pas en servir deux à la fois) et
+    // elle repart réduite.
+    if (autreLieu && _feuille.isAttached) {
+      _feuille.jumpTo(tailleFeuilleReduite);
+    }
     // La feuille réduite couvre à peu près le bas de la carte, sous ~60 %
     // de sa hauteur : seulement si le lieu se retrouve dessous, on le
     // remonte juste au-dessus — le plus petit déplacement possible.
@@ -324,8 +331,6 @@ class _EcranCarteState extends State<EcranCarte> {
         return false;
       },
       child: DraggableScrollableSheet(
-        // Un autre lieu touché : nouvelle feuille, repart réduite.
-        key: ValueKey(lieu.cle),
         controller: _feuille,
         initialChildSize: tailleFeuilleReduite,
         minChildSize: 0,
