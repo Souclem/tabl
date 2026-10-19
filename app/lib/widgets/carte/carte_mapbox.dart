@@ -77,7 +77,12 @@ class ControleurCarte {
   }
 }
 
-/// La carte Mapbox de Tabl : globe 3D au dézoom, style nuit sans les
+/// Le style de carte propre à Tabl (« nuit dorée »), publié dans Mapbox
+/// Studio. Sa source est versionnée dans `design/style_carte_tabl.json` :
+/// une modification faite dans Studio doit y être recopiée.
+const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
+
+/// La carte Mapbox de Tabl : globe 3D au dézoom, notre style sans les
 /// commerces de Mapbox (seuls nos lieux ressortent), ma position et une
 /// boussole. Chaque lieu : la photo de l'ami mis en avant dans une bulle
 /// dorée, avec « +N » s'il y a d'autres amis (propriétés `photo` et
@@ -248,28 +253,16 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   Future<void> _styleChargeListener(StyleLoadedEventData _) async {
     final carte = _carte;
     if (carte == null) return;
-    await carte.setProjection(StyleProjection(name: StyleProjectionName.globe));
-    await carte.setStyleImportConfigProperty('basemap', 'lightPreset', 'night');
-    await carte.setStyleImportConfigProperty(
-      'basemap',
-      'showPointOfInterestLabels',
-      false,
-    );
-
     await carte.addSource(GeoJsonSource(id: _source));
     await carte.addLayer(
       CircleLayer(
         id: _couche,
         sourceId: _source,
-        slot: 'top',
         filter: [
           '!',
           ['has', 'bulle'],
         ],
         circleColor: TablTokens.primaire.toARGB32(),
-        // Le mode nuit du style assombrit tout ce qui n'émet pas sa propre
-        // lumière : sans ça, les marqueurs dorés deviennent noirs.
-        circleEmissiveStrength: 1,
         // Lieu de mon réseau : marqueur plein ; restaurant où personne
         // n'est allé : petit point, pour en voir beaucoup sans surcharge.
         circleRadiusExpression: [
@@ -297,12 +290,10 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       SymbolLayer(
         id: _coucheBulles,
         sourceId: _source,
-        slot: 'top',
         filter: ['has', 'bulle'],
         iconImageExpression: ['get', 'bulle'],
         iconAllowOverlap: true,
         iconIgnorePlacement: true,
-        iconEmissiveStrength: 1,
         iconOpacityExpression: _opaciteExpression,
         iconSizeExpression: _echelleExpression,
       ),
@@ -565,7 +556,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   Widget build(BuildContext context) {
     return MapWidget(
       key: const ValueKey('tabl-carte'),
-      styleUri: MapboxStyles.STANDARD,
+      styleUri: styleCarteTabl,
       viewport: _vueInitiale,
       onMapCreated: _creee,
       onStyleLoadedListener: _styleChargeListener,
