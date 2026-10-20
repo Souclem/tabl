@@ -42,6 +42,35 @@ class _FauxSouvenirService implements SouvenirService {
     return const [];
   }
 
+  /// Les commentaires de chaque moment, par identifiant de moment.
+  final Map<String, List<Commentaire>> commentairesParMoment = {};
+
+  @override
+  Future<List<Commentaire>> commentaires(String souvenirId) async =>
+      List.of(commentairesParMoment[souvenirId] ?? const <Commentaire>[]);
+
+  @override
+  Future<void> commenter(String souvenirId, String texte) async {
+    commentairesParMoment
+        .putIfAbsent(souvenirId, () => [])
+        .add(
+          Commentaire(
+            id: 'c-$texte',
+            texte: texte,
+            creeLe: DateTime.now(),
+            auteurPseudo: 'moi',
+            estLeMien: true,
+          ),
+        );
+  }
+
+  @override
+  Future<void> supprimerCommentaire(String commentaireId) async {
+    for (final liste in commentairesParMoment.values) {
+      liste.removeWhere((c) => c.id == commentaireId);
+    }
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
@@ -226,6 +255,59 @@ void main() {
     await tester.tap(find.byTooltip('Fermer'));
     await tester.pumpAndSettle();
     expect(find.byType(TablVisionneuseMoment), findsNothing);
+    semantique.dispose();
+  });
+
+  testWidgets('un moment agrandi : ses commentaires, et y répondre', (
+    tester,
+  ) async {
+    final semantique = tester.ensureSemantics();
+    final service = await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+    service.commentairesParMoment['1'] = [
+      Commentaire(
+        id: 'c1',
+        texte: 'On y retourne quand ?',
+        creeLe: DateTime.now().subtract(const Duration(hours: 3)),
+        auteurPseudo: 'Emma',
+        estLeMien: false,
+      ),
+    ];
+    await _allerAuxSouvenirs(tester);
+    await mockNetworkImagesFor(() async {
+      await tester.tap(_tuile('Bibo'));
+      await tester.pumpAndSettle();
+    });
+
+    expect(find.text('1 commentaire'), findsOneWidget);
+    expect(find.text('On y retourne quand ?'), findsOneWidget);
+    expect(find.text('3 h'), findsOneWidget);
+    // Pas le sien : rien à supprimer.
+    expect(find.text('Supprimer'), findsNothing);
+
+    // « Commenter » place le curseur dans le champ, sans changer d'écran.
+    await tester.tap(find.byTooltip('Commenter'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus,
+      isTrue,
+    );
+
+    await tester.enterText(find.byType(TextField), 'Dès samedi.');
+    await tester.ensureVisible(find.byTooltip('Publier le commentaire'));
+    await mockNetworkImagesFor(() async {
+      await tester.tap(find.byTooltip('Publier le commentaire'));
+      await tester.pumpAndSettle();
+    });
+    expect(find.text('2 commentaires'), findsOneWidget);
+    expect(find.text('Dès samedi.'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Dès samedi.'), findsNothing);
+
+    // Le sien se retire.
+    await tester.ensureVisible(find.text('Supprimer'));
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dès samedi.'), findsNothing);
+    expect(find.text('1 commentaire'), findsOneWidget);
     semantique.dispose();
   });
 

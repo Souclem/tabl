@@ -19,6 +19,7 @@ export 'carte/segment_mode_carte.dart';
 export 'champ_mot_de_passe.dart';
 export 'champ_texte.dart';
 export 'profil/bilan_profil.dart';
+export 'profil/commentaires_moment.dart';
 export 'profil/en_tete_profil.dart';
 export 'profil/grille_moments.dart';
 export 'profil/onglets_profil.dart';

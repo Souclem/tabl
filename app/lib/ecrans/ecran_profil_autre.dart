@@ -73,15 +73,20 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
         widget.abonnementService.profil(widget.profilId),
         _chargerCompteurs(),
       ).wait;
-      final publications = profil.publicationsVisibles
-          ? await widget.souvenirService.souvenirsDe(widget.profilId)
-          : const <SouvenirFeed>[];
-      final duo = profil.publicationsVisibles
-          ? duoAvec(
+      // Ses moments et les nôtres partent ensemble : on attend la plus
+      // lente des deux requêtes, pas leur somme.
+      final (publications, mesMomentsAvecLui) = profil.publicationsVisibles
+          ? await (
+              widget.souvenirService.souvenirsDe(widget.profilId),
+              _mesMomentsAvecLui(),
+            ).wait
+          : (const <SouvenirFeed>[], null);
+      final duo = mesMomentsAvecLui == null
+          ? null
+          : duoAvec(
               sesMoments: publications,
-              mesMomentsAvecLui: await _mesMomentsAvecLui(),
-            )
-          : null;
+              mesMomentsAvecLui: mesMomentsAvecLui,
+            );
       if (!mounted) return;
       setState(() {
         _profil = profil;

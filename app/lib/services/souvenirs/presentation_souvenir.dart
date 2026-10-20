@@ -51,6 +51,24 @@ String dateLisibleSouvenir(DateTime date, {DateTime? maintenant}) {
   return date.year == annee ? jour : '$jour ${date.year}';
 }
 
+/// Quand un commentaire a été écrit : "à l’instant", "5 min", "3 h",
+/// "hier", "4 j", puis la date ("12 mars") passé une semaine.
+String dateLisibleCommentaire(DateTime creeLe, {DateTime? maintenant}) {
+  final local = creeLe.toLocal();
+  final ecart = (maintenant ?? DateTime.now()).difference(local);
+  if (ecart.inMinutes < 1) return 'à l’instant';
+  if (ecart.inHours < 1) return '${ecart.inMinutes} min';
+  if (ecart.inDays < 1) return '${ecart.inHours} h';
+  if (ecart.inDays == 1) return 'hier';
+  if (ecart.inDays < 7) return '${ecart.inDays} j';
+  return dateLisibleSouvenir(local, maintenant: maintenant);
+}
+
+/// "Commentaires" tant qu'il n'y en a aucun, "1 commentaire",
+/// "3 commentaires" ensuite.
+String titreCommentaires(int nombre) =>
+    nombre == 0 ? 'Commentaires' : pluriel(nombre, 'commentaire');
+
 /// La légende d'un moment telle qu'affichée partout dans l'app : entre
 /// guillemets « », c'est la voix de son auteur. Les guillemets que
 /// l'auteur aurait tapés lui-même ne sont pas doublés. `null` si vide.

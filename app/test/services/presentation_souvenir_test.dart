@@ -11,6 +11,22 @@ void main() {
     );
   });
 
+  test('commentaire : depuis quand, puis la date', () {
+    final maintenant = DateTime(2026, 10, 20, 18);
+    String depuis(Duration ecart) => dateLisibleCommentaire(
+      maintenant.subtract(ecart),
+      maintenant: maintenant,
+    );
+    expect(depuis(const Duration(seconds: 20)), 'à l’instant');
+    expect(depuis(const Duration(minutes: 5)), '5 min');
+    expect(depuis(const Duration(hours: 3)), '3 h');
+    expect(depuis(const Duration(hours: 30)), 'hier');
+    expect(depuis(const Duration(days: 4)), '4 j');
+    expect(depuis(const Duration(days: 20)), '30 septembre');
+    expect(titreCommentaires(0), 'Commentaires');
+    expect(titreCommentaires(3), '3 commentaires');
+  });
+
   test('légende : toujours entre guillemets, sans les doubler', () {
     expect(
       legendeAffichee('Onze petites assiettes.'),

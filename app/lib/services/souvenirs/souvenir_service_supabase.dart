@@ -245,13 +245,8 @@ class SouvenirServiceSupabase implements SouvenirService {
       _souvenirsPublies(auteurId: auteurId);
 
   @override
-  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) async {
-    final miens = await _souvenirsPublies(auteurId: _monId);
-    return [
-      for (final s in miens)
-        if (s.presents.any((p) => p.id == profilId)) s,
-    ];
-  }
+  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
+      _souvenirsPublies(auteurId: _monId, avecPresent: profilId);
 
   @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) =>
@@ -260,21 +255,30 @@ class SouvenirServiceSupabase implements SouvenirService {
   /// Requête commune au Feed et aux pages de profil : seule la
   /// restriction des auteurs change, tout le reste (réactions,
   /// commentaires, URLs signées) est résolu de la même façon.
+  /// [avecPresent] : seulement les moments où cette personne est taguée.
   Future<List<SouvenirFeed>> _souvenirsPublies({
     String? auteurId,
     String? restaurantId,
+    String? avecPresent,
   }) async {
+    final presentsFiltres = avecPresent == null
+        ? ''
+        : ', souvenirs_amis_tagues!inner(profil_id)';
     var requete = _client
         .from('souvenirs')
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, '
           'restaurants(nom, ville, categories), '
-          'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)',
+          'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)'
+          '$presentsFiltres',
         )
         .eq('statut', 'publie');
     if (restaurantId != null) {
       requete = requete.eq('restaurant_id', restaurantId);
+    }
+    if (avecPresent != null) {
+      requete = requete.eq('souvenirs_amis_tagues.profil_id', avecPresent);
     }
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
@@ -292,13 +296,26 @@ class SouvenirServiceSupabase implements SouvenirService {
 
     final ids = lignes.map((l) => l['id'] as String).toList();
 
-    final urlParChemin = await _resoudreUrlsPhotos(
-      lignes.map((l) => l['photo_url'] as String?).whereType<String>().toList(),
-    );
-    final reactions = await _reactionsParSouvenir(ids);
-    final nombreCommentaires = await _nombreCommentairesParSouvenir(ids);
-    final presents = await _presentsParSouvenir(ids);
-    final envies = await EnviesRestaurants(_client).mesEnviesIds();
+    // Indépendantes les unes des autres : envoyées ensemble, on n'attend
+    // que la plus lente au lieu de la somme des cinq.
+    final (
+      urlParChemin,
+      reactions,
+      nombreCommentaires,
+      presents,
+      envies,
+    ) = await (
+      _resoudreUrlsPhotos(
+        lignes
+            .map((l) => l['photo_url'] as String?)
+            .whereType<String>()
+            .toList(),
+      ),
+      _reactionsParSouvenir(ids),
+      _nombreCommentairesParSouvenir(ids),
+      _presentsParSouvenir(ids),
+      EnviesRestaurants(_client).mesEnviesIds(),
+    ).wait;
 
     return lignes.map((l) {
       final restaurant = l['restaurants'] as Map<String, dynamic>?;
@@ -373,7 +390,7 @@ class SouvenirServiceSupabase implements SouvenirService {
   Future<List<Commentaire>> commentaires(String souvenirId) async {
     final lignes = await _client
         .from('commentaires')
-        .select('id, texte, cree_le, auteur_id, profils(pseudo)')
+        .select('id, texte, cree_le, auteur_id, profils(pseudo, photo_url)')
         .eq('souvenir_id', souvenirId)
         .order('cree_le');
 
@@ -384,6 +401,11 @@ class SouvenirServiceSupabase implements SouvenirService {
         texte: l['texte'] as String,
         creeLe: DateTime.parse(l['cree_le'] as String),
         auteurPseudo: auteur?['pseudo'] as String? ?? '',
+        auteurPhotoUrl: urlPhotoProfil(
+          _client,
+          auteur?['photo_url'] as String?,
+          miniature: true,
+        ),
         estLeMien: l['auteur_id'] == _monId,
       );
     }).toList();

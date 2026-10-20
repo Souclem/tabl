@@ -26,6 +26,9 @@ class _FauxSouvenirService implements SouvenirService {
       mesMomentsAvecElle;
 
   @override
+  Future<List<Commentaire>> commentaires(String souvenirId) async => const [];
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 

@@ -6,17 +6,19 @@ import '../../theme/tokens.dart';
 import '../bouton_verre.dart';
 import '../bulles_personnes.dart';
 import '../publication.dart';
+import 'commentaires_moment.dart';
 import 'grille_moments.dart';
 
 /// Un moment agrandi depuis la grille d'un profil : la photo en grand
 /// en haut (elle arrive de sa tuile, voir [TuileMoment.cleHero]), puis
-/// le lieu, ceux qui étaient là, la légende, les impressions et les
-/// actions habituelles.
+/// le lieu, ceux qui étaient là, la légende, les impressions, les
+/// actions habituelles, puis les commentaires et de quoi en ajouter un
+/// (« Commenter » y place directement le curseur).
 ///
 /// Composant pur : tout arrive prêt à afficher, les gestes repartent par
 /// callbacks. Le panneau du bas glisse en place en suivant l'animation
 /// de la page qui l'affiche.
-class TablVisionneuseMoment extends StatelessWidget {
+class TablVisionneuseMoment extends StatefulWidget {
   const TablVisionneuseMoment({
     super.key,
     required this.cleHero,
@@ -26,7 +28,9 @@ class TablVisionneuseMoment extends StatelessWidget {
     required this.jaiReagi,
     required this.libelleReactions,
     required this.onReagir,
-    required this.onCommenter,
+    required this.titreCommentaires,
+    required this.commentaires,
+    required this.onEnvoyerCommentaire,
     required this.onOuvrirLieu,
     required this.onFermer,
     this.emojiEmotion,
@@ -62,7 +66,15 @@ class TablVisionneuseMoment extends StatelessWidget {
   /// `null` : pas de bouton Enregistrer (son propre moment).
   final VoidCallback? onEnregistrer;
   final VoidCallback onReagir;
-  final VoidCallback onCommenter;
+
+  /// "3 commentaires".
+  final String titreCommentaires;
+
+  /// `null` pendant le chargement.
+  final List<CommentaireAffiche>? commentaires;
+
+  /// `true` une fois le commentaire publié.
+  final Future<bool> Function(String texte) onEnvoyerCommentaire;
   final VoidCallback onOuvrirLieu;
   final VoidCallback onFermer;
 
@@ -71,7 +83,21 @@ class TablVisionneuseMoment extends StatelessWidget {
   final bool audienceRestreinte;
 
   @override
+  State<TablVisionneuseMoment> createState() => _TablVisionneuseMomentState();
+}
+
+class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
+  final _focusCommentaire = FocusNode();
+
+  @override
+  void dispose() {
+    _focusCommentaire.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final v = widget;
     final taille = MediaQuery.sizeOf(context);
     final hauteurPhoto = math.min(taille.width * 1.08, taille.height * 0.56);
     final animation =
@@ -86,15 +112,16 @@ class TablVisionneuseMoment extends StatelessWidget {
       child: Stack(
         children: [
           SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
                   height: hauteurPhoto,
                   child: Hero(
-                    tag: cleHero,
+                    tag: v.cleHero,
                     createRectTween: volEnLigneDroite,
-                    child: TablPhotoMoment(url: photoUrl),
+                    child: TablPhotoMoment(url: v.photoUrl),
                   ),
                 ),
                 FadeTransition(
@@ -104,7 +131,10 @@ class TablVisionneuseMoment extends StatelessWidget {
                       begin: const Offset(0, 0.06),
                       end: Offset.zero,
                     ).animate(arrivee),
-                    child: _Panneau(visionneuse: this),
+                    child: _Panneau(
+                      visionneuse: v,
+                      focusCommentaire: _focusCommentaire,
+                    ),
                   ),
                 ),
               ],
@@ -128,14 +158,14 @@ class TablVisionneuseMoment extends StatelessWidget {
                       TablBoutonVerre(
                         icone: Icons.close_rounded,
                         libelle: 'Fermer',
-                        onPresse: onFermer,
+                        onPresse: v.onFermer,
                       ),
                       const Spacer(),
-                      if (onOptions != null)
+                      if (v.onOptions != null)
                         TablBoutonVerre(
                           icone: Icons.more_horiz_rounded,
                           libelle: 'Options',
-                          onPresse: onOptions!,
+                          onPresse: v.onOptions!,
                         ),
                     ],
                   ),
@@ -150,9 +180,10 @@ class TablVisionneuseMoment extends StatelessWidget {
 }
 
 class _Panneau extends StatelessWidget {
-  const _Panneau({required this.visionneuse});
+  const _Panneau({required this.visionneuse, required this.focusCommentaire});
 
   final TablVisionneuseMoment visionneuse;
+  final FocusNode focusCommentaire;
 
   @override
   Widget build(BuildContext context) {
@@ -276,12 +307,19 @@ class _Panneau extends StatelessWidget {
           TablActionsPublication(
             jaiReagi: v.jaiReagi,
             onReagir: v.onReagir,
-            onCommenter: v.onCommenter,
+            onCommenter: focusCommentaire.requestFocus,
             enregistre: v.enregistre,
             onEnregistrer: v.onEnregistrer,
           ),
           const SizedBox(height: 4),
           Text(v.libelleReactions, style: TablTokens.legende),
+          const SizedBox(height: TablTokens.espaceL + 4),
+          TablCommentairesMoment(
+            titre: v.titreCommentaires,
+            commentaires: v.commentaires,
+            onEnvoyer: v.onEnvoyerCommentaire,
+            focusNode: focusCommentaire,
+          ),
         ],
       ),
     );
