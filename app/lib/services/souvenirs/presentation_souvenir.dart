@@ -24,6 +24,17 @@ String dateLisibleSouvenir(DateTime date, {DateTime? maintenant}) {
   return date.year == annee ? jour : '$jour ${date.year}';
 }
 
+/// La légende d'un moment telle qu'affichée partout dans l'app : entre
+/// guillemets « », c'est la voix de son auteur. Les guillemets que
+/// l'auteur aurait tapés lui-même ne sont pas doublés. `null` si vide.
+String? legendeAffichee(String? legende) {
+  final texte = legende?.trim().replaceAll(RegExp(r'^["«“\s]+|["»”\s]+$'), '');
+  if (texte == null || texte.isEmpty) return null;
+  // Espaces insécables : les guillemets ne se retrouvent jamais seuls en
+  // bout de ligne.
+  return '«\u00A0$texte\u00A0»';
+}
+
 /// "Aucun moment", "1 moment", "12 moments" — en-tête d'un profil.
 String libelleNombreMoments(int nombre) =>
     nombre == 0 ? 'Aucun moment' : '$nombre moment${nombre > 1 ? 's' : ''}';

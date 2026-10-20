@@ -10,4 +10,18 @@ void main() {
       '3 novembre 2025',
     );
   });
+
+  test('légende : toujours entre guillemets, sans les doubler', () {
+    expect(
+      legendeAffichee('Onze petites assiettes.'),
+      '«\u00A0Onze petites assiettes.\u00A0»',
+    );
+    expect(legendeAffichee('  « Déjà citée »  '), '«\u00A0Déjà citée\u00A0»');
+    expect(
+      legendeAffichee('"Tapée avec des guillemets"'),
+      '«\u00A0Tapée avec des guillemets\u00A0»',
+    );
+    expect(legendeAffichee('   '), isNull);
+    expect(legendeAffichee(null), isNull);
+  });
 }

@@ -322,7 +322,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Le Comptoir'), findsOneWidget);
-    expect(find.text('Onze petites assiettes.'), findsOneWidget);
+    expect(find.text('«\u00A0Onze petites assiettes.\u00A0»'), findsOneWidget);
     expect(find.textContaining('Paris'), findsOneWidget);
     expect(find.textContaining('martin'), findsOneWidget);
     // Pas de chiffre brut affiché pour les commentaires (conforme au

@@ -154,7 +154,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
         dateLisible: dateLisibleSouvenir(souvenir.dateVisite),
         photoUrl: souvenir.photoUrl,
         emoji: souvenir.emotion?.emoji,
-        legende: souvenir.legende,
+        legende: legendeAffichee(souvenir.legende),
         resumeReactions: souvenir.nombreReactions == 0
             ? null
             : libelleReactionsSouvenir(souvenir),
@@ -201,7 +201,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       restaurantNom: souvenir.restaurantNom,
       ville: souvenir.ville,
       emojiEmotion: souvenir.emotion?.emoji,
-      legende: souvenir.legende,
+      legende: legendeAffichee(souvenir.legende),
       impressions: souvenir.impressions,
       jaiReagi: souvenir.jaiReagi,
       libelleReactions: libelleReactionsSouvenir(souvenir),
