@@ -4,6 +4,7 @@ import 'package:network_image_mock/network_image_mock.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'package:app/ecrans/ecran_aide.dart';
 import 'package:app/ecrans/ecran_profil.dart';
 
 /// Seules les méthodes réellement appelées par le Profil sont
@@ -129,6 +130,11 @@ class _FauxTableService implements TableService {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
+class _FauxRetourService implements RetourService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 class _FauxAuthService implements AuthService {
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
@@ -163,6 +169,7 @@ Future<_FauxSouvenirService> _ouvrirProfil(
   WidgetTester tester,
   List<SouvenirFeed> souvenirs, {
   _FauxAbonnementService? abonnementService,
+  RetourService? retourService,
 }) async {
   tester.view.physicalSize = const Size(1000, 2400);
   tester.view.devicePixelRatio = 1.0;
@@ -179,6 +186,7 @@ Future<_FauxSouvenirService> _ouvrirProfil(
           souvenirService: service,
           utilisateur: _moi,
           tableService: _FauxTableService(),
+          retourService: retourService,
         ),
       ),
     );
@@ -359,6 +367,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ton 2026'), findsOneWidget);
     expect(find.text('1 moment · 1 adresse · 1 ville'), findsOneWidget);
+  });
+
+  testWidgets('Réglages → « Aide et contact » ouvre le formulaire', (
+    tester,
+  ) async {
+    await _ouvrirProfil(tester, [], retourService: _FauxRetourService());
+
+    await tester.tap(find.byTooltip('Réglages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aide et contact'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranAide), findsOneWidget);
+    expect(find.text('Un souci, une idée ?'), findsOneWidget);
   });
 
   testWidgets('Réglages : passer le profil en public demande confirmation', (

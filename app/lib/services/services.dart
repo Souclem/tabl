@@ -1,6 +1,9 @@
 /// Métier de Tabl : modèles, règles et accès aux données.
 library;
 
+export 'aide/retour.dart';
+export 'aide/retour_service.dart';
+export 'aide/retour_service_supabase.dart';
 export 'auth/auth_service.dart';
 export 'auth/auth_service_supabase.dart';
 export 'auth/utilisateur.dart';

@@ -6,6 +6,7 @@ import 'package:app/widgets/widgets.dart';
 import 'actions_publications.dart';
 import 'contenu_profil.dart';
 import 'ecran_accueil.dart';
+import 'ecran_aide.dart';
 import 'ecran_abonnes.dart';
 import 'feuille_audience.dart';
 
@@ -21,6 +22,7 @@ class EcranProfil extends StatefulWidget {
     required this.souvenirService,
     required this.utilisateur,
     this.tableService,
+    this.retourService,
   });
 
   final AuthService authService;
@@ -33,6 +35,10 @@ class EcranProfil extends StatefulWidget {
   /// `EcranPrincipal.carteService` — ne jamais toucher `TablBackend`
   /// avant que ce soit nécessaire.
   final TableService? tableService;
+
+  /// `null` par défaut : construit à l'ouverture d'« Aide et contact »,
+  /// même principe que [tableService].
+  final RetourService? retourService;
 
   @override
   State<EcranProfil> createState() => _EcranProfilState();
@@ -161,6 +167,17 @@ class _EcranProfilState extends State<EcranProfil>
   TableService get _tableService =>
       widget.tableService ?? TableServiceSupabase(TablBackend.client);
 
+  void _ouvrirAide() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranAide(
+          retourService:
+              widget.retourService ?? RetourServiceSupabase(TablBackend.client),
+        ),
+      ),
+    );
+  }
+
   // Recalculé seulement à la création de l'état et au retour de l'écran
   // Cercle (voir _allerVersAbonnes) — jamais à chaque reconstruction, sans
   // quoi un changement d'onglet dans l'IndexedStack parent ou toute autre
@@ -214,6 +231,28 @@ class _EcranProfilState extends State<EcranProfil>
                     },
                   ),
                 ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceL,
+                ),
+                leading: const Icon(
+                  Icons.support_agent_rounded,
+                  color: TablTokens.primaire,
+                ),
+                title: Text('Aide et contact', style: TablTokens.corps),
+                subtitle: Text(
+                  'Un bug, une idée, une question',
+                  style: TablTokens.legende,
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: TablTokens.texteDoux,
+                ),
+                onTap: () {
+                  Navigator.of(contexteFeuille).pop();
+                  _ouvrirAide();
+                },
+              ),
               Padding(
                 padding: const EdgeInsets.all(TablTokens.espaceL),
                 child: TablBouton(
