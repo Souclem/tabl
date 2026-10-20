@@ -19,7 +19,10 @@ tabl/
 │       ├── services/     # métier : auth, validation, accès aux données
 │       ├── navigation/   # transitions, câblage entre écrans
 │       └── main.dart
-└── supabase/             # migrations SQL (tables + policies RLS)
+├── supabase/
+│   ├── migrations/       # SQL : tables + policies RLS
+│   └── functions/        # fonctions Edge (TypeScript) : liens vers l'extérieur
+└── scripts/              # outils hors app (données de démo, Apps Script…)
 ```
 
 ## La règle d'organisation
@@ -42,6 +45,7 @@ dans `services/`. Cette séparation n'est plus imposée par le compilateur
 | Accès aux données | `app/lib/services/` |
 | Écran, navigation, câblage | `app/lib/ecrans/`, `app/lib/navigation/` |
 | Qui a le droit de voir quoi | policies RLS, dans `supabase/migrations/` |
+| Envoi vers un service extérieur (Google Sheet…) | `supabase/functions/` |
 
 Pas de logique métier en trigger Postgres ni en PL/pgSQL : Postgres sert aux
 données et au RLS, la logique vit dans du code applicatif.

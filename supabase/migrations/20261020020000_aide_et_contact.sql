@@ -3,7 +3,8 @@
 -- ============================================================
 --  Un bug, une idée, quelque chose de pas clair… avec jusqu'à trois
 --  captures d'écran. Chacun envoie les siens et ne relit que les
---  siens ; l'équipe les lit depuis le tableau de bord (hors RLS).
+--  siens. L'équipe les lit dans une Google Sheet partagée, où la
+--  fonction `transmettre-retours` recopie chaque nouveau message.
 --  Pas de modification après coup : on en envoie un autre.
 -- ============================================================
 
@@ -21,21 +22,28 @@ create table public.retours (
   -- un bug.
   plateforme text,
   systeme text,
-  -- Le suivi de l'équipe ; toujours "nouveau" à l'envoi.
-  statut text not null default 'nouveau'
-    check (statut in ('nouveau', 'en_cours', 'traite')),
-  cree_le timestamptz not null default now()
+  -- Le suivi (statut, priorité, responsable) se fait dans la feuille de
+  -- l'équipe, pas ici : un seul endroit à tenir à jour.
+  cree_le timestamptz not null default now(),
+  -- Recopié dans la feuille de l'équipe ; `null` : pas encore parti.
+  transmis_le timestamptz
 );
 
 create index retours_recents on public.retours (cree_le desc);
+create index retours_a_transmettre on public.retours (cree_le)
+  where transmis_le is null;
 
 grant select, insert on public.retours to authenticated;
+-- La fonction `transmettre-retours` lit les messages et marque ceux
+-- qu'elle a recopiés (les nouvelles tables ne sont plus exposées
+-- d'office, pas même au rôle service).
+grant select, update (transmis_le) on public.retours to service_role;
 alter table public.retours enable row level security;
 
 create policy "ecrire a l'equipe"
   on public.retours for insert
   to authenticated
-  with check (auteur_id = auth.uid() and statut = 'nouveau');
+  with check (auteur_id = auth.uid() and transmis_le is null);
 
 create policy "relire ses messages a l'equipe"
   on public.retours for select
