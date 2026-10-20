@@ -33,16 +33,28 @@ class _FauxSouvenirService implements SouvenirService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
-  _FauxAbonnementService({required this.estPrive, required this.statut});
+  _FauxAbonnementService({
+    required this.estPrive,
+    required this.statut,
+    this.meSuit = false,
+  });
 
   final bool estPrive;
+
+  /// Emma me suit déjà.
+  final bool meSuit;
   StatutAbonnement statut;
   final List<String> suivis = [];
   final List<String> arretes = [];
 
   @override
-  Future<ProfilVisite> profil(String id) async =>
-      ProfilVisite(id: id, pseudo: 'emma', estPrive: estPrive, statut: statut);
+  Future<ProfilVisite> profil(String id) async => ProfilVisite(
+    id: id,
+    pseudo: 'emma',
+    estPrive: estPrive,
+    statut: statut,
+    meSuit: meSuit,
+  );
 
   @override
   Future<CompteursProfil> compteurs(String profilId) async =>
@@ -189,6 +201,29 @@ void main() {
     expect(_tuile('Bibo'), findsOneWidget);
     expect(_tuile('Le Comptoir'), findsNothing);
     semantique.dispose();
+  });
+
+  testWidgets('elle me suit et pas moi : « Suivre en retour »', (
+    tester,
+  ) async {
+    final abonnements = _FauxAbonnementService(
+      estPrive: false,
+      statut: StatutAbonnement.aucun,
+      meSuit: true,
+    );
+    await _ouvrir(
+      tester,
+      abonnements: abonnements,
+      souvenirs: _FauxSouvenirService(const []),
+    );
+
+    expect(find.text('Suivre en retour'), findsOneWidget);
+    expect(find.text('Suivre'), findsNothing);
+
+    await tester.tap(find.text('Suivre en retour'));
+    await tester.pumpAndSettle();
+    expect(abonnements.suivis, ['emma-id']);
+    expect(find.text('Abonné'), findsOneWidget);
   });
 
   testWidgets('profil privé non suivi : rien que l\'en-tête, puis demande', (

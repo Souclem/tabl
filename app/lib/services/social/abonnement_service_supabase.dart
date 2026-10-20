@@ -54,37 +54,46 @@ class AbonnementServiceSupabase implements AbonnementService {
     final ids = profils.map((p) => p['id'] as String).toList();
     if (ids.isEmpty) return [];
 
-    final statutParId = <String, StatutAbonnement>{};
+    // Les deux sens séparément : le bouton dit où j'en suis avec elle
+    // (quelqu'un qui me suit n'est pas pour autant quelqu'un que je
+    // suis), « Suivre en retour » dit qu'elle me suit déjà.
+    final monStatutVers = <String, StatutAbonnement>{};
+    final meSuivent = <String>{};
+    final meDemandent = <String>{};
     for (final r in relations) {
       final suiveurId = r['suiveur_id'] as String;
       final suiviId = r['suivi_id'] as String;
       final accepte = r['statut'] == 'accepte';
-      if (suiveurId == _monId && ids.contains(suiviId)) {
-        statutParId[suiviId] = accepte
+      if (suiveurId == _monId) {
+        monStatutVers[suiviId] = accepte
             ? StatutAbonnement.abonne
             : StatutAbonnement.demandeEnvoyee;
-      } else if (suiviId == _monId && ids.contains(suiveurId)) {
-        statutParId[suiveurId] = accepte
-            ? StatutAbonnement.abonne
-            : StatutAbonnement.demandeRecue;
+      } else if (accepte) {
+        meSuivent.add(suiveurId);
+      } else {
+        meDemandent.add(suiveurId);
       }
     }
 
-    return profils
-        .map(
-          (p) => ProfilPublic(
-            id: p['id'] as String,
-            pseudo: p['pseudo'] as String,
-            statut: statutParId[p['id']] ?? StatutAbonnement.aucun,
-            photoUrl: _miniature(p),
-          ),
-        )
-        .toList();
+    return profils.map((p) {
+      final id = p['id'] as String;
+      return ProfilPublic(
+        id: id,
+        pseudo: p['pseudo'] as String,
+        statut:
+            monStatutVers[id] ??
+            (meDemandent.contains(id)
+                ? StatutAbonnement.demandeRecue
+                : StatutAbonnement.aucun),
+        meSuit: meSuivent.contains(id),
+        photoUrl: _miniature(p),
+      );
+    }).toList();
   }
 
   @override
   Future<ProfilVisite> profil(String id) async {
-    final (profil, relation) = await (
+    final (profil, relation, inverse) = await (
       _client
           .from('profils')
           .select('pseudo, photo_url, est_prive')
@@ -95,6 +104,14 @@ class AbonnementServiceSupabase implements AbonnementService {
           .select('statut')
           .eq('suiveur_id', _monId)
           .eq('suivi_id', id)
+          .maybeSingle(),
+      // Dans l'autre sens : me suit-elle déjà ?
+      _client
+          .from('abonnements')
+          .select('statut')
+          .eq('suiveur_id', id)
+          .eq('suivi_id', _monId)
+          .eq('statut', 'accepte')
           .maybeSingle(),
     ).wait;
     return ProfilVisite(
@@ -107,6 +124,7 @@ class AbonnementServiceSupabase implements AbonnementService {
         'accepte' => StatutAbonnement.abonne,
         _ => StatutAbonnement.demandeEnvoyee,
       },
+      meSuit: inverse != null,
     );
   }
 
@@ -265,6 +283,7 @@ class AbonnementServiceSupabase implements AbonnementService {
       }
     }
 
+    final meSuivent = abonnesIds.toSet();
     final ids = {...abonnesIds, ...abonnementsIds}.toList();
     if (ids.isEmpty) return (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
     final profils = await _client
@@ -281,6 +300,7 @@ class AbonnementServiceSupabase implements AbonnementService {
               id: id,
               pseudo: p['pseudo'] as String,
               statut: monStatutVers[id] ?? StatutAbonnement.aucun,
+              meSuit: meSuivent.contains(id),
               photoUrl: _miniature(p),
             ),
       ];

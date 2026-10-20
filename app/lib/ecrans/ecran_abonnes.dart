@@ -474,7 +474,7 @@ class _LigneProfil extends StatelessWidget {
             backgroundColor: TablTokens.primaire,
             foregroundColor: TablTokens.texteSurPrimaire,
           ),
-          child: const Text('Suivre'),
+          child: Text(profil.meSuit ? 'Suivre en retour' : 'Suivre'),
         );
       case StatutAbonnement.demandeEnvoyee:
         return OutlinedButton(

@@ -192,6 +192,13 @@ void main() {
             pseudo: 'emma',
             statut: StatutAbonnement.abonne,
           ),
+          // Me suit, mais je ne la suis pas.
+          ProfilPublic(
+            id: 'd',
+            pseudo: 'julia',
+            statut: StatutAbonnement.aucun,
+            meSuit: true,
+          ),
         ],
       );
 
@@ -211,6 +218,7 @@ void main() {
       expect(find.text('louis'), findsOneWidget);
       expect(find.text('emma'), findsOneWidget);
       expect(find.text('Suivre'), findsOneWidget);
+      expect(find.text('Suivre en retour'), findsOneWidget);
       expect(find.text('Demande envoyée'), findsOneWidget);
       expect(find.text('Abonné'), findsOneWidget);
     },

@@ -23,20 +23,28 @@ class ProfilPublic {
     required this.pseudo,
     required this.statut,
     this.photoUrl,
+    this.meSuit = false,
   });
 
   final String id;
   final String pseudo;
+
+  /// Où j'en suis avec cette personne, dans mon sens.
   final StatutAbonnement statut;
 
   /// Miniature de sa photo de profil, `null` s'il n'en a pas.
   final String? photoUrl;
+
+  /// Elle me suit déjà (relation acceptée) : « Suivre en retour »
+  /// plutôt que « Suivre ».
+  final bool meSuit;
 
   ProfilPublic copierAvec({StatutAbonnement? statut}) => ProfilPublic(
     id: id,
     pseudo: pseudo,
     statut: statut ?? this.statut,
     photoUrl: photoUrl,
+    meSuit: meSuit,
   );
 }
 
@@ -48,6 +56,7 @@ class ProfilVisite {
     required this.estPrive,
     required this.statut,
     this.photoUrl,
+    this.meSuit = false,
   });
 
   final String id;
@@ -58,6 +67,9 @@ class ProfilVisite {
   /// Où j'en suis avec cette personne, dans mon sens : je ne la suis pas
   /// ([StatutAbonnement.aucun]), j'ai demandé, ou je la suis.
   final StatutAbonnement statut;
+
+  /// Elle me suit déjà (relation acceptée) : « Suivre en retour ».
+  final bool meSuit;
 
   /// Comme Instagram : un profil privé ne montre ses publications qu'à
   /// ses abonnés acceptés ; aux autres, seulement l'en-tête. Le filtrage
@@ -72,6 +84,7 @@ class ProfilVisite {
     photoUrl: photoUrl,
     estPrive: estPrive,
     statut: statut ?? this.statut,
+    meSuit: meSuit,
   );
 }
 
