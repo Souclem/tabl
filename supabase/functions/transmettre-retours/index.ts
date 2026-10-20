@@ -55,10 +55,19 @@ Deno.serve(async () => {
   if (error) return Response.json({ erreur: error.message }, { status: 500 });
 
   let transmis = 0;
+  // Chaque échec est dit, dans les journaux et dans la réponse : un
+  // message qui ne part pas ne doit jamais passer inaperçu.
+  const erreurs: string[] = [];
+  const signaler = (id: string, e: unknown) => {
+    const message = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error(`retour ${id} :`, message);
+    erreurs.push(`${id} : ${message}`);
+  };
+
   for (const { id } of enAttente) {
     // Réservé avant l'envoi : deux appels simultanés n'envoient jamais
     // le même message deux fois.
-    const { data: retour } = await admin
+    const { data: retour, error: erreurReservation } = await admin
       .from("retours")
       .update({ transmis_le: new Date().toISOString() })
       .eq("id", id)
@@ -67,17 +76,25 @@ Deno.serve(async () => {
         "id, type, texte, captures, plateforme, systeme, cree_le, profils(pseudo)",
       )
       .maybeSingle<Retour>();
+    if (erreurReservation) {
+      signaler(id, erreurReservation);
+      continue;
+    }
+    // Déjà réservé par un appel simultané.
     if (!retour) continue;
     try {
       await envoyer(adresse, jeton, admin, retour);
       transmis++;
     } catch (e) {
       // Pas parti : rendu à la file, le prochain appel réessaiera.
-      console.error(`retour ${id} :`, e);
+      signaler(id, e);
       await admin.from("retours").update({ transmis_le: null }).eq("id", id);
     }
   }
-  return Response.json({ transmis });
+  return Response.json(
+    { transmis, erreurs },
+    { status: erreurs.length > 0 ? 500 : 200 },
+  );
 });
 
 async function envoyer(

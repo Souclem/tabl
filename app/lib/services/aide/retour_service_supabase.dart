@@ -46,7 +46,8 @@ class RetourServiceSupabase implements RetourService {
       _client.functions
           .invoke('transmettre-retours')
           .then<void>(
-            (_) {},
+            (reponse) =>
+                debugPrint('RetourService: transmission : ${reponse.data}'),
             onError: (Object e) =>
                 debugPrint('RetourService: transmission : $e'),
           ),
