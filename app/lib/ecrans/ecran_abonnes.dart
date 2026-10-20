@@ -17,7 +17,11 @@ class EcranAbonnes extends StatefulWidget {
     super.key,
     required this.abonnementService,
     this.souvenirService,
+    this.ongletAbonnes = true,
   });
+
+  /// L'onglet ouvert à l'arrivée : abonnés (par défaut) ou abonnements.
+  final bool ongletAbonnes;
 
   final AbonnementService abonnementService;
 
@@ -36,7 +40,7 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   List<ProfilPublic> _resultats = [];
   List<ProfilPublic> _abonnes = [];
   List<ProfilPublic> _abonnements = [];
-  bool _ongletAbonnes = true;
+  late bool _ongletAbonnes = widget.ongletAbonnes;
   bool _chargementDemandes = true;
   final Set<String> _idsEnCours = {};
   Timer? _debounceRecherche;

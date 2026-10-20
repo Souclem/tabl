@@ -47,6 +47,10 @@ class _FauxAbonnementService implements AbonnementService {
   final List<bool> reglagesPrive = [];
 
   @override
+  Future<CompteursProfil> compteurs(String profilId) async =>
+      (moments: 2, abonnes: 12, abonnements: 7);
+
+  @override
   Future<int> nombreDemandesEnAttente() async => 0;
 
   @override
@@ -87,20 +91,26 @@ class _FauxAuthService implements AuthService {
 
 const _moi = Utilisateur(id: 'moi', email: 'clem@tabl.app', pseudo: 'clem');
 
-SouvenirFeed _monSouvenir(String id, String restaurant) {
+SouvenirFeed _monSouvenir(
+  String id,
+  String restaurant, {
+  DateTime? date,
+  Emotion? emotion,
+}) {
   return SouvenirFeed(
     id: id,
     photoUrl: null,
-    legende: null,
+    legende: 'Très bon.',
     restaurantNom: restaurant,
     ville: 'Bruxelles',
     moment: 'soir',
-    dateVisite: DateTime(2026, 10, 3),
+    dateVisite: date ?? DateTime(2026, 10, 3),
     auteurPseudo: 'clem',
     nombreReactions: 0,
     jaiReagi: false,
     nombreCommentaires: 0,
     estAMoi: true,
+    emotion: emotion,
   );
 }
 
@@ -109,6 +119,10 @@ Future<_FauxSouvenirService> _ouvrirProfil(
   List<SouvenirFeed> souvenirs, {
   _FauxAbonnementService? abonnementService,
 }) async {
+  tester.view.physicalSize = const Size(1000, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   final service = _FauxSouvenirService(souvenirs);
   await mockNetworkImagesFor(() async {
     await tester.pumpWidget(
@@ -128,56 +142,76 @@ Future<_FauxSouvenirService> _ouvrirProfil(
   return service;
 }
 
+/// Une tuile du journal, par ce qu'en lit un lecteur d'écran.
+Finder _tuile(String restaurant) =>
+    find.bySemanticsLabel(RegExp('^$restaurant, '));
+
 void main() {
-  testWidgets('affiche ses propres publications, sans "Enregistrer"', (
-    tester,
-  ) async {
+  testWidgets('en-tête : moments, abonnés et abonnements', (tester) async {
     final service = await _ouvrirProfil(tester, [
       _monSouvenir('1', 'Bibo'),
       _monSouvenir('2', 'Le Comptoir'),
     ]);
 
     expect(service.auteursDemandes, ['moi']);
-    expect(find.text('2 moments'), findsOneWidget);
-    expect(find.text('Bibo'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Le Comptoir'), 300);
-    expect(find.text('Le Comptoir'), findsOneWidget);
-    expect(find.text('Enregistrer'), findsNothing);
+    // Les chiffres montent jusqu'à leur valeur, sous leur libellé.
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('MOMENTS'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.text('ABONNÉS'), findsOneWidget);
+    expect(find.text('7'), findsOneWidget);
+    expect(find.text('ABONNEMENTS'), findsOneWidget);
+    // Plus d'adresse e-mail ni de « sur Tabl depuis ».
+    expect(find.text('clem@tabl.app'), findsNothing);
   });
 
-  testWidgets('une publication se déplie sur place, puis se réduit', (
+  testWidgets('journal : les moments du mois en grille, par mois', (
     tester,
   ) async {
+    final semantique = tester.ensureSemantics();
     await _ouvrirProfil(tester, [
       _monSouvenir('1', 'Bibo'),
-      _monSouvenir('2', 'Le Comptoir'),
+      _monSouvenir('2', 'Le Comptoir', date: DateTime(2026, 9, 12)),
     ]);
 
-    // Compactes : pas de "⋯", pas de "Réduire".
-    expect(find.byTooltip('Options'), findsNothing);
-    expect(find.text('Réduire'), findsNothing);
-
-    await tester.tap(find.text('Bibo'));
-    await tester.pumpAndSettle();
-    expect(find.text('Réduire'), findsOneWidget);
-    expect(find.byTooltip('Options'), findsOneWidget);
-    // Toujours sur le profil : pas de nouvelle page.
-    expect(find.text('2 moments'), findsOneWidget);
-
-    await tester.tap(find.text('Réduire'));
-    await tester.pumpAndSettle();
-    expect(find.text('Réduire'), findsNothing);
-    expect(find.byTooltip('Options'), findsNothing);
+    expect(find.text('Octobre'), findsOneWidget);
+    expect(find.text('Septembre'), findsOneWidget);
+    expect(_tuile('Bibo'), findsOneWidget);
+    expect(_tuile('Le Comptoir'), findsOneWidget);
+    semantique.dispose();
   });
 
-  testWidgets('"⋯" → "Qui peut voir" modifie l\'audience sans changer de page', (
+  testWidgets('toucher une photo l\'agrandit, la croix la renvoie', (
     tester,
   ) async {
+    final semantique = tester.ensureSemantics();
+    await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+
+    await mockNetworkImagesFor(() async {
+      await tester.tap(_tuile('Bibo'));
+      await tester.pumpAndSettle();
+    });
+    expect(find.byType(TablVisionneuseMoment), findsOneWidget);
+    expect(find.text('Bibo'), findsOneWidget);
+    expect(find.text('«\u00A0Très bon.\u00A0»'), findsOneWidget);
+    // Son propre moment : pas d'« Enregistrer », mais le menu « ⋯ ».
+    expect(find.text('Enregistrer'), findsNothing);
+    expect(find.byTooltip('Options'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Fermer'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TablVisionneuseMoment), findsNothing);
+    semantique.dispose();
+  });
+
+  testWidgets('"⋯" → "Qui peut voir" modifie l\'audience', (tester) async {
+    final semantique = tester.ensureSemantics();
     final service = await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
 
-    // Les "⋯" sont sur la publication dépliée.
-    await tester.tap(find.text('Bibo'));
-    await tester.pumpAndSettle();
+    await mockNetworkImagesFor(() async {
+      await tester.tap(_tuile('Bibo'));
+      await tester.pumpAndSettle();
+    });
     await tester.tap(find.byTooltip('Options'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Qui peut voir'));
@@ -198,15 +232,33 @@ void main() {
     expect(audience.mode, ModeAudience.seulement);
     expect(audience.personneIds, {'sarah-id'});
     expect(find.text('Audience mise à jour.'), findsOneWidget);
+    semantique.dispose();
   });
 
-  testWidgets('passer le profil en public demande confirmation', (
+  testWidgets('Bilan : l\'année en chiffres', (tester) async {
+    await _ouvrirProfil(tester, [
+      _monSouvenir('1', 'Bibo'),
+      _monSouvenir('2', 'Bibo', date: DateTime(2026, 9, 12)),
+    ]);
+
+    await tester.tap(find.text('Bilan'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ton 2026'), findsOneWidget);
+    expect(find.text('2 moments · 1 adresse · 1 ville'), findsOneWidget);
+    expect(find.text('LÀ OÙ TU REVIENS'), findsOneWidget);
+    expect(find.text('×2'), findsOneWidget);
+    expect(find.text('Bruxelles'), findsOneWidget);
+  });
+
+  testWidgets('Réglages : passer le profil en public demande confirmation', (
     tester,
   ) async {
     final abonnements = _FauxAbonnementService();
     await _ouvrirProfil(tester, [], abonnementService: abonnements);
 
-    await tester.ensureVisible(find.text('Profil privé'));
+    await tester.tap(find.byTooltip('Réglages'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Profil privé'));
     await tester.pumpAndSettle();
     expect(find.text('Rendre votre profil public ?'), findsOneWidget);
@@ -225,6 +277,6 @@ void main() {
     await _ouvrirProfil(tester, []);
 
     expect(find.text("Vous n'avez encore rien publié."), findsOneWidget);
-    expect(find.text('Aucun moment'), findsOneWidget);
+    expect(find.text('Journal'), findsNothing);
   });
 }

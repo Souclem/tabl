@@ -15,6 +15,9 @@ import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
+      throw UnimplementedError();
+  @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
 
   final List<(String, bool)> appelsEnvie = [];
@@ -98,6 +101,13 @@ class _FauxSouvenirService implements SouvenirService {
 /// Faux [AbonnementService] : aucune méthode n'est appelée tant qu'on ne
 /// tape pas sur "Trouver des personnes".
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<CompteursProfil> compteurs(String profilId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> definirPhotoProfil(Uint8List photo) =>
+      throw UnimplementedError();
   @override
   Future<ProfilVisite> profil(String id) async => ProfilVisite(
     id: id,

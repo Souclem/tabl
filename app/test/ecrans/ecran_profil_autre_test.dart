@@ -18,6 +18,13 @@ class _FauxSouvenirService implements SouvenirService {
     return publications;
   }
 
+  /// Mes moments où elle est taguée.
+  List<SouvenirFeed> mesMomentsAvecElle = const [];
+
+  @override
+  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) async =>
+      mesMomentsAvecElle;
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
@@ -33,6 +40,10 @@ class _FauxAbonnementService implements AbonnementService {
   @override
   Future<ProfilVisite> profil(String id) async =>
       ProfilVisite(id: id, pseudo: 'emma', estPrive: estPrive, statut: statut);
+
+  @override
+  Future<CompteursProfil> compteurs(String profilId) async =>
+      (moments: 5, abonnes: 40, abonnements: 31);
 
   @override
   Future<StatutAbonnement> suivre(String suiviId) async {
@@ -53,8 +64,13 @@ class _FauxAbonnementService implements AbonnementService {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
-SouvenirFeed _publication(String id, String restaurant) => SouvenirFeed(
+SouvenirFeed _publication(
+  String id,
+  String restaurant, {
+  List<PersonnePresente> presents = const [],
+}) => SouvenirFeed(
   id: id,
+  presents: presents,
   photoUrl: null,
   legende: 'Très bon.',
   restaurantNom: restaurant,
@@ -93,10 +109,15 @@ Future<void> _ouvrir(
   });
 }
 
+/// Une tuile du journal, par ce qu'en lit un lecteur d'écran.
+Finder _tuile(String restaurant) =>
+    find.bySemanticsLabel(RegExp('^$restaurant, '));
+
 void main() {
-  testWidgets('profil public : ses publications, qui se déplient sur place', (
+  testWidgets('profil public : chiffres, journal, et un moment agrandi', (
     tester,
   ) async {
+    final semantique = tester.ensureSemantics();
     final souvenirs = _FauxSouvenirService([
       _publication('1', 'Bibo'),
       _publication('2', 'Le Comptoir'),
@@ -111,15 +132,50 @@ void main() {
     );
 
     expect(souvenirs.auteursDemandes, ['emma-id']);
-    expect(find.text('emma'), findsOneWidget);
-    expect(find.text('2 moments'), findsOneWidget);
+    expect(find.text('emma'), findsWidgets);
+    // Les moments que je vois, ses abonnés et abonnements.
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('40'), findsOneWidget);
+    expect(find.text('31'), findsOneWidget);
     expect(find.text('Suivre'), findsOneWidget);
+    expect(find.text('Septembre'), findsOneWidget);
 
-    await tester.tap(find.text('Bibo'));
-    await tester.pumpAndSettle();
-    expect(find.text('Réduire'), findsOneWidget);
-    // Pas de "⋯" sur le profil de quelqu'un d'autre.
+    await mockNetworkImagesFor(() async {
+      await tester.tap(_tuile('Bibo'));
+      await tester.pumpAndSettle();
+    });
+    expect(find.byType(TablVisionneuseMoment), findsOneWidget);
+    // Pas de « ⋯ » sur le moment de quelqu'un d'autre, mais Enregistrer.
     expect(find.byTooltip('Options'), findsNothing);
+    expect(find.text('Enregistrer'), findsOneWidget);
+    semantique.dispose();
+  });
+
+  testWidgets('« Toi & emma » : nos moments à deux, à revoir', (tester) async {
+    final semantique = tester.ensureSemantics();
+    const moi = PersonnePresente(id: 'moi', pseudo: 'clem', estMoi: true);
+    final souvenirs = _FauxSouvenirService([
+      _publication('1', 'Bibo', presents: const [moi]),
+      _publication('2', 'Le Comptoir'),
+    ]);
+    await _ouvrir(
+      tester,
+      abonnements: _FauxAbonnementService(
+        estPrive: false,
+        statut: StatutAbonnement.abonne,
+      ),
+      souvenirs: souvenirs,
+    );
+
+    expect(find.text('Toi & emma'), findsOneWidget);
+    expect(find.textContaining('1 moment ensemble'), findsOneWidget);
+
+    await tester.tap(find.text('Revoir vos moments'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vos moments à deux'), findsOneWidget);
+    expect(_tuile('Bibo'), findsOneWidget);
+    expect(_tuile('Le Comptoir'), findsNothing);
+    semantique.dispose();
   });
 
   testWidgets('profil privé non suivi : rien que l\'en-tête, puis demande', (
@@ -133,7 +189,8 @@ void main() {
     await _ouvrir(tester, abonnements: abonnements, souvenirs: souvenirs);
 
     expect(find.text('Ce profil est privé'), findsOneWidget);
-    expect(find.text('Bibo'), findsNothing);
+    // Son nombre de moments reste visible, comme sur Instagram.
+    expect(find.text('5'), findsOneWidget);
     // Ses publications ne sont même pas demandées.
     expect(souvenirs.auteursDemandes, isEmpty);
 
@@ -148,6 +205,7 @@ void main() {
   testWidgets('profil privé suivi : visible ; ne plus suivre le recache', (
     tester,
   ) async {
+    final semantique = tester.ensureSemantics();
     final souvenirs = _FauxSouvenirService([_publication('1', 'Bibo')]);
     final abonnements = _FauxAbonnementService(
       estPrive: true,
@@ -155,7 +213,7 @@ void main() {
     );
     await _ouvrir(tester, abonnements: abonnements, souvenirs: souvenirs);
 
-    expect(find.text('Bibo'), findsOneWidget);
+    expect(_tuile('Bibo'), findsOneWidget);
 
     await tester.tap(find.text('Abonné'));
     await tester.pumpAndSettle();
@@ -165,7 +223,8 @@ void main() {
 
     expect(abonnements.arretes, ['emma-id']);
     expect(find.text('Ce profil est privé'), findsOneWidget);
-    expect(find.text('Bibo'), findsNothing);
+    expect(_tuile('Bibo'), findsNothing);
     expect(find.text('Suivre'), findsOneWidget);
+    semantique.dispose();
   });
 }

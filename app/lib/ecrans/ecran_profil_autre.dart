@@ -3,9 +3,12 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
+import 'contenu_profil.dart';
 
-/// Le profil d'une autre personne, présenté comme le sien : en-tête,
-/// puis ses publications en lignes compactes qui se déplient sur place.
+/// Le profil d'une autre personne, présenté comme le sien : en-tête
+/// (photo, prénom, moments, abonnés, abonnements, « Suivre »), « Toi &
+/// elle » si on a déjà partagé des tables, puis son journal et son bilan
+/// (voir [ContenuProfil]).
 ///
 /// Comme Instagram : un profil privé que je ne suis pas ne montre que
 /// l'en-tête et "Suivre" ; ses publications restent cachées. Pour le
@@ -32,8 +35,15 @@ class EcranProfilAutre extends StatefulWidget {
 }
 
 class _EcranProfilAutreState extends State<EcranProfilAutre>
-    with ActionsPublications<EcranProfilAutre> {
+    with
+        ActionsPublications<EcranProfilAutre>,
+        ContenuProfil<EcranProfilAutre> {
   ProfilVisite? _profil;
+  CompteursProfil? _compteurs;
+  DuoProfils? _duo;
+
+  @override
+  String? get prenomProfil => _profil?.pseudo ?? widget.pseudo;
   bool _chargement = true;
   bool _erreur = false;
   bool _actionEnCours = false;
@@ -59,14 +69,26 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
       _erreur = false;
     });
     try {
-      final profil = await widget.abonnementService.profil(widget.profilId);
+      final (profil, compteurs) = await (
+        widget.abonnementService.profil(widget.profilId),
+        _chargerCompteurs(),
+      ).wait;
       final publications = profil.publicationsVisibles
           ? await widget.souvenirService.souvenirsDe(widget.profilId)
           : const <SouvenirFeed>[];
+      final duo = profil.publicationsVisibles
+          ? duoAvec(
+              sesMoments: publications,
+              mesMomentsAvecLui: await _mesMomentsAvecLui(),
+            )
+          : null;
       if (!mounted) return;
       setState(() {
         _profil = profil;
+        _compteurs = compteurs;
+        _duo = duo;
         souvenirs = publications;
+        momentsADeux = null;
         _chargement = false;
       });
     } catch (e) {
@@ -76,6 +98,27 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
         _chargement = false;
         _erreur = true;
       });
+    }
+  }
+
+  /// Les chiffres ne sont qu'un plus : sans eux (base pas encore à jour,
+  /// réseau), le profil s'affiche quand même, avec des tirets.
+  Future<CompteursProfil?> _chargerCompteurs() async {
+    try {
+      return await widget.abonnementService.compteurs(widget.profilId);
+    } catch (e) {
+      debugPrint('EcranProfilAutre: compteurs : $e');
+      return null;
+    }
+  }
+
+  /// Même principe pour « Toi & elle ».
+  Future<List<SouvenirFeed>> _mesMomentsAvecLui() async {
+    try {
+      return await widget.souvenirService.mesMomentsAvec(widget.profilId);
+    } catch (e) {
+      debugPrint('EcranProfilAutre: moments à deux : $e');
+      return const [];
     }
   }
 
@@ -144,57 +187,119 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
   Widget build(BuildContext context) {
     final profil = _profil;
     final publications = souvenirs;
+    final visibles = profil != null && profil.publicationsVisibles;
+    final duo = _duo;
+    final pseudo = profil?.pseudo ?? widget.pseudo;
     return Scaffold(
-      body: SafeArea(
-        child: Stack(
-          children: [
-            RefreshIndicator(
-              color: TablTokens.primaire,
-              onRefresh: _charger,
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: TablTokens.espaceXxl),
-                children: [
-                  TablEnTeteProfil(
-                    pseudo: profil?.pseudo ?? widget.pseudo,
-                    photoUrl: profil?.photoUrl,
-                    resumeMoments:
-                        profil != null &&
-                            profil.publicationsVisibles &&
-                            publications != null
-                        ? libelleNombreMoments(publications.length)
-                        : null,
-                    action: profil == null ? null : _boutonSuivi(profil),
+      backgroundColor: TablTokens.fond,
+      body: RefreshIndicator(
+        color: TablTokens.primaire,
+        edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        onRefresh: _charger,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: TablEnTeteProfil.hauteurDepliee(
+                context,
+                avecAction: true,
+              ),
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              automaticallyImplyLeading: false,
+              leadingWidth: 44 + TablTokens.espaceM,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: TablTokens.espaceM),
+                child: Center(
+                  child: TablBoutonVerre(
+                    icone: Icons.arrow_back_rounded,
+                    libelle: 'Retour',
+                    onPresse: () => Navigator.of(context).pop(),
                   ),
-                  if (_chargement && profil == null)
-                    const Padding(
-                      padding: EdgeInsets.all(TablTokens.espaceXl),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: TablTokens.primaire,
-                        ),
-                      ),
-                    )
-                  else if (_erreur || profil == null)
-                    const _Message(texte: messageErreurGenerique)
-                  else if (!profil.publicationsVisibles)
-                    _ProfilPrive(pseudo: profil.pseudo)
-                  else if (publications == null || publications.isEmpty)
-                    const _Message(texte: 'Aucun moment à afficher.')
-                  else
-                    for (final souvenir in publications)
-                      publicationDepliable(
-                        souvenir,
-                        contexte: ContextePublication.profilAutre,
-                      ),
+                ),
+              ),
+              flexibleSpace: TablEnTeteProfil(
+                pseudo: pseudo,
+                photoUrl: profil?.photoUrl,
+                couvertureUrl: visibles && publications != null
+                    ? photoCouverture(publications)
+                    : null,
+                avecRetour: true,
+                compteurs: [
+                  CompteurProfil(
+                    // Ce que je peux voir quand ses moments me sont
+                    // ouverts, sinon le total publié (comme Instagram).
+                    nombre: visibles
+                        ? publications?.length
+                        : _compteurs?.moments,
+                    libelle: 'moments',
+                  ),
+                  CompteurProfil(
+                    nombre: _compteurs?.abonnes,
+                    libelle: 'abonnés',
+                  ),
+                  CompteurProfil(
+                    nombre: _compteurs?.abonnements,
+                    libelle: 'abonnements',
+                  ),
                 ],
+                action: SizedBox(
+                  height: 46,
+                  child: profil == null ? null : _boutonSuivi(profil),
+                ),
               ),
             ),
-            Positioned(
-              top: TablTokens.espaceS,
-              left: TablTokens.espaceM,
-              child: TablBoutonRetour(
-                onPresse: () => Navigator.of(context).pop(),
-              ),
+            if (_chargement && profil == null)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(TablTokens.espaceXl),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: TablTokens.primaire,
+                    ),
+                  ),
+                ),
+              )
+            else if (_erreur || profil == null)
+              const SliverToBoxAdapter(
+                child: _Message(texte: messageErreurGenerique),
+              )
+            else if (!profil.publicationsVisibles)
+              SliverToBoxAdapter(child: _ProfilPrive(pseudo: profil.pseudo))
+            else if (publications == null || publications.isEmpty)
+              const SliverToBoxAdapter(
+                child: _Message(texte: 'Aucun moment à afficher.'),
+              )
+            else ...[
+              if (duo != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      TablTokens.espaceL - 4,
+                      TablTokens.espaceS,
+                      TablTokens.espaceL - 4,
+                      TablTokens.espaceS,
+                    ),
+                    child: TablCarteDuo(
+                      monPseudo: 'Toi',
+                      sonPseudo: pseudo,
+                      saPhotoUrl: profil.photoUrl,
+                      depuis: duo.depuis,
+                      resume: duo.resume,
+                      onRevoir: () => setState(() {
+                        ongletBilan = false;
+                        anneeChoisie = null;
+                        momentsADeux = duo.souvenirs;
+                      }),
+                    ),
+                  ),
+                ),
+              ...slivresJournalEtBilan(publications),
+            ],
+            const SliverToBoxAdapter(
+              child: SizedBox(height: TablTokens.espaceXxl),
             ),
           ],
         ),
@@ -221,9 +326,14 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
           child: const Text('Demande envoyée'),
         );
       case StatutAbonnement.abonne:
-        return OutlinedButton(
+        return OutlinedButton.icon(
           onPressed: enCours ? null : () => _nePlusSuivre(profil),
-          child: const Text('Abonné'),
+          icon: const Icon(
+            Icons.check_rounded,
+            size: 18,
+            color: TablTokens.primaire,
+          ),
+          label: const Text('Abonné'),
         );
     }
   }

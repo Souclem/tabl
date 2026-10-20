@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'abonnement_service.dart';
@@ -96,6 +98,22 @@ class AbonnementServiceSupabase implements AbonnementService {
         'accepte' => StatutAbonnement.abonne,
         _ => StatutAbonnement.demandeEnvoyee,
       },
+    );
+  }
+
+  @override
+  Future<CompteursProfil> compteurs(String profilId) async {
+    // Fonction de la base : les tables elles-mêmes ne laissent pas
+    // compter ce qu'on ne peut pas voir (migration 20261020000000).
+    final lignes = await _client.rpc(
+      'compteurs_profil',
+      params: {'p_profil': profilId},
+    );
+    final ligne = (lignes as List).first as Map<String, dynamic>;
+    return (
+      moments: ligne['moments'] as int,
+      abonnes: ligne['abonnes'] as int,
+      abonnements: ligne['abonnements'] as int,
     );
   }
 
@@ -293,11 +311,31 @@ class AbonnementServiceSupabase implements AbonnementService {
   }
 
   @override
-  Future<void> definirProfilPrive(bool prive) async {
+  Future<String> definirPhotoProfil(Uint8List photo) async {
+    // Un nom nouveau à chaque fois : l'ancienne adresse, encore en cache
+    // dans les images déjà affichées, ne montre jamais la nouvelle photo
+    // par erreur. La miniature (voir `cheminMiniature`) reçoit la même
+    // image, déjà petite (l'app la réduit avant l'envoi).
+    final chemin = '$_monId/photo-${DateTime.now().millisecondsSinceEpoch}.jpg';
+    const options = FileOptions(contentType: 'image/jpeg');
+    await Future.wait([
+      _client.storage
+          .from('avatars')
+          .uploadBinary(chemin, photo, fileOptions: options),
+      _client.storage
+          .from('avatars')
+          .uploadBinary(cheminMiniature(chemin), photo, fileOptions: options),
+    ]);
     await _client
         .from('profils')
-        .update({'est_prive': prive})
+        .update({'photo_url': chemin})
         .eq('id', _monId);
+    return urlPhotoProfil(_client, chemin)!;
+  }
+
+  @override
+  Future<void> definirProfilPrive(bool prive) async {
+    await _client.from('profils').update({'est_prive': prive}).eq('id', _monId);
     if (prive) return;
     await _client
         .from('abonnements')

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
+import 'contenu_profil.dart';
 import 'ecran_accueil.dart';
 import 'ecran_abonnes.dart';
 import 'feuille_audience.dart';
 
-/// Onglet Profil : identité de l'utilisateur, ses propres publications
-/// (présentées comme dans le Feed, via le même [TablPublication]), accès
-/// aux abonnés et déconnexion.
+/// Onglet Profil : en haut, qui on est (photo, prénom, moments, abonnés,
+/// abonnements) ; dessous, son journal en grille par mois et son bilan
+/// de l'année (voir [ContenuProfil]). Les réglages (profil privé,
+/// déconnexion) sont derrière le bouton en haut à droite.
 class EcranProfil extends StatefulWidget {
   const EcranProfil({
     super.key,
@@ -36,8 +39,25 @@ class EcranProfil extends StatefulWidget {
 }
 
 class _EcranProfilState extends State<EcranProfil>
-    with ActionsPublications<EcranProfil> {
+    with ActionsPublications<EcranProfil>, ContenuProfil<EcranProfil> {
   bool _enCours = false;
+
+  @override
+  String? get prenomProfil => null;
+
+  @override
+  void Function(SouvenirFeed)? get optionsMoment => _ouvrirOptions;
+
+  /// Remplace la photo de l'utilisateur dès qu'il en a choisi une
+  /// nouvelle, sans attendre une reconnexion.
+  String? _photoUrl;
+
+  late Future<CompteursProfil> _compteurs = _chargerCompteurs();
+
+  // `async` : même une erreur levée tout de suite arrive par le Future,
+  // et l'en-tête affiche alors des tirets au lieu de tout faire tomber.
+  Future<CompteursProfil> _chargerCompteurs() async =>
+      widget.abonnementService.compteurs(widget.utilisateur.id);
 
   @override
   AbonnementService get abonnementService => widget.abonnementService;
@@ -57,6 +77,7 @@ class _EcranProfilState extends State<EcranProfil>
   void recharger() {
     setState(() {
       _futurSouvenirs = _chargerSouvenirs();
+      _compteurs = _chargerCompteurs();
       souvenirs = null;
     });
   }
@@ -80,7 +101,12 @@ class _EcranProfilState extends State<EcranProfil>
     }
   }
 
-  Future<void> _basculerProfilPrive(bool prive) async {
+  /// [rafraichir] : redessine la feuille des réglages, qui ne suit pas
+  /// les `setState` de l'écran.
+  Future<void> _basculerProfilPrive(
+    bool prive, {
+    VoidCallback? rafraichir,
+  }) async {
     if (!prive) {
       final confirme = await showDialog<bool>(
         context: context,
@@ -108,15 +134,18 @@ class _EcranProfilState extends State<EcranProfil>
     }
     final avant = _profilPrive;
     setState(() => _profilPrive = prive);
+    rafraichir?.call();
     try {
       await widget.abonnementService.definirProfilPrive(prive);
       if (!mounted) return;
       setState(() {
         _nombreDemandes = widget.abonnementService.nombreDemandesEnAttente();
+        _compteurs = _chargerCompteurs();
       });
     } catch (_) {
       if (!mounted) return;
       setState(() => _profilPrive = avant);
+      rafraichir?.call();
       afficherMessage(context, messageErreurGenerique);
     }
   }
@@ -132,19 +161,113 @@ class _EcranProfilState extends State<EcranProfil>
   late Future<int> _nombreDemandes = widget.abonnementService
       .nombreDemandesEnAttente();
 
-  Future<void> _allerVersAbonnes() async {
+  Future<void> _allerVersAbonnes({required bool ongletAbonnes}) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => EcranAbonnes(
           abonnementService: widget.abonnementService,
           souvenirService: widget.souvenirService,
+          ongletAbonnes: ongletAbonnes,
         ),
       ),
     );
     if (!mounted) return;
     setState(() {
       _nombreDemandes = widget.abonnementService.nombreDemandesEnAttente();
+      _compteurs = _chargerCompteurs();
     });
+  }
+
+  void _ouvrirReglages() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      showDragHandle: true,
+      builder: (contexteFeuille) => StatefulBuilder(
+        builder: (contexteFeuille, redessiner) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceL,
+                ),
+                child: Text('Réglages', style: TablTokens.titre),
+              ),
+              const SizedBox(height: TablTokens.espaceS),
+              if (_profilPrive != null)
+                _InterrupteurProfilPrive(
+                  prive: _profilPrive!,
+                  onChange: (prive) => _basculerProfilPrive(
+                    prive,
+                    rafraichir: () {
+                      if (contexteFeuille.mounted) redessiner(() {});
+                    },
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(TablTokens.espaceL),
+                child: TablBouton(
+                  libelle: 'Se déconnecter',
+                  enCours: _enCours,
+                  onPresse: () {
+                    Navigator.of(contexteFeuille).pop();
+                    _seDeconnecter();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _modifierProfil() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      showDragHandle: true,
+      builder: (contexteFeuille) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Changer la photo de profil'),
+              onTap: () {
+                Navigator.of(contexteFeuille).pop();
+                _changerPhoto();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changerPhoto() async {
+    // Petite et légère : une photo de profil s'affiche au plus en 96 px.
+    final fichier = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 600,
+      maxHeight: 600,
+      imageQuality: 85,
+    );
+    if (fichier == null || !mounted) return;
+    try {
+      final url = await widget.abonnementService.definirPhotoProfil(
+        await fichier.readAsBytes(),
+      );
+      if (!mounted) return;
+      setState(() => _photoUrl = url);
+      afficherMessage(context, 'Photo de profil mise à jour.');
+    } catch (e) {
+      debugPrint('EcranProfil: photo : $e');
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+    }
   }
 
   void _ouvrirOptions(SouvenirFeed souvenir) {
@@ -231,98 +354,154 @@ class _EcranProfilState extends State<EcranProfil>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: TablTokens.fond,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            FutureBuilder<List<SouvenirFeed>>(
-              future: _futurSouvenirs,
-              builder: (context, snapshot) {
-                final termine =
-                    snapshot.connectionState == ConnectionState.done;
-                if (termine && snapshot.hasError) {
-                  debugPrint(
-                    'EcranProfil: ${snapshot.error}\n${snapshot.stackTrace}',
-                  );
-                }
-                final mesSouvenirs = termine && !snapshot.hasError
-                    ? (souvenirs ??= snapshot.data!)
-                    : null;
-                return RefreshIndicator(
-                  color: TablTokens.primaire,
-                  onRefresh: () async {
-                    recharger();
-                    await _futurSouvenirs;
-                  },
-                  child: ListView(
-                    // La barre de navigation flotte par-dessus (voir
-                    // EcranPrincipal) : marge basse identique au Feed.
-                    padding: const EdgeInsets.only(
-                      bottom: TablTokens.espaceXxl + TablTokens.espaceL,
+      body: FutureBuilder<List<SouvenirFeed>>(
+        future: _futurSouvenirs,
+        builder: (context, snapshot) {
+          final termine = snapshot.connectionState == ConnectionState.done;
+          if (termine && snapshot.hasError) {
+            debugPrint(
+              'EcranProfil: ${snapshot.error}\n${snapshot.stackTrace}',
+            );
+          }
+          final mesSouvenirs = termine && !snapshot.hasError
+              ? (souvenirs ??= snapshot.data!)
+              : null;
+          return RefreshIndicator(
+            color: TablTokens.primaire,
+            edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
+            onRefresh: () async {
+              recharger();
+              await _futurSouvenirs;
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  pinned: true,
+                  expandedHeight: TablEnTeteProfil.hauteurDepliee(
+                    context,
+                    avecAction: false,
+                  ),
+                  backgroundColor: Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  automaticallyImplyLeading: false,
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: TablTokens.espaceM),
+                      child: TablBoutonVerre(
+                        icone: Icons.tune_rounded,
+                        libelle: 'Réglages',
+                        onPresse: _ouvrirReglages,
+                      ),
                     ),
-                    children: [
-                      TablEnTeteProfil(
-                        pseudo: widget.utilisateur.pseudo,
-                        photoUrl: widget.utilisateur.photoUrl,
-                        sousTitre: widget.utilisateur.email,
-                        resumeMoments: mesSouvenirs == null
-                            ? null
-                            : libelleNombreMoments(mesSouvenirs.length),
-                      ),
-                      if (!termine)
-                        const Padding(
-                          padding: EdgeInsets.all(TablTokens.espaceXl),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: TablTokens.primaire,
-                            ),
-                          ),
-                        )
-                      else if (mesSouvenirs == null)
-                        _MessageListe(texte: messageErreurGenerique)
-                      else if (mesSouvenirs.isEmpty)
-                        const _MessageListe(
-                          texte: "Vous n'avez encore rien publié.",
-                        )
-                      else
-                        for (final souvenir in mesSouvenirs)
-                          publicationDepliable(
-                            souvenir,
-                            contexte: ContextePublication.profilPerso,
-                            onOptions: () => _ouvrirOptions(souvenir),
-                          ),
-                      if (_profilPrive != null)
-                        _InterrupteurProfilPrive(
-                          prive: _profilPrive!,
-                          onChange: _basculerProfilPrive,
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.all(TablTokens.espaceL),
-                        child: TablBouton(
-                          libelle: 'Se déconnecter',
-                          enCours: _enCours,
-                          onPresse: _seDeconnecter,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            Positioned(
-              top: TablTokens.espaceS,
-              right: TablTokens.espaceM,
-              child: Row(
-                children: [
-                  _BoutonAbonnes(
+                  ],
+                  flexibleSpace: _EnTete(
+                    utilisateur: widget.utilisateur,
+                    photoUrl: _photoUrl ?? widget.utilisateur.photoUrl,
+                    souvenirs: mesSouvenirs,
+                    compteurs: _compteurs,
                     nombreDemandes: _nombreDemandes,
-                    onPresse: _allerVersAbonnes,
+                    onModifier: _modifierProfil,
+                    onAbonnes: () => _allerVersAbonnes(ongletAbonnes: true),
+                    onAbonnements: () =>
+                        _allerVersAbonnes(ongletAbonnes: false),
                   ),
-                ],
-              ),
+                ),
+                if (!termine)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(TablTokens.espaceXl),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: TablTokens.primaire,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (mesSouvenirs == null)
+                  const SliverToBoxAdapter(
+                    child: _MessageListe(texte: messageErreurGenerique),
+                  )
+                else if (mesSouvenirs.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: _MessageListe(
+                      texte: "Vous n'avez encore rien publié.",
+                    ),
+                  )
+                else
+                  ...slivresJournalEtBilan(mesSouvenirs),
+                // La barre de navigation flotte par-dessus (voir
+                // EcranPrincipal).
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
+    );
+  }
+}
+
+/// L'en-tête de son profil, une fois les chiffres arrivés.
+class _EnTete extends StatelessWidget {
+  const _EnTete({
+    required this.utilisateur,
+    required this.photoUrl,
+    required this.souvenirs,
+    required this.compteurs,
+    required this.nombreDemandes,
+    required this.onModifier,
+    required this.onAbonnes,
+    required this.onAbonnements,
+  });
+
+  final Utilisateur utilisateur;
+  final String? photoUrl;
+  final List<SouvenirFeed>? souvenirs;
+  final Future<CompteursProfil> compteurs;
+  final Future<int> nombreDemandes;
+  final VoidCallback onModifier;
+  final VoidCallback onAbonnes;
+  final VoidCallback onAbonnements;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<CompteursProfil>(
+      future: compteurs,
+      builder: (context, chiffres) {
+        if (chiffres.hasError) {
+          debugPrint('EcranProfil: compteurs : ${chiffres.error}');
+        }
+        return FutureBuilder<int>(
+          future: nombreDemandes,
+          builder: (context, demandes) => TablEnTeteProfil(
+            pseudo: utilisateur.pseudo,
+            photoUrl: photoUrl,
+            couvertureUrl: souvenirs == null
+                ? null
+                : photoCouverture(souvenirs!),
+            onModifier: onModifier,
+            compteurs: [
+              CompteurProfil(
+                nombre: souvenirs?.length,
+                libelle: souvenirs?.length == 1 ? 'moment' : 'moments',
+              ),
+              CompteurProfil(
+                nombre: chiffres.data?.abonnes,
+                libelle: 'abonnés',
+                onPresse: onAbonnes,
+                pastille: (demandes.data ?? 0) > 0,
+              ),
+              CompteurProfil(
+                nombre: chiffres.data?.abonnements,
+                libelle: 'abonnements',
+                onPresse: onAbonnements,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -368,65 +547,6 @@ class _MessageListe extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
       ),
-    );
-  }
-}
-
-/// Icône vers l'écran Cercle, avec un badge si des demandes de suivi
-/// sont en attente.
-class _BoutonAbonnes extends StatelessWidget {
-  const _BoutonAbonnes({required this.nombreDemandes, required this.onPresse});
-
-  final Future<int> nombreDemandes;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<int>(
-      future: nombreDemandes,
-      builder: (context, snapshot) {
-        final nombre = snapshot.data ?? 0;
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Material(
-              color: TablTokens.surface,
-              shape: const CircleBorder(
-                side: BorderSide(color: TablTokens.bordure),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: IconButton(
-                onPressed: onPresse,
-                icon: const Icon(Icons.people_outline_rounded, size: 20),
-                color: TablTokens.primaire,
-                splashRadius: 22,
-              ),
-            ),
-            if (nombre > 0)
-              Positioned(
-                top: -2,
-                right: -2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  height: 17,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: TablTokens.primaire,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$nombre',
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: TablTokens.texteSurPrimaire,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
     );
   }
 }

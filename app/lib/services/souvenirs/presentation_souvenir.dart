@@ -15,6 +15,33 @@ const List<String> _moisAnnee = [
   'décembre',
 ];
 
+/// "janvier" … "décembre" ([mois] de 1 à 12).
+String nomDuMois(int mois) => _moisAnnee[mois - 1];
+
+/// "8 moments", "1 adresse"… : [nombre] suivi de [mot], au pluriel au-delà
+/// de 1.
+String pluriel(int nombre, String mot) =>
+    '$nombre $mot${nombre > 1 ? 's' : ''}';
+
+/// "Déjeuner" ou "Dîner" pour la valeur stockée en base (`'midi'`,
+/// `'soir'`), `null` pour toute autre.
+String? libelleMomentRepas(String moment) => switch (moment) {
+  'midi' => 'Déjeuner',
+  'soir' => 'Dîner',
+  _ => null,
+};
+
+/// "Arthur", "Arthur et Emma", "Arthur, Emma et Louise" ; au-delà de
+/// trois : "Arthur, Emma et 2 autres".
+String listeDeNoms(List<String> noms) {
+  if (noms.isEmpty) return '';
+  if (noms.length == 1) return noms.first;
+  if (noms.length > 3) {
+    return '${noms[0]}, ${noms[1]} et ${pluriel(noms.length - 2, 'autre')}';
+  }
+  return '${noms.sublist(0, noms.length - 1).join(', ')} et ${noms.last}';
+}
+
 /// Date d'un souvenir telle qu'affichée sur une publication : "12 mars"
 /// cette année, "3 novembre 2025" sinon (sans l'année, une liste du plus
 /// récent au plus ancien semblerait en désordre).

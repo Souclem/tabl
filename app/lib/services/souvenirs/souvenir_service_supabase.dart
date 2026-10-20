@@ -10,6 +10,7 @@ import 'commentaire.dart';
 import '../social/photo_profil.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
+import 'personne_presente.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
 
@@ -244,6 +245,15 @@ class SouvenirServiceSupabase implements SouvenirService {
       _souvenirsPublies(auteurId: auteurId);
 
   @override
+  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) async {
+    final miens = await _souvenirsPublies(auteurId: _monId);
+    return [
+      for (final s in miens)
+        if (s.presents.any((p) => p.id == profilId)) s,
+    ];
+  }
+
+  @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) =>
       _souvenirsPublies(restaurantId: restaurantId);
 
@@ -259,7 +269,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, '
-          'restaurants(nom, ville), '
+          'restaurants(nom, ville, categories), '
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)',
         )
         .eq('statut', 'publie');
@@ -287,7 +297,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     );
     final reactions = await _reactionsParSouvenir(ids);
     final nombreCommentaires = await _nombreCommentairesParSouvenir(ids);
-    final amisTagues = await _amisTaguesParSouvenir(ids);
+    final presents = await _presentsParSouvenir(ids);
     final envies = await EnviesRestaurants(_client).mesEnviesIds();
 
     return lignes.map((l) {
@@ -311,7 +321,9 @@ class SouvenirServiceSupabase implements SouvenirService {
         nombreCommentaires: nombreCommentaires[id] ?? 0,
         emotion: Emotion.depuisEmoji(l['emotion'] as String?),
         premieresReactions: donneesReactions.pseudos,
-        amisTagues: amisTagues[id] ?? const [],
+        presents: presents[id] ?? const [],
+        categories:
+            (restaurant?['categories'] as List?)?.cast<String>() ?? const [],
         impressions: (l['impressions'] as List?)?.cast<String>() ?? const [],
         estAMoi: l['auteur_id'] == _monId,
         audienceRestreinte:
@@ -450,26 +462,39 @@ class SouvenirServiceSupabase implements SouvenirService {
     return comptes;
   }
 
-  /// Pseudos des amis tagués, regroupés par souvenir.
-  Future<Map<String, List<String>>> _amisTaguesParSouvenir(
+  /// Les personnes taguées comme présentes, regroupées par souvenir.
+  Future<Map<String, List<PersonnePresente>>> _presentsParSouvenir(
     List<String> souvenirIds,
   ) async {
     if (souvenirIds.isEmpty) return {};
 
     final lignes = await _client
         .from('souvenirs_amis_tagues')
-        .select('souvenir_id, profils(pseudo)')
+        .select('souvenir_id, profil_id, profils(pseudo, photo_url)')
         .inFilter('souvenir_id', souvenirIds);
 
-    final pseudosParSouvenir = <String, List<String>>{};
+    final parSouvenir = <String, List<PersonnePresente>>{};
     for (final l in lignes) {
-      final id = l['souvenir_id'] as String;
       final profil = l['profils'] as Map<String, dynamic>?;
       final pseudo = profil?['pseudo'] as String?;
       if (pseudo == null) continue;
-      pseudosParSouvenir.putIfAbsent(id, () => []).add(pseudo);
+      final profilId = l['profil_id'] as String;
+      parSouvenir
+          .putIfAbsent(l['souvenir_id'] as String, () => [])
+          .add(
+            PersonnePresente(
+              id: profilId,
+              pseudo: pseudo,
+              photoUrl: urlPhotoProfil(
+                _client,
+                profil?['photo_url'] as String?,
+                miniature: true,
+              ),
+              estMoi: profilId == _monId,
+            ),
+          );
     }
-    return pseudosParSouvenir;
+    return parSouvenir;
   }
 
   /// Résout des chemins de bucket en URLs signées (valables 1h) — le

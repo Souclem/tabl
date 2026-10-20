@@ -27,6 +27,10 @@ class TablTokens {
   /// Fond des cartes, des champs et des surfaces posées sur le fond.
   static const Color surface = Color(0xFF221C17);
 
+  /// Cartes posées à même le fond, plus discrètes que [surface] (profil :
+  /// bilan, sélecteurs).
+  static const Color surfaceBasse = Color(0xFF110F0C);
+
   /// Texte principal.
   static const Color texte = Color(0xFFF5F0E8);
 

@@ -177,7 +177,7 @@ class TablPublication extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       for (final impression in impressions.take(2))
-                        _PuceImpression(texte: impression),
+                        TablPuceImpression(texte: impression),
                       if (impressions.length > 2)
                         Text(
                           '+${impressions.length - 2}',
@@ -187,25 +187,12 @@ class TablPublication extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 15),
-                Row(
-                  children: [
-                    _ActionTabler(actif: jaiReagi, onPresse: onReagir),
-                    _ActionTexte(
-                      icone: Icons.mode_comment_outlined,
-                      libelle: 'Commenter',
-                      onPresse: onCommenter,
-                    ),
-                    const Spacer(),
-                    if (_afficheEnregistrer)
-                      _ActionTexte(
-                        icone: enregistre
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_border_rounded,
-                        libelle: enregistre ? 'Enregistrée' : 'Enregistrer',
-                        actif: enregistre,
-                        onPresse: onEnregistrer!,
-                      ),
-                  ],
+                TablActionsPublication(
+                  jaiReagi: jaiReagi,
+                  onReagir: onReagir,
+                  onCommenter: onCommenter,
+                  enregistre: enregistre,
+                  onEnregistrer: _afficheEnregistrer ? onEnregistrer : null,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -472,8 +459,9 @@ class _Photo extends StatelessWidget {
   }
 }
 
-class _PuceImpression extends StatelessWidget {
-  const _PuceImpression({required this.texte});
+/// Une impression ("Assiette · Exceptionnelle") en petite pastille.
+class TablPuceImpression extends StatelessWidget {
+  const TablPuceImpression({super.key, required this.texte});
 
   final String texte;
 
@@ -493,6 +481,51 @@ class _PuceImpression extends StatelessWidget {
           color: TablTokens.texte.withValues(alpha: 0.6),
         ),
       ),
+    );
+  }
+}
+
+/// La rangée d'actions sous un moment : J'aime, Commenter, et
+/// Enregistrer à droite quand [onEnregistrer] est fourni.
+class TablActionsPublication extends StatelessWidget {
+  const TablActionsPublication({
+    super.key,
+    required this.jaiReagi,
+    required this.onReagir,
+    required this.onCommenter,
+    this.enregistre = false,
+    this.onEnregistrer,
+  });
+
+  final bool jaiReagi;
+  final VoidCallback onReagir;
+  final VoidCallback onCommenter;
+  final bool enregistre;
+
+  /// `null` : pas de bouton Enregistrer (son propre moment).
+  final VoidCallback? onEnregistrer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _ActionTabler(actif: jaiReagi, onPresse: onReagir),
+        _ActionTexte(
+          icone: Icons.mode_comment_outlined,
+          libelle: 'Commenter',
+          onPresse: onCommenter,
+        ),
+        const Spacer(),
+        if (onEnregistrer != null)
+          _ActionTexte(
+            icone: enregistre
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_border_rounded,
+            libelle: enregistre ? 'Enregistrée' : 'Enregistrer',
+            actif: enregistre,
+            onPresse: onEnregistrer!,
+          ),
+      ],
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/services/services.dart';
@@ -10,6 +12,13 @@ import 'package:app/ecrans/ecran_profil_autre.dart';
 /// ou refusées disparaissent réellement de [demandesRecues], comme le
 /// ferait le vrai service — pour tester le rafraîchissement après action.
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<CompteursProfil> compteurs(String profilId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> definirPhotoProfil(Uint8List photo) =>
+      throw UnimplementedError();
   @override
   Future<ProfilVisite> profil(String id) async => ProfilVisite(
     id: id,

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/services/services.dart';
@@ -119,6 +121,13 @@ class _FauxTableService implements TableService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<CompteursProfil> compteurs(String profilId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> definirPhotoProfil(Uint8List photo) =>
+      throw UnimplementedError();
   @override
   Future<ProfilVisite> profil(String id) => throw UnimplementedError();
 

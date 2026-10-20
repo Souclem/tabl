@@ -112,17 +112,23 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     recharger();
   }
 
-  /// Le profil de l'auteur d'une publication, en page ; à son retour, la
-  /// liste est rechargée (un abonnement a pu changer ce qui est visible).
+  /// Le profil de l'auteur d'une publication.
   Future<void> ouvrirProfil(SouvenirFeed souvenir) async {
-    final service = abonnementService;
     final auteurId = souvenir.auteurId;
-    if (service == null || auteurId == null) return;
+    if (auteurId == null) return;
+    await ouvrirProfilDe(auteurId, souvenir.auteurPseudo);
+  }
+
+  /// Le profil de quelqu'un, en page ; à son retour, la liste est
+  /// rechargée (un abonnement a pu changer ce qui est visible).
+  Future<void> ouvrirProfilDe(String profilId, String pseudo) async {
+    final service = abonnementService;
+    if (service == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => EcranProfilAutre(
-          profilId: auteurId,
-          pseudo: souvenir.auteurPseudo,
+          profilId: profilId,
+          pseudo: pseudo,
           abonnementService: service,
           souvenirService: souvenirService,
         ),

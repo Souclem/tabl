@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'profil_public.dart';
 
 /// Contrat du graphe social de Tabl.
@@ -13,6 +15,11 @@ abstract interface class AbonnementService {
 
   /// Le profil d'une autre personne, avec où j'en suis avec elle.
   Future<ProfilVisite> profil(String id);
+
+  /// Moments publiés, abonnés et abonnements d'un profil (relations
+  /// acceptées seulement). Visibles sur tout profil, même privé, comme
+  /// Instagram : les moments et les listes restent protégés.
+  Future<CompteursProfil> compteurs(String profilId);
 
   /// Suit [suiviId] : abonnement immédiat si son profil est public
   /// ([StatutAbonnement.abonne]), demande en attente sinon
@@ -55,6 +62,10 @@ abstract interface class AbonnementService {
 
   /// `true` si mon profil est privé (réglage par défaut).
   Future<bool> monProfilEstPrive();
+
+  /// Remplace ma photo de profil (déjà recadrée, JPEG) ; retourne son
+  /// adresse publique.
+  Future<String> definirPhotoProfil(Uint8List photo);
 
   /// Rend mon profil privé ou public. Passer en public accepte toutes
   /// les demandes en attente, comme Instagram : elles n'ont plus de

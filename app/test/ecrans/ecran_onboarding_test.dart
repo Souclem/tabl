@@ -49,6 +49,13 @@ class _FauxAuthService implements AuthService {
 /// tests, les écrans se contentent de le recevoir en paramètre.
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<CompteursProfil> compteurs(String profilId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<String> definirPhotoProfil(Uint8List photo) =>
+      throw UnimplementedError();
+  @override
   Future<ProfilVisite> profil(String id) => throw UnimplementedError();
 
   @override
@@ -93,6 +100,9 @@ class _FauxAbonnementService implements AbonnementService {
 }
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
+      throw UnimplementedError();
   @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
 

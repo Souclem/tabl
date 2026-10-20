@@ -1,4 +1,5 @@
 import 'emotion.dart';
+import 'personne_presente.dart';
 
 /// Un souvenir tel qu'affiché dans le Feed — déjà résolu et prêt à
 /// afficher (l'URL de la photo est une URL signée, pas le chemin brut du
@@ -18,7 +19,8 @@ class SouvenirFeed {
     required this.nombreCommentaires,
     this.emotion,
     this.premieresReactions = const [],
-    this.amisTagues = const [],
+    this.presents = const [],
+    this.categories = const [],
     this.impressions = const [],
     this.estAMoi = false,
     this.audienceRestreinte = false,
@@ -62,8 +64,13 @@ class SouvenirFeed {
   /// qu'un chiffre brut mis en avant.
   final List<String> premieresReactions;
 
-  /// Pseudos des amis tagués comme présents lors de ce moment.
-  final List<String> amisTagues;
+  /// Les personnes taguées comme présentes lors de ce moment.
+  final List<PersonnePresente> presents;
+
+  /// Catégories du restaurant, telles que l'annuaire les fournit (en
+  /// anglais : "Italian Restaurant") — à traduire avec
+  /// `libelleCategorie` pour l'affichage.
+  final List<String> categories;
 
   /// Ce qui ressort ("Assiette · Exceptionnelle", "Service · Attentionné"...),
   /// affiché en pastilles sous la légende.
@@ -111,7 +118,8 @@ class SouvenirFeed {
       nombreCommentaires: nombreCommentaires ?? this.nombreCommentaires,
       emotion: emotion,
       premieresReactions: premieresReactions ?? this.premieresReactions,
-      amisTagues: amisTagues,
+      presents: presents,
+      categories: categories,
       impressions: impressions,
       estAMoi: estAMoi,
       audienceRestreinte: audienceRestreinte,

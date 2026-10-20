@@ -71,3 +71,7 @@ class DemandeAbonnement {
   final String suiveurId;
   final String pseudo;
 }
+
+/// Les chiffres d'un profil : ses moments publiés, ses abonnés (qui le
+/// suivent) et ses abonnements (qu'il suit).
+typedef CompteursProfil = ({int moments, int abonnes, int abonnements});
