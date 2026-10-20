@@ -54,10 +54,18 @@ class _EcranProfilState extends State<EcranProfil>
 
   late Future<CompteursProfil> _compteurs = _chargerCompteurs();
 
-  // `async` : même une erreur levée tout de suite arrive par le Future,
-  // et l'en-tête affiche alors des tirets au lieu de tout faire tomber.
-  Future<CompteursProfil> _chargerCompteurs() async =>
-      widget.abonnementService.compteurs(widget.utilisateur.id);
+  /// Ses propres abonnés et abonnements se lisent directement (la base
+  /// laisse chacun voir ses relations) : pas besoin de la fonction qui
+  /// compte ceux des autres. Le nombre de moments vient de la liste.
+  Future<CompteursProfil> _chargerCompteurs() async {
+    final (:abonnes, :abonnements) = await widget.abonnementService
+        .abonnesEtAbonnements();
+    return (
+      moments: 0,
+      abonnes: abonnes.length,
+      abonnements: abonnements.length,
+    );
+  }
 
   @override
   AbonnementService get abonnementService => widget.abonnementService;

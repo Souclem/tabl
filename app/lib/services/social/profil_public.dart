@@ -22,11 +22,22 @@ class ProfilPublic {
     required this.id,
     required this.pseudo,
     required this.statut,
+    this.photoUrl,
   });
 
   final String id;
   final String pseudo;
   final StatutAbonnement statut;
+
+  /// Miniature de sa photo de profil, `null` s'il n'en a pas.
+  final String? photoUrl;
+
+  ProfilPublic copierAvec({StatutAbonnement? statut}) => ProfilPublic(
+    id: id,
+    pseudo: pseudo,
+    statut: statut ?? this.statut,
+    photoUrl: photoUrl,
+  );
 }
 
 /// Le profil d'une autre personne, tel qu'on le visite.
@@ -66,10 +77,17 @@ class ProfilVisite {
 
 /// Une demande de suivi reçue, en attente de réponse.
 class DemandeAbonnement {
-  const DemandeAbonnement({required this.suiveurId, required this.pseudo});
+  const DemandeAbonnement({
+    required this.suiveurId,
+    required this.pseudo,
+    this.photoUrl,
+  });
 
   final String suiveurId;
   final String pseudo;
+
+  /// Miniature de sa photo de profil, `null` s'il n'en a pas.
+  final String? photoUrl;
 }
 
 /// Les chiffres d'un profil : ses moments publiés, ses abonnés (qui le

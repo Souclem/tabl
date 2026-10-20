@@ -4,227 +4,148 @@ import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
 
-/// Une année proposée dans le sélecteur, avec son nombre de moments.
-class AnneeProposee {
-  const AnneeProposee({required this.annee, required this.compte});
-
-  final int annee;
-
-  /// "12 moments".
-  final String compte;
-}
-
-/// Journal / Bilan, avec une pastille dorée qui glisse de l'un à
-/// l'autre, et l'année affichée à côté. Fait pour rester épinglé en haut
-/// du profil pendant qu'on défile (voir [TablDelegueHauteurFixe]).
-class TablOngletsProfil extends StatelessWidget {
-  const TablOngletsProfil({
+/// Les rubriques d'un profil, comme sur Strava : des mots répartis sur la
+/// largeur, un trait doré sous celle qu'on regarde, qui glisse quand on
+/// en change. Fait pour rester épinglé en haut pendant qu'on défile
+/// (voir [TablDelegueHauteurFixe]).
+class TablOngletsTexte extends StatelessWidget {
+  const TablOngletsTexte({
     super.key,
-    required this.bilan,
-    required this.onChoisirBilan,
-    required this.annee,
-    required this.annees,
-    required this.onChoisirAnnee,
+    required this.libelles,
+    required this.index,
+    required this.onChoisir,
   });
 
-  /// Hauteur totale, marges comprises.
-  static const double hauteur = 66;
+  static const double hauteur = 52;
 
-  /// `false` : Journal.
-  final bool bilan;
-  final ValueChanged<bool> onChoisirBilan;
-  final int annee;
-  final List<AnneeProposee> annees;
-  final ValueChanged<int> onChoisirAnnee;
+  final List<String> libelles;
+  final int index;
+  final ValueChanged<int> onChoisir;
 
   @override
   Widget build(BuildContext context) {
+    const duree = Duration(milliseconds: 380);
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
           height: hauteur,
-          color: TablTokens.fond.withValues(alpha: 0.9),
-          padding: const EdgeInsets.symmetric(
-            horizontal: TablTokens.espaceL - 4,
-            vertical: 10,
+          decoration: BoxDecoration(
+            color: TablTokens.fond.withValues(alpha: 0.92),
+            border: const Border(bottom: BorderSide(color: TablTokens.surface)),
           ),
-          child: Row(
+          child: Stack(
             children: [
-              Expanded(
-                child: _Segments(bilan: bilan, onChoisirBilan: onChoisirBilan),
-              ),
-              const SizedBox(width: 10),
-              _ChoixAnnee(
-                annee: annee,
-                annees: annees,
-                onChoisirAnnee: onChoisirAnnee,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Segments extends StatelessWidget {
-  const _Segments({required this.bilan, required this.onChoisirBilan});
-
-  final bool bilan;
-  final ValueChanged<bool> onChoisirBilan;
-
-  @override
-  Widget build(BuildContext context) {
-    const duree = Duration(milliseconds: 450);
-    Widget segment(
-      String libelle, {
-      required bool actif,
-      required bool versBilan,
-    }) {
-      return Expanded(
-        child: Semantics(
-          button: true,
-          selected: actif,
-          child: InkWell(
-            onTap: () => onChoisirBilan(versBilan),
-            borderRadius: BorderRadius.circular(20),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: duree,
-                style: TablTokens.corps.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: actif
-                      ? TablTokens.texteSurPrimaire
-                      : TablTokens.texteDoux,
-                ),
-                child: Text(libelle),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      height: 46,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
-        borderRadius: BorderRadius.circular(23),
-        border: Border.all(color: TablTokens.surface),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: duree,
-            curve: Curves.easeOutCubic,
-            alignment: bilan ? Alignment.centerRight : Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: 0.5,
-              heightFactor: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: TablTokens.primaire,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: TablTokens.primaire.withValues(alpha: 0.25),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              segment('Journal', actif: !bilan, versBilan: false),
-              segment('Bilan', actif: bilan, versBilan: true),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChoixAnnee extends StatelessWidget {
-  const _ChoixAnnee({
-    required this.annee,
-    required this.annees,
-    required this.onChoisirAnnee,
-  });
-
-  final int annee;
-  final List<AnneeProposee> annees;
-  final ValueChanged<int> onChoisirAnnee;
-
-  @override
-  Widget build(BuildContext context) {
-    final pilule = Container(
-      height: 46,
-      padding: const EdgeInsets.only(left: 16, right: 12),
-      decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
-        borderRadius: BorderRadius.circular(23),
-        border: Border.all(color: TablTokens.surface),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$annee',
-            style: TablTokens.titreAffichage.copyWith(fontSize: 18),
-          ),
-          if (annees.length > 1) ...[
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 20,
-              color: TablTokens.primaire,
-            ),
-          ],
-        ],
-      ),
-    );
-    if (annees.length <= 1) return pilule;
-    return PopupMenuButton<int>(
-      tooltip: "Choisir l'année",
-      onSelected: onChoisirAnnee,
-      color: TablTokens.surface,
-      position: PopupMenuPosition.under,
-      offset: const Offset(0, 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(TablTokens.arrondiM),
-        side: const BorderSide(color: TablTokens.bordure),
-      ),
-      itemBuilder: (_) => [
-        for (final a in annees)
-          PopupMenuItem<int>(
-            value: a.annee,
-            child: SizedBox(
-              width: 150,
-              child: Row(
+              Row(
                 children: [
-                  Text(
-                    '${a.annee}',
-                    style: TablTokens.titreAffichage.copyWith(
-                      fontSize: 18,
-                      color: a.annee == annee
-                          ? TablTokens.primaire
-                          : TablTokens.texte,
+                  for (var i = 0; i < libelles.length; i++)
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: i == index,
+                        child: InkWell(
+                          onTap: () => onChoisir(i),
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: duree,
+                              style: TablTokens.corps.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: i == index
+                                    ? TablTokens.texte
+                                    : TablTokens.texteDoux,
+                              ),
+                              child: Text(libelles[i]),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  Text(a.compte, style: TablTokens.legende),
                 ],
               ),
-            ),
+              AnimatedAlign(
+                duration: duree,
+                curve: Curves.easeOutCubic,
+                alignment: Alignment(
+                  libelles.length == 1
+                      ? 0
+                      : -1 + 2 * index / (libelles.length - 1),
+                  1,
+                ),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / libelles.length,
+                  child: Container(
+                    height: 2.5,
+                    margin: const EdgeInsets.symmetric(horizontal: 28),
+                    decoration: BoxDecoration(
+                      color: TablTokens.primaire,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-      ],
-      child: pilule,
+        ),
+      ),
+    );
+  }
+}
+
+/// La période d'un bilan : « Depuis le début », puis chaque année, en
+/// pastilles qui défilent ; celle choisie est dorée.
+class TablChoixPeriode extends StatelessWidget {
+  const TablChoixPeriode({
+    super.key,
+    required this.periodes,
+    required this.index,
+    required this.onChoisir,
+  });
+
+  final List<String> periodes;
+  final int index;
+  final ValueChanged<int> onChoisir;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: periodes.length,
+        separatorBuilder: (_, _) => const SizedBox(width: TablTokens.espaceS),
+        itemBuilder: (context, i) {
+          final choisie = i == index;
+          return Semantics(
+            button: true,
+            selected: choisie,
+            child: GestureDetector(
+              onTap: () => onChoisir(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: choisie ? TablTokens.primaire : Colors.transparent,
+                  borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
+                  border: Border.all(
+                    color: choisie ? TablTokens.primaire : TablTokens.bordure,
+                  ),
+                ),
+                child: Text(
+                  periodes[i],
+                  style: TablTokens.corps.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: choisie
+                        ? TablTokens.texteSurPrimaire
+                        : TablTokens.texte,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

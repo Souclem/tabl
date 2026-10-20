@@ -103,7 +103,8 @@ class TitresBilan {
   final String pied;
 }
 
-/// L'année d'un profil en chiffres : avec qui, où, quand, quoi.
+/// Un profil en chiffres, depuis le début ou sur une année : avec qui,
+/// où, quand, quoi.
 class BilanAnnee {
   const BilanAnnee({
     required this.titre,
@@ -119,7 +120,7 @@ class BilanAnnee {
     required this.cuisines,
   });
 
-  /// "Ton 2026", "Le 2026 d'Arthur".
+  /// "Ton bilan", "Ton 2026", "Le 2026 d'Arthur".
   final String titre;
 
   /// "12 moments · 10 adresses · 4 villes".
@@ -143,14 +144,20 @@ class BilanAnnee {
   final List<String> cuisines;
 }
 
-/// Le bilan de [annee] à partir de tous les moments d'un profil.
-/// [prenom] : `null` pour son propre profil, le pseudo de l'autre sinon.
-BilanAnnee bilanDeLAnnee(List<SouvenirFeed> tous, int annee, {String? prenom}) {
+/// Le bilan d'un profil à partir de tous ses moments : depuis le début,
+/// ou sur [annee] seulement. [prenom] : `null` pour son propre profil,
+/// le pseudo de l'autre sinon.
+BilanAnnee bilanDuProfil(
+  List<SouvenirFeed> tous, {
+  int? annee,
+  String? prenom,
+}) {
   final estMoi = prenom == null;
   final souvenirs = [
     for (final s in parDateDecroissante(tous))
-      if (s.dateVisite.year == annee) s,
+      if (annee == null || s.dateVisite.year == annee) s,
   ];
+  final periode = annee == null ? '' : ' cette année';
 
   final adresses = {for (final s in souvenirs) cleRestaurant(s)}.length;
   final nombreVilles = {
@@ -178,19 +185,23 @@ BilanAnnee bilanDeLAnnee(List<SouvenirFeed> tous, int annee, {String? prenom}) {
       : proche(personnes.first, detaille: true);
 
   return BilanAnnee(
-    titre: estMoi ? 'Ton $annee' : 'Le $annee ${_de(prenom)}',
+    titre: switch ((estMoi, annee)) {
+      (true, null) => 'Ton bilan',
+      (true, _) => 'Ton $annee',
+      (false, null) => 'Le bilan ${_de(prenom!)}',
+      (false, _) => 'Le $annee ${_de(prenom!)}',
+    },
     resume:
         '${pluriel(souvenirs.length, 'moment')} · '
         '${pluriel(adresses, 'adresse')} · ${pluriel(nombreVilles, 'ville')}',
     titres: estMoi
-        ? const TitresBilan(
+        ? TitresBilan(
             avecQui: 'Avec qui tu partages tes tables',
             retours: 'Là où tu reviens',
             villes: 'Tes villes',
             moments: 'Tes moments',
             cuisines: 'Ce que tu manges',
-            aucunRetour:
-                'Aucune adresse deux fois cette année… pour l’instant.',
+            aucunRetour: 'Aucune adresse deux fois$periode… pour l’instant.',
             pied: 'Ton bilan se construit tout seul, à chaque moment publié.',
           )
         : TitresBilan(
@@ -199,7 +210,7 @@ BilanAnnee bilanDeLAnnee(List<SouvenirFeed> tous, int annee, {String? prenom}) {
             villes: 'Ses villes',
             moments: 'Ses moments',
             cuisines: 'Ce qu’aime $prenom',
-            aucunRetour: 'Pas encore d’adresse où revenir cette année.',
+            aucunRetour: 'Pas encore d’adresse où revenir$periode.',
             pied:
                 'Seuls les moments que $prenom partage avec toi comptent '
                 'ici.',

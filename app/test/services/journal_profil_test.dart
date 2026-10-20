@@ -46,34 +46,38 @@ void main() {
       );
     });
 
-    test('une année regroupée par mois, avec qui et où', () {
-      final mois = journalDeLAnnee([
-        _moment('1', DateTime(2026, 10, 16), presents: [_arthur]),
+    test('tous les moments regroupés par mois, années comprises', () {
+      final mois = journalParMois([
+        _moment('1', DateTime(2026, 10, 16)),
         _moment('2', DateTime(2026, 9, 2)),
-        _moment(
-          '3',
-          DateTime(2026, 10, 2),
-          ville: 'Namur',
-          presents: [_emma, _arthur],
-        ),
+        _moment('3', DateTime(2026, 10, 2)),
         _moment('4', DateTime(2025, 10, 2)),
-      ], 2026);
+      ]);
 
-      expect(mois.map((m) => m.titre), ['Octobre', 'Septembre']);
-      final octobre = mois.first;
-      expect(octobre.compte, '2 moments');
-      expect(octobre.souvenirs.map((s) => s.id), ['1', '3']);
-      // Arthur, deux fois présent, passe devant Emma.
-      expect(octobre.personnes.map((p) => p.pseudo), ['Arthur', 'Emma']);
-      expect(octobre.recit, 'Arthur et Emma · Liège, Namur');
-      expect(mois.last.recit, 'En solo · Liège');
+      expect(mois.map((m) => (m.titre, m.annee)), [
+        ('Octobre', 2026),
+        ('Septembre', 2026),
+        ('Octobre', 2025),
+      ]);
+      expect(mois.first.compte, '2 moments');
+      expect(mois.first.souvenirs.map((s) => s.id), ['1', '3']);
     });
 
-    test('le compte courant tagué se dit « Toi »', () {
-      final mois = journalDeLAnnee([
-        _moment('1', DateTime(2026, 10, 1), presents: [_moi, _arthur]),
-      ], 2026);
-      expect(mois.single.recit, 'Toi et Arthur · Liège');
+    test('périodes d\'un bilan', () {
+      expect(libellesPeriodes([2026, 2025]), [
+        'Depuis le début',
+        '2026',
+        '2025',
+      ]);
+    });
+
+    test('les plus présents d\'abord', () {
+      final personnes = personnesLesPlusPresentes([
+        _moment('1', DateTime(2026, 10, 16), presents: [_arthur]),
+        _moment('2', DateTime(2026, 10, 2), presents: [_emma, _arthur]),
+      ]);
+      expect(personnes.map((p) => p.pseudo), ['Arthur', 'Emma']);
+      expect(nomPersonne(_moi), 'Toi');
     });
 
     test('vedette : le coup de cœur d\'un mois d\'au moins trois moments', () {
@@ -170,8 +174,19 @@ void main() {
       _moment('4', DateTime(2025, 11, 23)),
     ];
 
+    test('depuis le début, toutes années comprises', () {
+      final bilan = bilanDuProfil(tous);
+      expect(bilan.titre, 'Ton bilan');
+      expect(bilan.resume, '4 moments · 2 adresses · 2 villes');
+      expect(bilan.retours.single.nombreVisites, 3);
+      expect(
+        bilanDuProfil(const [], prenom: 'Arthur').titre,
+        'Le bilan d’Arthur',
+      );
+    });
+
     test('le sien, à « tu »', () {
-      final bilan = bilanDeLAnnee(tous, 2026);
+      final bilan = bilanDuProfil(tous, annee: 2026);
       expect(bilan.titre, 'Ton 2026');
       expect(bilan.resume, '3 moments · 2 adresses · 2 villes');
       expect(bilan.titres.retours, 'Là où tu reviens');
@@ -182,7 +197,7 @@ void main() {
     });
 
     test('retours : deux visites dans l\'année, depuis la toute première', () {
-      final retour = bilanDeLAnnee(tous, 2026).retours.single;
+      final retour = bilanDuProfil(tous, annee: 2026).retours.single;
       expect(retour.restaurantNom, 'Bibo');
       expect(retour.nombreVisites, 2);
       expect(retour.lieu, 'Liège · depuis novembre 2025');
@@ -190,7 +205,7 @@ void main() {
     });
 
     test('villes, moments et cuisines', () {
-      final bilan = bilanDeLAnnee(tous, 2026);
+      final bilan = bilanDuProfil(tous, annee: 2026);
       expect(bilan.villes.map((v) => (v.nom, v.part)), [
         ('Liège', 1.0),
         ('Bruxelles', 0.5),
@@ -204,11 +219,11 @@ void main() {
     });
 
     test('celui d\'un autre, à son prénom', () {
-      final bilan = bilanDeLAnnee(
+      final bilan = bilanDuProfil(
         [
           _moment('1', DateTime(2026, 10, 1), presents: [_moi]),
         ],
-        2026,
+        annee: 2026,
         prenom: 'Arthur',
       );
       expect(bilan.titre, 'Le 2026 d’Arthur');
@@ -216,7 +231,7 @@ void main() {
       expect(bilan.roleBinome, 'Son binôme de table : toi');
       expect(bilan.binome!.nom, 'Toi');
       expect(
-        bilanDeLAnnee(const [], 2026, prenom: 'Louise').titre,
+        bilanDuProfil(const [], annee: 2026, prenom: 'Louise').titre,
         'Le 2026 de Louise',
       );
     });

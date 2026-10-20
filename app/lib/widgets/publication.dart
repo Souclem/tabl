@@ -507,17 +507,19 @@ class TablActionsPublication extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rien que des icônes : le geste se comprend tout seul. Le nom de
+    // chaque action reste dans l'info-bulle et pour les lecteurs d'écran.
     return Row(
       children: [
-        _ActionTabler(actif: jaiReagi, onPresse: onReagir),
-        _ActionTexte(
+        TablBoutonReaction(actif: jaiReagi, onPresse: onReagir),
+        _ActionIcone(
           icone: Icons.mode_comment_outlined,
           libelle: 'Commenter',
           onPresse: onCommenter,
         ),
         const Spacer(),
         if (onEnregistrer != null)
-          _ActionTexte(
+          _ActionIcone(
             icone: enregistre
                 ? Icons.bookmark_rounded
                 : Icons.bookmark_border_rounded,
@@ -530,39 +532,8 @@ class TablActionsPublication extends StatelessWidget {
   }
 }
 
-/// Bouton "J'aime" : reprend l'animation cloche + cœur déjà en place
-/// (identité de marque), avec le libellé dynamique du prototype
-/// ("J'aime" / "Aimé").
-class _ActionTabler extends StatelessWidget {
-  const _ActionTabler({required this.actif, required this.onPresse});
-
-  final bool actif;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: TablTokens.espaceS),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TablBoutonReaction(actif: actif, onPresse: onPresse),
-          Text(
-            actif ? 'Aimé' : "J'aime",
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: actif ? FontWeight.w600 : FontWeight.w500,
-              color: actif ? TablTokens.primaire : TablTokens.texteDoux,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionTexte extends StatelessWidget {
-  const _ActionTexte({
+class _ActionIcone extends StatelessWidget {
+  const _ActionIcone({
     required this.icone,
     required this.libelle,
     required this.onPresse,
@@ -576,22 +547,13 @@ class _ActionTexte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final couleur = actif ? TablTokens.primaire : TablTokens.texteDoux;
-    return TextButton.icon(
+    return IconButton(
       onPressed: onPresse,
-      style: TextButton.styleFrom(
-        foregroundColor: couleur,
-        padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceXs),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      icon: Icon(icone, size: 19, color: couleur),
-      label: Text(
-        libelle,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: actif ? FontWeight.w600 : FontWeight.w500,
-        ),
+      tooltip: libelle,
+      icon: Icon(
+        icone,
+        size: 23,
+        color: actif ? TablTokens.primaire : TablTokens.texteDoux,
       ),
     );
   }

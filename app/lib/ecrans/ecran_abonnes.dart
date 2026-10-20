@@ -176,9 +176,8 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
     });
   }
 
-  ProfilPublic _avecStatut(ProfilPublic p, StatutAbonnement statut) {
-    return ProfilPublic(id: p.id, pseudo: p.pseudo, statut: statut);
-  }
+  ProfilPublic _avecStatut(ProfilPublic p, StatutAbonnement statut) =>
+      p.copierAvec(statut: statut);
 
   @override
   Widget build(BuildContext context) {
@@ -352,7 +351,11 @@ class _LigneDemande extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: _Nom(pseudo: demande.pseudo, onPresse: onOuvrir),
+            child: _Nom(
+              pseudo: demande.pseudo,
+              photoUrl: demande.photoUrl,
+              onPresse: onOuvrir,
+            ),
           ),
           TextButton(
             onPressed: enCours ? null : onRefuser,
@@ -399,7 +402,11 @@ class _LigneAbonne extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: _Nom(pseudo: profil.pseudo, onPresse: onOuvrir),
+            child: _Nom(
+              pseudo: profil.pseudo,
+              photoUrl: profil.photoUrl,
+              onPresse: onOuvrir,
+            ),
           ),
           TextButton(
             onPressed: enCours ? null : onRetirer,
@@ -446,7 +453,11 @@ class _LigneProfil extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: _Nom(pseudo: profil.pseudo, onPresse: onOuvrir),
+            child: _Nom(
+              pseudo: profil.pseudo,
+              photoUrl: profil.photoUrl,
+              onPresse: onOuvrir,
+            ),
           ),
           _bouton(),
         ],
@@ -487,9 +498,10 @@ class _LigneProfil extends StatelessWidget {
 /// Le nom d'une personne dans une liste, touchable pour ouvrir son
 /// profil.
 class _Nom extends StatelessWidget {
-  const _Nom({required this.pseudo, required this.onPresse});
+  const _Nom({required this.pseudo, required this.onPresse, this.photoUrl});
 
   final String pseudo;
+  final String? photoUrl;
   final VoidCallback onPresse;
 
   @override
@@ -498,8 +510,22 @@ class _Nom extends StatelessWidget {
       onTap: onPresse,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
-        child: Text(pseudo, style: TablTokens.corps),
+        padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXs),
+        child: Row(
+          children: [
+            // Sa tête d'abord : on reconnaît quelqu'un avant de lire son
+            // pseudo.
+            TablAvatar(pseudo: pseudo, photoUrl: photoUrl, rayon: 22),
+            const SizedBox(width: TablTokens.espaceM),
+            Flexible(
+              child: Text(
+                pseudo,
+                overflow: TextOverflow.ellipsis,
+                style: TablTokens.corps.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -337,7 +337,7 @@ void main() {
     expect(find.textContaining('martin'), findsOneWidget);
     // Pas de chiffre brut affiché pour les commentaires (conforme au
     // prototype) : juste le libellé "Commenter".
-    expect(find.text('Commenter'), findsOneWidget);
+    expect(find.byTooltip('Commenter'), findsOneWidget);
     // Jamais un chiffre brut mis en avant pour les réactions : une phrase.
     expect(find.text('Louise, Arthur et 1 autre ont aimé'), findsOneWidget);
     expect(find.text('Votre feed est encore vide.'), findsNothing);
@@ -377,12 +377,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text("J'aime"), findsOneWidget);
+    expect(find.byTooltip("J'aime"), findsOneWidget);
     await tester.tap(find.byType(TablBoutonReaction));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 800));
 
-    expect(find.text('Aimé'), findsOneWidget);
+    expect(find.byTooltip('Aimé'), findsOneWidget);
     expect(find.text('Vous avez aimé'), findsOneWidget);
     expect(service.appelsReaction, [('1', true)]);
   });
@@ -456,7 +456,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Commenter'));
+    await tester.tap(find.byTooltip('Commenter'));
     await tester.pumpAndSettle();
 
     expect(find.byType(EcranCommentaires), findsOneWidget);
@@ -483,13 +483,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Enregistrer').first);
+      await tester.tap(find.byTooltip('Enregistrer').first);
       await tester.pumpAndSettle();
 
       expect(service.appelsEnvie, [('resto-1', true)]);
       // L'envie porte sur le lieu : l'autre post du même restaurant suit.
-      await tester.scrollUntilVisible(find.text('Enregistrée').last, 300);
-      expect(find.text('Enregistrer'), findsNothing);
+      await tester.scrollUntilVisible(find.byTooltip('Enregistrée').last, 300);
+      expect(find.byTooltip('Enregistrer'), findsNothing);
     },
   );
 

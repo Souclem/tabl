@@ -288,11 +288,7 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
                       saPhotoUrl: profil.photoUrl,
                       depuis: duo.depuis,
                       resume: duo.resume,
-                      onRevoir: () => setState(() {
-                        ongletBilan = false;
-                        anneeChoisie = null;
-                        momentsADeux = duo.souvenirs;
-                      }),
+                      onRevoir: () => revoirMomentsADeux(duo.souvenirs),
                     ),
                   ),
                 ),

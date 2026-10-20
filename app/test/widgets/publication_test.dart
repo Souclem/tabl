@@ -40,7 +40,7 @@ void main() {
 
     expect(find.text('martin'), findsOneWidget);
     expect(find.text('20 août'), findsOneWidget);
-    expect(find.text('Enregistrer'), findsOneWidget);
+    expect(find.byTooltip('Enregistrer'), findsOneWidget);
     expect(find.byTooltip('Options'), findsNothing);
   });
 
@@ -54,8 +54,8 @@ void main() {
 
     expect(find.text('martin'), findsNothing);
     expect(find.text('20 août'), findsOneWidget);
-    expect(find.text('Enregistrer'), findsNothing);
-    expect(find.text('Commenter'), findsOneWidget);
+    expect(find.byTooltip('Enregistrer'), findsNothing);
+    expect(find.byTooltip('Commenter'), findsOneWidget);
 
     await tester.ensureVisible(find.byTooltip('Options'));
     await tester.tap(find.byTooltip('Options'));
@@ -77,9 +77,9 @@ void main() {
     expect(find.text('martin'), findsNothing);
     expect(find.byTooltip('Options'), findsNothing);
 
-    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.ensureVisible(find.byTooltip('Enregistrer'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Enregistrer'));
+    await tester.tap(find.byTooltip('Enregistrer'));
     expect(enregistrements, 1);
   });
 }

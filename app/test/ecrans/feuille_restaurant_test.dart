@@ -113,7 +113,7 @@ void main() {
     // celui de Thomas reste compact.
     expect(find.byType(TablPublication), findsOneWidget);
     expect(find.byType(TablLigneAvis), findsOneWidget);
-    expect(find.text('Commenter'), findsOneWidget);
+    expect(find.byTooltip('Commenter'), findsOneWidget);
 
     await tester.tap(find.text('Réduire'));
     await tester.pumpAndSettle();

@@ -21,7 +21,10 @@ class _FauxSouvenirService implements SouvenirService {
   }
 
   @override
-  Future<void> basculerReaction(String souvenirId, {required bool reagir}) async {}
+  Future<void> basculerReaction(
+    String souvenirId, {
+    required bool reagir,
+  }) async {}
 
   final List<AudienceSouvenir> audiencesModifiees = [];
 
@@ -47,8 +50,17 @@ class _FauxAbonnementService implements AbonnementService {
   final List<bool> reglagesPrive = [];
 
   @override
-  Future<CompteursProfil> compteurs(String profilId) async =>
-      (moments: 2, abonnes: 12, abonnements: 7);
+  Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
+  abonnesEtAbonnements() async => (
+    abonnes: [
+      for (var i = 0; i < 12; i++)
+        ProfilPublic(id: 'a$i', pseudo: 'a$i', statut: StatutAbonnement.aucun),
+    ],
+    abonnements: [
+      for (var i = 0; i < 7; i++)
+        ProfilPublic(id: 's$i', pseudo: 's$i', statut: StatutAbonnement.abonne),
+    ],
+  );
 
   @override
   Future<int> nombreDemandesEnAttente() async => 0;
@@ -64,7 +76,11 @@ class _FauxAbonnementService implements AbonnementService {
 
   @override
   Future<List<ProfilPublic>> mesRelations() async => const [
-    ProfilPublic(id: 'sarah-id', pseudo: 'sarah', statut: StatutAbonnement.abonne),
+    ProfilPublic(
+      id: 'sarah-id',
+      pseudo: 'sarah',
+      statut: StatutAbonnement.abonne,
+    ),
   ];
 
   @override
@@ -142,6 +158,12 @@ Future<_FauxSouvenirService> _ouvrirProfil(
   return service;
 }
 
+/// Ouvre l'onglet Souvenirs (le Bilan est ouvert à l'arrivée).
+Future<void> _allerAuxSouvenirs(WidgetTester tester) async {
+  await tester.tap(find.text('Souvenirs'));
+  await tester.pumpAndSettle();
+}
+
 /// Une tuile du journal, par ce qu'en lit un lecteur d'écran.
 Finder _tuile(String restaurant) =>
     find.bySemanticsLabel(RegExp('^$restaurant, '));
@@ -155,8 +177,9 @@ void main() {
 
     expect(service.auteursDemandes, ['moi']);
     // Les chiffres montent jusqu'à leur valeur, sous leur libellé.
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('MOMENTS'), findsOneWidget);
+    // « 2 » aussi au centre de l'anneau du Bilan, ouvert à l'arrivée.
+    expect(find.text('2'), findsWidgets);
+    expect(find.text('MOMENTS'), findsWidgets);
     expect(find.text('12'), findsOneWidget);
     expect(find.text('ABONNÉS'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
@@ -173,6 +196,7 @@ void main() {
       _monSouvenir('1', 'Bibo'),
       _monSouvenir('2', 'Le Comptoir', date: DateTime(2026, 9, 12)),
     ]);
+    await _allerAuxSouvenirs(tester);
 
     expect(find.text('Octobre'), findsOneWidget);
     expect(find.text('Septembre'), findsOneWidget);
@@ -186,6 +210,7 @@ void main() {
   ) async {
     final semantique = tester.ensureSemantics();
     await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+    await _allerAuxSouvenirs(tester);
 
     await mockNetworkImagesFor(() async {
       await tester.tap(_tuile('Bibo'));
@@ -195,7 +220,7 @@ void main() {
     expect(find.text('Bibo'), findsOneWidget);
     expect(find.text('«\u00A0Très bon.\u00A0»'), findsOneWidget);
     // Son propre moment : pas d'« Enregistrer », mais le menu « ⋯ ».
-    expect(find.text('Enregistrer'), findsNothing);
+    expect(find.byTooltip('Enregistrer'), findsNothing);
     expect(find.byTooltip('Options'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Fermer'));
@@ -207,6 +232,7 @@ void main() {
   testWidgets('"⋯" → "Qui peut voir" modifie l\'audience', (tester) async {
     final semantique = tester.ensureSemantics();
     final service = await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+    await _allerAuxSouvenirs(tester);
 
     await mockNetworkImagesFor(() async {
       await tester.tap(_tuile('Bibo'));
@@ -235,20 +261,22 @@ void main() {
     semantique.dispose();
   });
 
-  testWidgets('Bilan : l\'année en chiffres', (tester) async {
+  testWidgets('Bilan : ouvert à l\'arrivée, depuis le début', (tester) async {
     await _ouvrirProfil(tester, [
       _monSouvenir('1', 'Bibo'),
-      _monSouvenir('2', 'Bibo', date: DateTime(2026, 9, 12)),
+      _monSouvenir('2', 'Bibo', date: DateTime(2025, 9, 12)),
     ]);
 
-    await tester.tap(find.text('Bilan'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Ton 2026'), findsOneWidget);
+    expect(find.text('Ton bilan'), findsOneWidget);
     expect(find.text('2 moments · 1 adresse · 1 ville'), findsOneWidget);
     expect(find.text('LÀ OÙ TU REVIENS'), findsOneWidget);
     expect(find.text('×2'), findsOneWidget);
-    expect(find.text('Bruxelles'), findsOneWidget);
+
+    // Une seule année à la fois.
+    await tester.tap(find.text('2026'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ton 2026'), findsOneWidget);
+    expect(find.text('1 moment · 1 adresse · 1 ville'), findsOneWidget);
   });
 
   testWidgets('Réglages : passer le profil en public demande confirmation', (
@@ -277,6 +305,6 @@ void main() {
     await _ouvrirProfil(tester, []);
 
     expect(find.text("Vous n'avez encore rien publié."), findsOneWidget);
-    expect(find.text('Journal'), findsNothing);
+    expect(find.text('Souvenirs'), findsNothing);
   });
 }

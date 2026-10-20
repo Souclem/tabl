@@ -44,6 +44,7 @@ export 'option_audience.dart';
 export 'publication.dart';
 export 'publication_depliable.dart';
 export 'selecteur_emotion.dart';
+export 'selecteur_personnes.dart';
 export 'separateur_texte.dart';
 export 'tables/bulle_message_organisation.dart';
 export 'tables/calendrier_jours.dart';

@@ -5,18 +5,27 @@ import 'package:app/widgets/widgets.dart';
 import 'actions_publications.dart';
 import 'page_moment.dart';
 
-/// Ce que partagent son profil et celui des autres sous l'en-tête :
-/// Journal (les moments de l'année, en grille par mois) et Bilan (l'année
-/// en chiffres), avec le choix de l'année. Un moment touché s'agrandit
-/// par-dessus ([ouvrirPageMoment]).
+/// Les rubriques d'un profil, dans l'ordre des onglets.
+enum RubriqueProfil {
+  bilan('Bilan'),
+  souvenirs('Souvenirs');
+
+  const RubriqueProfil(this.libelle);
+  final String libelle;
+}
+
+/// Ce que partagent son profil et celui des autres sous l'en-tête, en
+/// onglets comme sur Strava : le Bilan (en chiffres, depuis le début ou
+/// sur une année) puis les Souvenirs (tous les moments, en grille par
+/// mois). Un moment touché s'agrandit par-dessus ([ouvrirPageMoment]).
 mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
-  bool ongletBilan = false;
+  RubriqueProfil rubrique = RubriqueProfil.bilan;
 
-  /// `null` : la plus récente.
-  int? anneeChoisie;
+  /// La période du bilan ; `null` : depuis le début.
+  int? anneeBilan;
 
-  /// « Revoir vos moments » : le journal ne montre plus que les moments
-  /// partagés avec cette personne. `null` : tous.
+  /// « Revoir vos moments » : les souvenirs ne montrent plus que les
+  /// moments partagés avec cette personne. `null` : tous.
   List<SouvenirFeed>? momentsADeux;
 
   /// `null` sur son propre profil, son pseudo sur celui d'un autre (« Le
@@ -29,53 +38,46 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
   /// Le menu « ⋯ » d'un moment agrandi ; `null` : aucun.
   void Function(SouvenirFeed)? get optionsMoment => null;
 
+  /// « Revoir vos moments » : les Souvenirs, réduits aux moments à deux.
+  void revoirMomentsADeux(List<SouvenirFeed> ensemble) => setState(() {
+    rubrique = RubriqueProfil.souvenirs;
+    momentsADeux = ensemble;
+  });
+
   /// Les slivers sous l'en-tête, pour une liste déjà chargée et non vide.
   List<Widget> slivresJournalEtBilan(List<SouvenirFeed> tous) {
-    final journal = momentsADeux ?? tous;
-    final annees = anneesDuJournal(ongletBilan ? tous : journal);
-    if (annees.isEmpty) return const [];
-    final annee = annees.contains(anneeChoisie) ? anneeChoisie! : annees.first;
-    final source = ongletBilan ? tous : journal;
     return [
       SliverPersistentHeader(
         pinned: true,
         delegate: TablDelegueHauteurFixe(
-          hauteur: TablOngletsProfil.hauteur,
-          child: TablOngletsProfil(
-            bilan: ongletBilan,
-            onChoisirBilan: (bilan) => setState(() => ongletBilan = bilan),
-            annee: annee,
-            annees: [
-              for (final a in annees)
-                AnneeProposee(
-                  annee: a,
-                  compte: pluriel(
-                    source.where((s) => s.dateVisite.year == a).length,
-                    'moment',
-                  ),
-                ),
-            ],
-            onChoisirAnnee: (a) => setState(() => anneeChoisie = a),
+          hauteur: TablOngletsTexte.hauteur,
+          child: TablOngletsTexte(
+            libelles: [for (final r in RubriqueProfil.values) r.libelle],
+            index: rubrique.index,
+            onChoisir: (i) =>
+                setState(() => rubrique = RubriqueProfil.values[i]),
           ),
         ),
       ),
-      if (ongletBilan)
-        ..._slivresBilan(tous, annee)
-      else ...[
-        if (momentsADeux != null)
-          SliverToBoxAdapter(
-            child: _FiltreADeux(
-              onRetirer: () => setState(() => momentsADeux = null),
+      ...switch (rubrique) {
+        RubriqueProfil.bilan => _slivresBilan(tous),
+        RubriqueProfil.souvenirs => [
+          if (momentsADeux != null)
+            SliverToBoxAdapter(
+              child: _FiltreADeux(
+                onRetirer: () => setState(() => momentsADeux = null),
+              ),
             ),
-          ),
-        ..._slivresJournal(journal, annee),
-      ],
+          ..._slivresSouvenirs(momentsADeux ?? tous),
+        ],
+      },
     ];
   }
 
-  List<Widget> _slivresJournal(List<SouvenirFeed> souvenirs, int annee) {
+  List<Widget> _slivresSouvenirs(List<SouvenirFeed> souvenirs) {
     return [
-      for (final mois in journalDeLAnnee(souvenirs, annee))
+      const SliverToBoxAdapter(child: SizedBox(height: TablTokens.espaceS)),
+      for (final mois in journalParMois(souvenirs))
         SliverMainAxisGroup(
           key: ValueKey('${mois.annee}-${mois.mois}-${momentsADeux != null}'),
           slivers: [
@@ -93,25 +95,17 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(bottom: TablTokens.espaceM),
-                child: Column(
-                  children: [
-                    TablRecitMois(
-                      bulles: [for (final p in mois.personnes) bullePour(p)],
-                      recit: mois.recit,
-                    ),
-                    TablGrilleMoments(
-                      indexVedette: mois.indexVedette,
-                      tuiles: [
-                        for (final s in mois.souvenirs)
-                          TuileMoment(
-                            cleHero: _cleHero(s),
-                            photoUrl: s.photoUrl,
-                            libelle: libelleTuileMoment(s),
-                            marquant: estMarquant(s),
-                            onPresse: () => ouvrirMoment(s),
-                          ),
-                      ],
-                    ),
+                child: TablGrilleMoments(
+                  indexVedette: mois.indexVedette,
+                  tuiles: [
+                    for (final s in mois.souvenirs)
+                      TuileMoment(
+                        cleHero: _cleHero(s),
+                        photoUrl: s.photoUrl,
+                        libelle: libelleTuileMoment(s),
+                        marquant: estMarquant(s),
+                        onPresse: () => ouvrirMoment(s),
+                      ),
                   ],
                 ),
               ),
@@ -121,11 +115,13 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
     ];
   }
 
-  List<Widget> _slivresBilan(List<SouvenirFeed> tous, int annee) {
-    final bilan = bilanDeLAnnee(tous, annee, prenom: prenomProfil);
+  List<Widget> _slivresBilan(List<SouvenirFeed> tous) {
+    final annees = anneesDuJournal(tous);
+    final annee = annees.contains(anneeBilan) ? anneeBilan : null;
+    final bilan = bilanDuProfil(tous, annee: annee, prenom: prenomProfil);
     final titres = bilan.titres;
     var rang = 0;
-    // Chaque section arrive après la précédente ; une autre année les
+    // Chaque section arrive après la précédente ; une autre période les
     // fait toutes revenir.
     Widget section(Widget enfant) => Padding(
       padding: const EdgeInsets.only(bottom: 34),
@@ -141,12 +137,21 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(
           TablTokens.espaceL - 4,
-          TablTokens.espaceL,
+          TablTokens.espaceM,
           TablTokens.espaceL - 4,
           0,
         ),
         sliver: SliverList.list(
           children: [
+            if (annees.length > 1) ...[
+              TablChoixPeriode(
+                periodes: libellesPeriodes(annees),
+                index: annee == null ? 0 : annees.indexOf(annee) + 1,
+                onChoisir: (i) =>
+                    setState(() => anneeBilan = i == 0 ? null : annees[i - 1]),
+              ),
+              const SizedBox(height: TablTokens.espaceL),
+            ],
             section(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,14 +297,8 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
     ];
   }
 
-  /// La tête d'une personne présente ; son profil s'ouvre au tap (jamais
-  /// le sien : on y est déjà, ou on y revient par la barre du bas).
-  BullePersonne bullePour(PersonnePresente p) => BullePersonne(
-    pseudo: nomPersonne(p),
-    photoUrl: p.photoUrl,
-    onPresse: _ouvrirPersonne(p),
-  );
-
+  /// Ouvre le profil d'une personne (jamais le sien : on y est déjà, ou
+  /// on y revient par la barre du bas).
   VoidCallback? _ouvrirPersonne(PersonnePresente p) =>
       p.estMoi || abonnementService == null
       ? null

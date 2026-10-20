@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
-import '../bulles_personnes.dart';
 
 /// L'en-tête d'un mois du journal, fait pour rester épinglé pendant
 /// qu'on parcourt ses photos : « Octobre 2026 · 3 moments ».
@@ -61,44 +60,6 @@ class TablEnTeteMois extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Sous l'en-tête d'un mois : les têtes de ceux qui étaient là, et le
-/// récit en une ligne (« Arthur et Emma · Liège »).
-class TablRecitMois extends StatelessWidget {
-  const TablRecitMois({super.key, required this.bulles, required this.recit});
-
-  final List<BullePersonne> bulles;
-  final String recit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        TablTokens.espaceL - 4,
-        2,
-        TablTokens.espaceL - 4,
-        12,
-      ),
-      child: Row(
-        children: [
-          if (bulles.isNotEmpty) ...[
-            TablBullesPersonnes(bulles: bulles, taille: 34),
-            const SizedBox(width: 10),
-          ],
-          Expanded(
-            child: Text(
-              recit,
-              style: TablTokens.corps.copyWith(
-                fontSize: 14,
-                color: TablTokens.texte.withValues(alpha: 0.82),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

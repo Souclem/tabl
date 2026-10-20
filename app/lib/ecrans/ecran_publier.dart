@@ -855,17 +855,17 @@ class _EtapeFinaliser extends StatelessWidget {
                   style: TablTokens.legende,
                 );
               }
-              return Wrap(
-                spacing: TablTokens.espaceS,
-                runSpacing: TablTokens.espaceS,
-                children: [
+              return TablSelecteurPersonnes(
+                personnes: [
                   for (final ami in amis)
-                    TablPuceSelection(
-                      libelle: ami.pseudo,
-                      selectionnee: amisTaguesIds.contains(ami.id),
-                      onBascule: () => onBasculerAmi(ami.id),
+                    PersonneSelectionnable(
+                      id: ami.id,
+                      pseudo: ami.pseudo,
+                      photoUrl: ami.photoUrl,
                     ),
                 ],
+                selection: amisTaguesIds,
+                onBascule: onBasculerAmi,
               );
             },
           ),

@@ -3,16 +3,14 @@ import 'personne_presente.dart';
 import 'presentation_souvenir.dart';
 import 'souvenir_feed.dart';
 
-/// Un mois du journal d'un profil : ses moments en grille, et en une
-/// ligne avec qui et où ils ont eu lieu.
+/// Un mois des souvenirs d'un profil : ses moments, en grille. Avec qui
+/// on était se voit sur chaque moment, pas sur le mois.
 class MoisJournal {
   const MoisJournal({
     required this.annee,
     required this.mois,
     required this.titre,
     required this.compte,
-    required this.personnes,
-    required this.recit,
     required this.souvenirs,
     required this.indexVedette,
   });
@@ -25,13 +23,6 @@ class MoisJournal {
 
   /// "3 moments".
   final String compte;
-
-  /// Les personnes les plus présentes ce mois-ci (3 au plus), pour leurs
-  /// bulles.
-  final List<PersonnePresente> personnes;
-
-  /// "Arthur et Emma · Liège", "En solo · Milan".
-  final String recit;
 
   /// Du plus récent au plus ancien.
   final List<SouvenirFeed> souvenirs;
@@ -70,41 +61,35 @@ List<int> anneesDuJournal(List<SouvenirFeed> souvenirs) {
   return annees;
 }
 
-/// Les moments de [annee], regroupés par mois, du plus récent au plus
-/// ancien.
-List<MoisJournal> journalDeLAnnee(List<SouvenirFeed> souvenirs, int annee) {
-  final parMois = <int, List<SouvenirFeed>>{};
+/// Les périodes proposées pour un bilan : « Depuis le début », puis
+/// chaque année de [annees].
+List<String> libellesPeriodes(List<int> annees) => [
+  'Depuis le début',
+  for (final a in annees) '$a',
+];
+
+/// Tous les moments, regroupés par mois, du plus récent au plus ancien.
+List<MoisJournal> journalParMois(List<SouvenirFeed> souvenirs) {
+  final parMois = <(int, int), List<SouvenirFeed>>{};
   for (final s in parDateDecroissante(souvenirs)) {
-    if (s.dateVisite.year != annee) continue;
-    parMois.putIfAbsent(s.dateVisite.month, () => []).add(s);
+    parMois
+        .putIfAbsent((s.dateVisite.year, s.dateVisite.month), () => [])
+        .add(s);
   }
   return [
-    for (final MapEntry(key: mois, value: duMois) in parMois.entries)
-      _moisJournal(annee, mois, duMois),
+    for (final MapEntry(key: (annee, mois), value: duMois) in parMois.entries)
+      MoisJournal(
+        annee: annee,
+        mois: mois,
+        titre: _majuscule(nomDuMois(mois)),
+        compte: pluriel(duMois.length, 'moment'),
+        souvenirs: duMois,
+        indexVedette: indexVedette(duMois),
+      ),
   ];
 }
 
-MoisJournal _moisJournal(int annee, int mois, List<SouvenirFeed> duMois) {
-  final personnes = personnesLesPlusPresentes(duMois);
-  final villes = <String>{
-    for (final s in duMois)
-      if (s.ville.isNotEmpty) s.ville,
-  };
-  final avecQui = personnes.isEmpty
-      ? 'En solo'
-      : listeDeNoms(personnes.map(nomPersonne).toList());
-  final nomMois = nomDuMois(mois);
-  return MoisJournal(
-    annee: annee,
-    mois: mois,
-    titre: '${nomMois[0].toUpperCase()}${nomMois.substring(1)}',
-    compte: pluriel(duMois.length, 'moment'),
-    personnes: personnes.take(3).toList(),
-    recit: [avecQui, if (villes.isNotEmpty) villes.join(', ')].join(' · '),
-    souvenirs: duMois,
-    indexVedette: indexVedette(duMois),
-  );
-}
+String _majuscule(String mot) => '${mot[0].toUpperCase()}${mot.substring(1)}';
 
 /// Les personnes présentes dans [souvenirs], de la plus fréquente à la
 /// moins fréquente (à égalité : la plus récente d'abord).

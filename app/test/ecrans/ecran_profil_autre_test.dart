@@ -109,6 +109,12 @@ Future<void> _ouvrir(
   });
 }
 
+/// Ouvre l'onglet Souvenirs (le Bilan est ouvert à l'arrivée).
+Future<void> _allerAuxSouvenirs(WidgetTester tester) async {
+  await tester.tap(find.text('Souvenirs'));
+  await tester.pumpAndSettle();
+}
+
 /// Une tuile du journal, par ce qu'en lit un lecteur d'écran.
 Finder _tuile(String restaurant) =>
     find.bySemanticsLabel(RegExp('^$restaurant, '));
@@ -134,10 +140,14 @@ void main() {
     expect(souvenirs.auteursDemandes, ['emma-id']);
     expect(find.text('emma'), findsWidgets);
     // Les moments que je vois, ses abonnés et abonnements.
-    expect(find.text('2'), findsOneWidget);
+    // « 2 » aussi au centre de l'anneau du Bilan, ouvert à l'arrivée.
+    expect(find.text('2'), findsWidgets);
     expect(find.text('40'), findsOneWidget);
     expect(find.text('31'), findsOneWidget);
     expect(find.text('Suivre'), findsOneWidget);
+    expect(find.text('Le bilan d’emma'), findsOneWidget);
+
+    await _allerAuxSouvenirs(tester);
     expect(find.text('Septembre'), findsOneWidget);
 
     await mockNetworkImagesFor(() async {
@@ -147,7 +157,7 @@ void main() {
     expect(find.byType(TablVisionneuseMoment), findsOneWidget);
     // Pas de « ⋯ » sur le moment de quelqu'un d'autre, mais Enregistrer.
     expect(find.byTooltip('Options'), findsNothing);
-    expect(find.text('Enregistrer'), findsOneWidget);
+    expect(find.byTooltip('Enregistrer'), findsOneWidget);
     semantique.dispose();
   });
 
@@ -212,6 +222,7 @@ void main() {
       statut: StatutAbonnement.abonne,
     );
     await _ouvrir(tester, abonnements: abonnements, souvenirs: souvenirs);
+    await _allerAuxSouvenirs(tester);
 
     expect(_tuile('Bibo'), findsOneWidget);
 

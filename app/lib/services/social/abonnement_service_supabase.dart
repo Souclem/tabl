@@ -20,6 +20,14 @@ class AbonnementServiceSupabase implements AbonnementService {
 
   String get _monId => _client.auth.currentSession!.user.id;
 
+  /// La miniature de la photo d'une ligne de `profils` (colonne
+  /// `photo_url`), pour les listes de personnes.
+  String? _miniature(Map<String, dynamic> profil) => urlPhotoProfil(
+    _client,
+    profil['photo_url'] as String?,
+    miniature: true,
+  );
+
   @override
   Future<List<ProfilPublic>> rechercher(String requete) async {
     final v = requete.trim();
@@ -31,7 +39,7 @@ class AbonnementServiceSupabase implements AbonnementService {
     final resultats = await Future.wait([
       _client
           .from('profils')
-          .select('id, pseudo')
+          .select('id, pseudo, photo_url')
           .ilike('pseudo', '%$v%')
           .neq('id', _monId)
           .limit(20),
@@ -68,6 +76,7 @@ class AbonnementServiceSupabase implements AbonnementService {
             id: p['id'] as String,
             pseudo: p['pseudo'] as String,
             statut: statutParId[p['id']] ?? StatutAbonnement.aucun,
+            photoUrl: _miniature(p),
           ),
         )
         .toList();
@@ -160,7 +169,7 @@ class AbonnementServiceSupabase implements AbonnementService {
 
     final profils = await _client
         .from('profils')
-        .select('id, pseudo')
+        .select('id, pseudo, photo_url')
         .inFilter('id', ids);
 
     return profils
@@ -168,6 +177,7 @@ class AbonnementServiceSupabase implements AbonnementService {
           (p) => DemandeAbonnement(
             suiveurId: p['id'] as String,
             pseudo: p['pseudo'] as String,
+            photoUrl: _miniature(p),
           ),
         )
         .toList();
@@ -205,35 +215,29 @@ class AbonnementServiceSupabase implements AbonnementService {
   Future<List<ProfilPublic>> mesRelations() async {
     final lignes = await _client
         .from('abonnements')
-        .select('suiveur_id, suivi_id, profils_suiveur:profils!suiveur_id(pseudo), '
-            'profils_suivi:profils!suivi_id(pseudo)')
+        .select('suiveur_id, suivi_id, profils_suiveur:profils!suiveur_id(pseudo, photo_url), '
+            'profils_suivi:profils!suivi_id(pseudo, photo_url)')
         .eq('statut', 'accepte')
         .or('suiveur_id.eq.$_monId,suivi_id.eq.$_monId');
 
-    final amis = <String, String>{};
+    final amis = <String, ProfilPublic>{};
     for (final l in lignes) {
       final suiveurId = l['suiveur_id'] as String;
       final suiviId = l['suivi_id'] as String;
-      if (suiveurId == _monId) {
-        final profil = l['profils_suivi'] as Map<String, dynamic>?;
-        final pseudo = profil?['pseudo'] as String?;
-        if (pseudo != null) amis[suiviId] = pseudo;
-      } else {
-        final profil = l['profils_suiveur'] as Map<String, dynamic>?;
-        final pseudo = profil?['pseudo'] as String?;
-        if (pseudo != null) amis[suiveurId] = pseudo;
-      }
+      final (id, profil) = suiveurId == _monId
+          ? (suiviId, l['profils_suivi'] as Map<String, dynamic>?)
+          : (suiveurId, l['profils_suiveur'] as Map<String, dynamic>?);
+      final pseudo = profil?['pseudo'] as String?;
+      if (pseudo == null) continue;
+      amis[id] = ProfilPublic(
+        id: id,
+        pseudo: pseudo,
+        statut: StatutAbonnement.abonne,
+        photoUrl: _miniature(profil!),
+      );
     }
 
-    return amis.entries
-        .map(
-          (e) => ProfilPublic(
-            id: e.key,
-            pseudo: e.value,
-            statut: StatutAbonnement.abonne,
-          ),
-        )
-        .toList();
+    return amis.values.toList();
   }
 
   @override
@@ -265,20 +269,19 @@ class AbonnementServiceSupabase implements AbonnementService {
     if (ids.isEmpty) return (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
     final profils = await _client
         .from('profils')
-        .select('id, pseudo')
+        .select('id, pseudo, photo_url')
         .inFilter('id', ids);
-    final pseudos = {
-      for (final p in profils) p['id'] as String: p['pseudo'] as String,
-    };
+    final parId = {for (final p in profils) p['id'] as String: p};
 
     List<ProfilPublic> liste(List<String> ids) {
       final resultat = [
         for (final id in ids)
-          if (pseudos[id] != null)
+          if (parId[id] case final p?)
             ProfilPublic(
               id: id,
-              pseudo: pseudos[id]!,
+              pseudo: p['pseudo'] as String,
               statut: monStatutVers[id] ?? StatutAbonnement.aucun,
+              photoUrl: _miniature(p),
             ),
       ];
       resultat.sort(
