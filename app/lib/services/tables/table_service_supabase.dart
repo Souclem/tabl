@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/registre_restaurants.dart';
 import '../souvenirs/emotion.dart';
+import '../stockage/liens_signes.dart';
 import 'candidat_date_proposition.dart';
 import 'confirmation_proposition.dart';
 import 'decouverte_table.dart';
@@ -111,7 +112,7 @@ class TableServiceSupabase implements TableService {
         if (l['couverture_photo_url'] != null) l['couverture_photo_url'] as String,
       for (final chemins in photosChemins) ...chemins,
     }.toList();
-    final urlParChemin = await _resoudreUrlsPhotos(tousChemins);
+    final urlParChemin = await liensSignes(_client, 'souvenirs', tousChemins);
 
     final resultats = tablesRows.map((l) {
       final id = l['id'] as String;
@@ -252,7 +253,7 @@ class TableServiceSupabase implements TableService {
 
     final cheminsRecents = await _cheminsPhotosRecents(tableId, limite: 6);
     final couvertureChemin = ligne['couverture_photo_url'] as String?;
-    final urlParChemin = await _resoudreUrlsPhotos([
+    final urlParChemin = await liensSignes(_client, 'souvenirs', [
       ?couvertureChemin,
       ...cheminsRecents,
     ]);
@@ -355,7 +356,7 @@ class TableServiceSupabase implements TableService {
         .map((l) => (l['souvenirs'] as Map<String, dynamic>)['photo_url'] as String?)
         .whereType<String>()
         .toList();
-    final urlParChemin = await _resoudreUrlsPhotos(chemins);
+    final urlParChemin = await liensSignes(_client, 'souvenirs', chemins);
 
     final experiences = lignes.map((l) {
       final s = l['souvenirs'] as Map<String, dynamic>;
@@ -974,21 +975,5 @@ class TableServiceSupabase implements TableService {
         etat == 'polling' ||
         etat == 'date_selection' ||
         etat == 'confirmed';
-  }
-
-  Future<Map<String, String>> _resoudreUrlsPhotos(List<String> chemins) async {
-    if (chemins.isEmpty) return {};
-    final uniques = chemins.toSet().toList();
-    final resultats = await _client.storage
-        .from('souvenirs')
-        .createSignedUrlsResult(uniques, 3600);
-
-    final urlParChemin = <String, String>{};
-    for (final resultat in resultats) {
-      if (resultat is SignedUrlSuccess) {
-        urlParChemin[resultat.path] = resultat.signedUrl;
-      }
-    }
-    return urlParChemin;
   }
 }

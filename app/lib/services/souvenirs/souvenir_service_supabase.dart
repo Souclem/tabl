@@ -8,6 +8,7 @@ import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import '../social/photo_profil.dart';
+import '../stockage/liens_signes.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
 import 'personne_presente.dart';
@@ -305,7 +306,9 @@ class SouvenirServiceSupabase implements SouvenirService {
       presents,
       envies,
     ) = await (
-      _resoudreUrlsPhotos(
+      liensSignes(
+        _client,
+        'souvenirs',
         lignes
             .map((l) => l['photo_url'] as String?)
             .whereType<String>()
@@ -517,24 +520,6 @@ class SouvenirServiceSupabase implements SouvenirService {
           );
     }
     return parSouvenir;
-  }
-
-  /// Résout des chemins de bucket en URLs signées (valables 1h) — le
-  /// bucket est privé, une URL directe ne fonctionnerait pas.
-  Future<Map<String, String>> _resoudreUrlsPhotos(List<String> chemins) async {
-    if (chemins.isEmpty) return {};
-
-    final resultats = await _client.storage
-        .from('souvenirs')
-        .createSignedUrlsResult(chemins, 3600);
-
-    final urlParChemin = <String, String>{};
-    for (final resultat in resultats) {
-      if (resultat is SignedUrlSuccess) {
-        urlParChemin[resultat.path] = resultat.signedUrl;
-      }
-    }
-    return urlParChemin;
   }
 
   /// Dépose une photo dans le bucket, sous son propre dossier

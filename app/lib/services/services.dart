@@ -47,6 +47,7 @@ export 'souvenirs/souvenir_feed.dart';
 export 'souvenirs/souvenir_service.dart';
 export 'souvenirs/souvenir_service_supabase.dart';
 export 'souvenirs/validation_souvenir.dart';
+export 'stockage/liens_signes.dart';
 export 'tabl_backend.dart';
 export 'tables/candidat_date_proposition.dart';
 export 'tables/confirmation_proposition.dart';

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../stockage/liens_signes.dart';
 import 'instant_affichable.dart';
 import 'instant_service.dart';
 import 'instants_config.dart';
@@ -69,7 +70,7 @@ class InstantServiceSupabase implements InstantService {
         .order('cree_le');
 
     final chemins = lignes.map((l) => l['media_url'] as String).toList();
-    final urlParChemin = await _resoudreUrls(chemins);
+    final urlParChemin = await liensSignes(_client, 'instants', chemins);
 
     return lignes.map((l) {
       final chemin = l['media_url'] as String;
@@ -188,22 +189,6 @@ class InstantServiceSupabase implements InstantService {
           ),
       plusRecentActifLe: plusRecent,
     );
-  }
-
-  Future<Map<String, String>> _resoudreUrls(List<String> chemins) async {
-    if (chemins.isEmpty) return {};
-
-    final resultats = await _client.storage
-        .from('instants')
-        .createSignedUrlsResult(chemins, 3600);
-
-    final urlParChemin = <String, String>{};
-    for (final resultat in resultats) {
-      if (resultat is SignedUrlSuccess) {
-        urlParChemin[resultat.path] = resultat.signedUrl;
-      }
-    }
-    return urlParChemin;
   }
 
   Future<String> _deposerMedia(Uint8List media, TypeMediaInstant type) async {
