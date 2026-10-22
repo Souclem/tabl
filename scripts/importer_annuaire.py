@@ -8,6 +8,24 @@ l'annuaire (nouveaux lieux ajoutés, fiches mises à jour, lieux fermés
 retirés). Les restaurants déjà entrés dans Tabl (`restaurants`) ne sont
 jamais touchés.
 
+Seulement les lieux où l'on mange (décision du 2026-10-22) : restaurants,
+repas sur le pouce et cafés (FAMILLES). Pas les bars, boulangeries,
+glaciers, cantines, brasseries artisanales… Un bar qui sert aussi à
+manger est rangé à la fois Bar et Restaurant : il reste.
+
+Foursquare est rempli par ses utilisateurs : on y trouve aussi des
+soirées (« Bal des Bleus », « Garden HEC »), des lieux disparus depuis
+des années. Deux règles écartent ceux qui passeraient encore :
+  - les lieux signalés par Foursquare (fermé, n'existe pas, privé,
+    inapproprié, doublon) ;
+  - les fantômes : ni adresse, ni téléphone, ni site, ni réseau social,
+    et pas rafraîchis depuis FRAICHEUR_ANS ans. Les fiches maigres mais
+    récentes, elles, sont presque toutes de vrais lieux (friteries,
+    cafés de village) : gardées.
+Rien de propre à un pays : seulement des catégories et des champs que
+Foursquare remplit partout. Sur la Belgique (octobre 2026) : 129 000
+lieux → 56 000.
+
 Prérequis (une seule fois) :
   - un jeton Hugging Face avec accès au dataset, dans ~/.config/tabl/hf_token
   - python3 -m venv scripts/.venv && scripts/.venv/bin/pip install duckdb
@@ -32,6 +50,14 @@ from supabase_cli import executer_fichier as executer, tableau as sql_tableau, t
 
 DATASET = "foursquare/fsq-os-places"
 TAILLE_LOT = 4000
+FRAICHEUR_ANS = 3
+# Familles de « Dining and Drinking » gardées (2e niveau des catégories
+# Foursquare, ex. "Dining and Drinking > Restaurant > Pizzeria").
+FAMILLES = [
+    "Restaurant", "Creperie", "Bagel Shop",
+    "Breakfast Spot", "Snack Place", "Food Truck", "Food Court", "Food Stand",
+    "Cafe, Coffee, and Tea House",
+]
 
 
 def derniere_release(jeton: str) -> str:
@@ -69,9 +95,19 @@ def main() -> None:
       WHERE country IN ({liste_pays})
         AND date_closed IS NULL
         AND name IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL
-        AND list_has_any(list_transform(fsq_category_labels,
-                                        x -> split_part(x, ' > ', 1)),
-                         ['Dining and Drinking'])
+        AND list_has_any(
+              list_transform(
+                list_filter(fsq_category_labels,
+                            x -> starts_with(x, 'Dining and Drinking > ')),
+                x -> split_part(x, ' > ', 2)),
+              [{",".join(sql_texte(f) for f in FAMILLES)}])
+        AND (unresolved_flags IS NULL OR len(unresolved_flags) = 0)
+        AND (nullif(trim(address), '') IS NOT NULL
+             OR tel IS NOT NULL OR website IS NOT NULL OR email IS NOT NULL
+             OR facebook_id IS NOT NULL OR instagram IS NOT NULL
+             OR twitter IS NOT NULL
+             OR try_cast(date_refreshed AS DATE)
+                  >= current_date - INTERVAL {FRAICHEUR_ANS} YEAR)
     """).fetchall()
     print(f"{len(lignes)} lieux ouverts à importer")
 
