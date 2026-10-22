@@ -22,12 +22,14 @@ LieuCarte _lieu({
   visiteParMoi: moi,
   estEnvie: envie,
   amiPseudo: ami,
-  amiPhotoUrl: ami == null ? null : 'https://photo/$ami.jpg',
 );
 
 void main() {
   test('résumé des visites : des noms, jamais un chiffre seul', () {
-    expect(_lieu(amis: 1, visites: 1, ami: 'Emma').resumeVisites, 'Emma y est allé');
+    expect(
+      _lieu(amis: 1, visites: 1, ami: 'Emma').resumeVisites,
+      'Emma y est allé',
+    );
     expect(
       _lieu(amis: 3, visites: 5, ami: 'Emma').resumeVisites,
       'Emma et 2 autres y sont allés',
@@ -78,22 +80,27 @@ void main() {
     expect(copie.duReseau, isTrue);
   });
 
-  test('GeoJSON : longitude puis latitude, et ce qu\'il faut pour le marqueur', () {
+  test(
+    'GeoJSON : longitude puis latitude, et ce qu\'il faut pour le marqueur',
+    () {
+      final json =
+          jsonDecode(geojsonLieux([_lieu(amis: 3, visites: 4, ami: 'Emma')]))
+              as Map<String, dynamic>;
+      final point = (json['features'] as List).single as Map<String, dynamic>;
+      expect(point['geometry'], {
+        'type': 'Point',
+        'coordinates': [5.5802, 50.6471],
+      });
+      // Le chiffre de la petite bulle : les amis qui y sont allés.
+      expect(point['properties'], {'cle': 'r1', 'amis': 3});
+    },
+  );
+
+  test('GeoJSON : le lieu dont la feuille est ouverte est marqué', () {
     final json =
-        jsonDecode(geojsonLieux([_lieu(amis: 1, visites: 1, ami: 'Emma')]))
+        jsonDecode(geojsonLieux([_lieu(amis: 1)], cleChoisie: 'r1'))
             as Map<String, dynamic>;
     final point = (json['features'] as List).single as Map<String, dynamic>;
-    expect(point['geometry'], {
-      'type': 'Point',
-      'coordinates': [5.5802, 50.6471],
-    });
-    expect(point['properties'], {
-      'cle': 'r1',
-      'visites': 1,
-      'envie': false,
-      'reseau': true,
-      'photo': 'https://photo/Emma.jpg',
-      'autres': 0,
-    });
+    expect((point['properties'] as Map)['choisi'], isTrue);
   });
 }

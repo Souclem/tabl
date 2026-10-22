@@ -1,5 +1,3 @@
-import 'lieu_carte.dart';
-
 /// Les familles de cuisine proposées dans le filtre "Cuisine" : les
 /// catégories Foursquare sont trop nombreuses (des centaines) pour être
 /// proposées telles quelles.
@@ -82,10 +80,7 @@ const Map<String, Set<String>> famillesCuisine = {
   },
 };
 
-/// Les filtres de la carte, tous combinés (ET). Les filtres "réseau"
-/// (une personne, une Table, coups de cœur, là où on revient, midi/soir)
-/// portent sur les visites de mon réseau : ils masquent d'office les
-/// lieux de l'annuaire, où personne n'est allé.
+/// Les filtres de la carte, tous combinés (ET), appliqués par la base.
 class FiltresCarte {
   const FiltresCarte({
     this.personneId,
@@ -124,17 +119,6 @@ class FiltresCarte {
   /// `'midi'` ou `'soir'`.
   final String? moment;
 
-  bool get _filtreVisites =>
-      personneId != null ||
-      tableId != null ||
-      coupsDeCoeur ||
-      laOuOnRevient ||
-      moment != null;
-
-  /// Les points de l'annuaire restent visibles : aucun filtre ne les
-  /// exclut par nature.
-  bool get annuaireVisible => !_filtreVisites && !mesEnvies;
-
   int get nombreActifs => [
     personneId != null,
     tableId != null,
@@ -151,16 +135,6 @@ class FiltresCarte {
   List<String>? get categories => familles.isEmpty
       ? null
       : [for (final f in familles) ...?famillesCuisine[f]];
-
-  /// Un lieu de l'annuaire passe-t-il les filtres ? (Les lieux de mon
-  /// réseau arrivent déjà filtrés par la base.) Personne de mon réseau
-  /// n'y est allé : seuls la cuisine et l'absence de filtre "réseau"
-  /// comptent.
-  bool gardeAnnuaire(LieuCarte lieu) {
-    if (!annuaireVisible) return false;
-    final choisies = categories;
-    return choisies == null || lieu.categories.any(choisies.contains);
-  }
 
   FiltresCarte copierAvec({
     String? Function()? personneId,

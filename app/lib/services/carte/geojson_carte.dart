@@ -18,16 +18,10 @@ String geojsonLieux(Iterable<LieuCarte> lieux, {String? cleChoisie}) {
           },
           'properties': {
             'cle': lieu.cle,
-            'visites': lieu.visites,
-            'envie': lieu.estEnvie,
-            // Visité par mon réseau ou en envie : marqueur plein ; sinon
-            // petit point (un restaurant de l'annuaire).
-            'reseau': lieu.duReseau,
+            // Le chiffre de la petite bulle : les amis qui y sont allés.
+            'amis': lieu.amis,
             // Le lieu dont la feuille est ouverte : marqueur agrandi.
             if (lieu.cle == cleChoisie) 'choisi': true,
-            // Bulle photo de l'ami en avant, avec « +N » autres amis.
-            'photo': ?lieu.amiEnAvant?.photoUrl,
-            'autres': ?lieu.amiEnAvant?.autres,
           },
         },
     ],

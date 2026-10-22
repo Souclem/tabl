@@ -1,8 +1,7 @@
 import '../restaurants/categories_lieu.dart';
 
-/// Un lieu affichable sur la carte, déjà résumé par la base : soit entré
-/// dans Tabl et visité par mon réseau (ou mis en envie), soit seulement
-/// présent dans l'annuaire. Les chiffres tiennent déjà compte des
+/// Un lieu de la carte, déjà résumé par la base : un restaurant où au
+/// moins un de mes amis est allé. Les chiffres tiennent déjà compte des
 /// filtres de la recherche qui l'a renvoyé.
 class LieuCarte {
   const LieuCarte({
@@ -20,7 +19,6 @@ class LieuCarte {
     this.visiteParMoi = false,
     this.estEnvie = false,
     this.amiPseudo,
-    this.amiPhotoUrl,
   });
 
   final String nom;
@@ -49,7 +47,6 @@ class LieuCarte {
 
   /// L'ami mis en avant (celui qui y est allé le plus souvent).
   final String? amiPseudo;
-  final String? amiPhotoUrl;
 
   /// Identifiant stable sur la carte, quelle que soit l'origine du lieu.
   String get cle => restaurantId ?? 'fsq:$fsqPlaceId';
@@ -58,12 +55,12 @@ class LieuCarte {
   /// points de l'annuaire.
   bool get duReseau => visites > 0 || estEnvie;
 
-  /// L'ami mis en avant sur le marqueur (sa photo), et le nombre d'autres
-  /// amis qui y sont allés (le « +2 »). `null` si aucun ami n'y est allé.
-  ({String pseudo, String? photoUrl, int autres})? get amiEnAvant {
+  /// L'ami mis en avant, et le nombre d'autres amis qui y sont allés.
+  /// `null` si aucun ami n'y est allé.
+  ({String pseudo, int autres})? get amiEnAvant {
     final pseudo = amiPseudo;
     if (pseudo == null || amis == 0) return null;
-    return (pseudo: pseudo, photoUrl: amiPhotoUrl, autres: amis - 1);
+    return (pseudo: pseudo, autres: amis - 1);
   }
 
   /// "Italien · Rue du Pont 16, Liège".
@@ -109,7 +106,6 @@ class LieuCarte {
       visiteParMoi: visiteParMoi,
       estEnvie: estEnvie ?? this.estEnvie,
       amiPseudo: amiPseudo,
-      amiPhotoUrl: amiPhotoUrl,
     );
   }
 }
@@ -122,6 +118,9 @@ class ZoneCarte {
     required this.nord,
     required this.est,
   });
+
+  /// Toute la Terre.
+  static const monde = ZoneCarte(sud: -90, ouest: -180, nord: 90, est: 180);
 
   final double sud;
   final double ouest;

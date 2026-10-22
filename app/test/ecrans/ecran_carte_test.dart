@@ -6,40 +6,39 @@ import 'package:app/widgets/widgets.dart';
 import 'package:app/ecrans/ecran_carte.dart';
 
 /// Faux service : applique quelques filtres comme le ferait la base, et
-/// garde les filtres reçus pour vérifier que l'écran recharge.
+/// garde les recherches reçues pour vérifier que l'écran recharge.
 class _FauxCarteService implements CarteService {
   _FauxCarteService(this.lieux);
 
   final List<LieuCarte> lieux;
   final List<FiltresCarte> recherches = [];
+  final List<ZoneCarte> zones = [];
 
   @override
   Future<List<LieuCarte>> lieuxReseau(
     ZoneCarte zone,
     FiltresCarte filtres, {
-    int limite = 400,
+    int limite = nombreMaxLieuxCarte,
   }) async {
     recherches.add(filtres);
+    zones.add(zone);
     return [
       for (final l in lieux)
-        if ((!filtres.coupsDeCoeur || l.coupsDeCoeur > 0) &&
+        if (l.amis > 0 &&
+            (!filtres.coupsDeCoeur || l.coupsDeCoeur > 0) &&
             (!filtres.mesEnvies || l.estEnvie))
           l,
     ];
   }
 
   @override
-  Future<List<LieuCarte>> lieuxAnnuaire(ZoneCarte zone, {int limite = 600}) async =>
-      [];
-
-  @override
-  Future<Set<String>> mesLieuxVisites() async => {};
-
-  @override
   Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;
 
   @override
-  Future<void> basculerEnvie(String restaurantId, {required bool envie}) async {}
+  Future<void> basculerEnvie(
+    String restaurantId, {
+    required bool envie,
+  }) async {}
 }
 
 class _FauxAbonnementService implements AbonnementService {
@@ -56,20 +55,27 @@ class _FauxAbonnementService implements AbonnementService {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
-LieuCarte _lieu(String nom, {bool coupDeCoeur = false, bool envie = false}) =>
-    LieuCarte(
-      restaurantId: nom,
-      nom: nom,
-      ville: 'Liège',
-      latitude: 50.64,
-      longitude: 5.57,
-      categories: const ['Brasserie'],
-      estEnvie: envie,
-      amis: envie ? 0 : 1,
-      visites: envie ? 0 : 1,
-      coupsDeCoeur: coupDeCoeur ? 1 : 0,
-      amiPseudo: envie ? null : 'Emma',
-    );
+/// Un restaurant où Emma est allée (à Liège, sauf [latitude] et
+/// [longitude] données).
+LieuCarte _lieu(
+  String nom, {
+  bool coupDeCoeur = false,
+  bool envie = false,
+  double latitude = 50.64,
+  double longitude = 5.57,
+}) => LieuCarte(
+  restaurantId: nom,
+  nom: nom,
+  ville: 'Liège',
+  latitude: latitude,
+  longitude: longitude,
+  categories: const ['Brasserie'],
+  estEnvie: envie,
+  amis: 1,
+  visites: 1,
+  coupsDeCoeur: coupDeCoeur ? 1 : 0,
+  amiPseudo: 'Emma',
+);
 
 Future<_FauxCarteService> _ouvrir(
   WidgetTester tester,
@@ -124,7 +130,7 @@ void main() {
     expect(find.text('Le Campus'), findsOneWidget);
     expect(find.text('Bibo'), findsOneWidget);
     expect(find.text('Como en Casa'), findsOneWidget);
-    expect(find.text('Emma y est allé'), findsNWidgets(2));
+    expect(find.text('Emma y est allé'), findsNWidgets(3));
 
     await _toucher(tester, 'Coups de cœur 😍');
     expect(find.text('Le Campus'), findsOneWidget);
@@ -139,8 +145,25 @@ void main() {
     expect(find.text('Le Campus'), findsNothing);
   });
 
-  testWidgets('filtre "une personne" : choix dans une feuille', (tester) async {
+  testWidgets('tout est chargé d\'un coup ; la liste suit la zone visible', (
+    tester,
+  ) async {
+    final service = await _ouvrir(tester, [
+      _lieu('Bibo'),
+      _lieu('Le Comptoir Paris', latitude: 48.86, longitude: 2.35),
+    ]);
 
+    // Le monde entier : les bulles de la carte comptent juste partout.
+    expect(service.zones.single, same(ZoneCarte.monde));
+
+    // La liste s'en tient à la zone visible (la Belgique au départ).
+    await tester.tap(find.text('Liste'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bibo'), findsOneWidget);
+    expect(find.text('Le Comptoir Paris'), findsNothing);
+  });
+
+  testWidgets('filtre "une personne" : choix dans une feuille', (tester) async {
     final service = await _ouvrir(tester, [_lieu('Bibo')]);
     await tester.tap(find.text('Une personne'));
     await tester.pumpAndSettle();

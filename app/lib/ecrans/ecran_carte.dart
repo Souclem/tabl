@@ -7,10 +7,9 @@ import 'package:app/widgets/widgets.dart';
 import 'feuille_restaurant.dart';
 
 /// Onglet Carte. En haut : le titre, la bascule Carte / Liste et la
-/// rangée de filtres. En bas : la carte (lieux de mon réseau en doré,
-/// annuaire en points discrets de près) ou la liste des lieux de mon
-/// réseau. Un tap ouvre un aperçu ; la fiche complète du restaurant
-/// viendra ensuite.
+/// rangée de filtres. En bas : la carte des restaurants où mes amis sont
+/// allés (regroupés en bulles chiffrées de loin, un par un de près) ou
+/// leur liste pour la zone visible. Un tap ouvre la feuille du lieu.
 class EcranCarte extends StatefulWidget {
   const EcranCarte({
     super.key,
@@ -64,10 +63,6 @@ class _EcranCarteState extends State<EcranCarte> {
       ? TablBarreNavigation.hauteurOccupee(context)
       : MediaQuery.paddingOf(context).bottom;
 
-  /// À partir de ce zoom (une ville), l'annuaire complète la carte : plus
-  /// loin, les lieux du réseau suffisent à remplir les places disponibles.
-  static const _zoomAnnuaire = 12.0;
-
   final _controleur = ControleurCarte();
 
   /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
@@ -77,16 +72,14 @@ class _EcranCarteState extends State<EcranCarte> {
     nord: 51.6,
     est: 6.5,
   );
-  double _zoom = 6.5;
 
   bool _enListe = false;
   late FiltresCarte _filtres = widget.filtresInitiaux;
 
-  /// Lieux de mon réseau dans la zone visible, filtres appliqués par la
-  /// base (une ligne résumée par lieu).
+  /// Tous les restaurants où mes amis sont allés, filtres appliqués par
+  /// la base (une ligne résumée par lieu) : chargés d'un coup, pour que
+  /// les bulles chiffrées comptent juste à tous les zooms.
   List<LieuCarte> _reseau = const [];
-  List<LieuCarte> _annuaire = const [];
-  Set<String> _mesLieuxVisites = const {};
   List<ResumeTable> _tables = const [];
   List<ProfilPublic> _personnes = const [];
   LieuCarte? _selection;
@@ -110,29 +103,22 @@ class _EcranCarteState extends State<EcranCarte> {
     _charger();
     _chargerTables();
     _chargerPersonnes();
-    _chargerMesLieuxVisites();
     _localiser();
   }
 
-  /// Recharge la zone visible avec les filtres actuels : les lieux de mon
-  /// réseau, et l'annuaire de près.
+  /// Recharge les lieux avec les filtres actuels, pour le monde entier :
+  /// déplacer la carte ne demande rien de plus à la base.
   Future<void> _charger() async {
     final numero = ++_recherche;
-    final zone = _zone;
     final filtres = _filtres;
     setState(() => _chargement = true);
     try {
-      final resultats = await Future.wait([
-        widget.carteService.lieuxReseau(zone, filtres),
-        _zoom >= _zoomAnnuaire && filtres.annuaireVisible
-            ? widget.carteService.lieuxAnnuaire(zone)
-            : Future.value(const <LieuCarte>[]),
-      ]);
+      final lieux = await widget.carteService.lieuxReseau(
+        ZoneCarte.monde,
+        filtres,
+      );
       if (!mounted || numero != _recherche) return;
-      setState(() {
-        _reseau = resultats[0];
-        _annuaire = resultats[1];
-      });
+      setState(() => _reseau = lieux);
     } catch (e) {
       debugPrint('EcranCarte: chargement : $e');
       if (mounted && numero == _recherche) {
@@ -170,15 +156,6 @@ class _EcranCarteState extends State<EcranCarte> {
     }
   }
 
-  Future<void> _chargerMesLieuxVisites() async {
-    try {
-      final lieux = await widget.carteService.mesLieuxVisites();
-      if (mounted) setState(() => _mesLieuxVisites = lieux);
-    } catch (e) {
-      debugPrint('EcranCarte: mes lieux visités : $e');
-    }
-  }
-
   Future<void> _localiser() async {
     final position = await widget.positionService?.positionActuelle();
     if (!mounted || position == null) return;
@@ -186,7 +163,8 @@ class _EcranCarteState extends State<EcranCarte> {
     await _controleur.centrerSur(position.latitude, position.longitude);
   }
 
-  /// Appelée par la carte une fois immobile depuis un instant.
+  /// Appelée par la carte une fois immobile depuis un instant : la liste
+  /// montre les lieux de cette zone.
   void _zoneVisible(
     double sud,
     double ouest,
@@ -195,40 +173,6 @@ class _EcranCarteState extends State<EcranCarte> {
     double zoom,
   ) {
     _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
-    _zoom = zoom;
-    _charger();
-  }
-
-  /// L'annuaire sans les lieux déjà affichés comme lieux de mon réseau,
-  /// filtres appliqués (cuisine, jamais essayé).
-  List<LieuCarte> get _annuaireFiltre {
-    final dejaAffiches = {
-      for (final l in _reseau)
-        if (l.fsqPlaceId != null) l.fsqPlaceId,
-    };
-    return [
-      for (final l in _annuaire)
-        if (!dejaAffiches.contains(l.fsqPlaceId) &&
-            !(_filtres.jamaisEssaye &&
-                _mesLieuxVisites.contains(l.fsqPlaceId)) &&
-            _filtres.gardeAnnuaire(l))
-          l,
-    ];
-  }
-
-  /// Ce que dit la règle de pertinence pour la zone, plus le lieu dont la
-  /// feuille est ouverte, toujours visible même si la règle l'écartait.
-  List<LieuCarte> get _lieuxAffiches {
-    final affiches = lieuxAAfficher(
-      [..._reseau, ..._annuaireFiltre],
-      _zone,
-      zoom: _zoom,
-    );
-    final selection = _selection;
-    if (selection != null && !affiches.any((l) => l.cle == selection.cle)) {
-      affiches.add(selection);
-    }
-    return affiches;
   }
 
   double? _distance(LieuCarte lieu) {
@@ -242,11 +186,19 @@ class _EcranCarteState extends State<EcranCarte> {
     );
   }
 
-  /// La liste : les lieux de mon réseau de la zone visible, du plus
-  /// proche au plus loin si la position est connue, sinon les plus
-  /// pertinents d'abord (l'ordre de la base).
+  /// La liste : les lieux de la zone visible, du plus proche au plus loin
+  /// si la position est connue, sinon les plus pertinents d'abord
+  /// (l'ordre de la base).
   List<LieuCarte> get _lieuxListe {
-    final lieux = [..._reseau];
+    final zone = _zone;
+    final lieux = [
+      for (final l in _reseau)
+        if (l.latitude >= zone.sud &&
+            l.latitude <= zone.nord &&
+            l.longitude >= zone.ouest &&
+            l.longitude <= zone.est)
+          l,
+    ];
     if (_position != null) {
       lieux.sort((a, b) => _distance(a)!.compareTo(_distance(b)!));
     }
@@ -266,10 +218,7 @@ class _EcranCarteState extends State<EcranCarte> {
 
   void _tapLieu(String cle) {
     _fermetureEnAttente?.cancel();
-    final lieu = [
-      ..._reseau,
-      ..._annuaire,
-    ].where((l) => l.cle == cle).firstOrNull;
+    final lieu = _reseau.where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
     final autreLieu = _selection != null && _selection!.cle != cle;
     setState(() => _selection = lieu);
@@ -619,10 +568,10 @@ class _EcranCarteState extends State<EcranCarte> {
         Positioned.fill(
           child: widget.afficherCarte
               ? TablCarteMapbox(
-                  // Toujours la même règle : ce que disent les filtres, et
-                  // parmi ça les plus pertinents pour la zone visible.
+                  // Tous les lieux : la carte les regroupe elle-même
+                  // selon le zoom.
                   geojsonLieux: geojsonLieux(
-                    _lieuxAffiches,
+                    _reseau,
                     cleChoisie: _selection?.cle,
                   ),
                   // Belgique, avant de connaître la position.
@@ -679,8 +628,8 @@ class _EcranCarteState extends State<EcranCarte> {
         child: Text(
           _filtres.nombreActifs > 0
               ? 'Aucun lieu de votre réseau ne correspond à ces filtres.'
-              : 'Aucun lieu dans votre réseau pour l\'instant. Publiez un '
-                    'moment ou ajoutez des envies depuis la carte.',
+              : 'Aucun restaurant où vos amis sont allés ici pour '
+                    'l\'instant.',
           textAlign: TextAlign.center,
           style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
         ),

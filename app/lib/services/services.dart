@@ -12,7 +12,6 @@ export 'carte/carte_service.dart';
 export 'carte/carte_service_supabase.dart';
 export 'carte/filtres_carte.dart';
 export 'carte/geojson_carte.dart';
-export 'carte/pertinence_carte.dart';
 export 'carte/lieu_carte.dart';
 export 'instants/instant_affichable.dart';
 export 'instants/instant_service.dart';

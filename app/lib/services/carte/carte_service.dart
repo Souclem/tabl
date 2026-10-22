@@ -1,25 +1,21 @@
 import 'filtres_carte.dart';
 import 'lieu_carte.dart';
 
-/// Les données de la carte, toujours pour une zone précise : on ne
-/// charge jamais plus que ce qui peut s'afficher.
+/// Au plus autant de lieux sur la carte : tous les restaurants où mes
+/// amis sont allés, chargés d'un coup pour que les bulles chiffrées
+/// comptent juste à tous les zooms.
+const nombreMaxLieuxCarte = 5000;
+
+/// Les données de la carte.
 abstract interface class CarteService {
-  /// Les lieux de mon réseau (visités par moi ou les personnes que je
-  /// suis, ou en envie) dans [zone], [filtres] appliqués, une ligne
-  /// résumée par lieu, les plus pertinents d'abord.
+  /// Les restaurants où au moins un de mes amis est allé, dans [zone],
+  /// [filtres] appliqués, une ligne résumée par lieu, les plus
+  /// pertinents d'abord.
   Future<List<LieuCarte>> lieuxReseau(
     ZoneCarte zone,
     FiltresCarte filtres, {
-    int limite = 400,
+    int limite = nombreMaxLieuxCarte,
   });
-
-  /// Les lieux de l'annuaire dans [zone], pour les restaurants où
-  /// personne de mon réseau n'est allé.
-  Future<List<LieuCarte>> lieuxAnnuaire(ZoneCarte zone, {int limite = 600});
-
-  /// Identifiants Foursquare des restaurants où je suis allé moi-même :
-  /// le filtre "Jamais essayé" les écarte aussi des points de l'annuaire.
-  Future<Set<String>> mesLieuxVisites();
 
   /// L'identifiant `restaurants` d'un lieu, en l'y faisant entrer s'il
   /// n'est encore que dans l'annuaire (mettre en envie un lieu jamais
