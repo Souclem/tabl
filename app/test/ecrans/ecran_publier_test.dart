@@ -31,6 +31,8 @@ class _FauxImagePickerPlatform extends ImagePickerPlatform {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<Set<String>> empreintesImportees() => throw UnimplementedError();
+  @override
   Future<void> supprimer(String souvenirId) => throw UnimplementedError();
   @override
   Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>

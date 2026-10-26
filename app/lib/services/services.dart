@@ -39,6 +39,7 @@ export 'souvenirs/bilan_profil.dart';
 export 'souvenirs/commentaire.dart';
 export 'souvenirs/date_souvenir.dart';
 export 'souvenirs/emotion.dart';
+export 'souvenirs/import_souvenirs.dart';
 export 'souvenirs/filtre_reseau.dart';
 export 'souvenirs/journal_profil.dart';
 export 'souvenirs/metadonnees_photo.dart';

@@ -68,7 +68,7 @@ class _EcranProfilState extends State<EcranProfil>
   /// Le menu « Comment retrouver vos souvenirs ? » ; au retour d'un
   /// souvenir ajouté, ses souvenirs se rechargent et s'affichent.
   Future<void> _ajouterDesSouvenirs() async {
-    final ajoute = await Navigator.of(context).push<bool>(
+    final ajoutes = await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => EcranChoixSouvenir(
           souvenirService: widget.souvenirService,
@@ -85,10 +85,13 @@ class _EcranProfilState extends State<EcranProfil>
         ),
       ),
     );
-    if (ajoute != true || !mounted) return;
+    if ((ajoutes ?? 0) == 0 || !mounted) return;
     recharger();
     setState(() => rubrique = RubriqueProfil.souvenirs);
-    afficherMessage(context, 'Souvenir ajouté.');
+    afficherMessage(
+      context,
+      ajoutes == 1 ? 'Souvenir ajouté.' : '$ajoutes souvenirs ajoutés.',
+    );
   }
 
   /// Remplace la photo de l'utilisateur dès qu'il en a choisi une

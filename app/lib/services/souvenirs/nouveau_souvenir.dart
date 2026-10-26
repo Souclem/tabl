@@ -4,6 +4,7 @@ import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'date_souvenir.dart';
 import 'emotion.dart';
+import 'metadonnees_photo.dart';
 
 /// Au plus, par souvenir : la principale et 9 autres.
 const nombreMaxPhotosSouvenir = 10;
@@ -20,6 +21,7 @@ class NouveauSouvenir {
     this.legende,
     this.moment,
     this.audience = AudienceSouvenir.toutLeMonde,
+    this.empreintes = const [],
   }) : assert(photos.length >= 1 && photos.length <= nombreMaxPhotosSouvenir);
 
   final LieuRestaurant lieu;
@@ -33,4 +35,8 @@ class NouveauSouvenir {
   /// `'midi'` ou `'soir'`.
   final String? moment;
   final AudienceSouvenir audience;
+
+  /// Les empreintes de ses photos ([MetadonneesPhoto.empreinte]) : un
+  /// prochain import les reconnaîtra comme déjà rangées.
+  final List<String> empreintes;
 }

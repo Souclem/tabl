@@ -56,6 +56,10 @@ abstract interface class SouvenirService {
   /// retour que [publier] : les Tables dont l'association a échoué.
   Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir);
 
+  /// Les empreintes des photos déjà rangées dans mes souvenirs, pour
+  /// qu'un import les ignore.
+  Future<Set<String>> empreintesImportees();
+
   /// L'audience actuelle d'un souvenir déjà publié, et les amis tagués
   /// (pour l'avertissement "ne verra pas ce moment") — pour préremplir
   /// la feuille "Qui peut voir ?". Réservé à l'auteur (RLS).

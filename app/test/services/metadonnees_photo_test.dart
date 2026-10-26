@@ -36,6 +36,9 @@ void main() {
     expect(m.latitude, closeTo(50.64735, 1e-6));
     expect(m.longitude, closeTo(-5.58045, 1e-6));
     expect(m.aUnePosition, isTrue);
+    // La même photo, relue : la même empreinte.
+    expect(m.empreinte, hasLength(32));
+    expect((await lireMetadonnees(_photoExif)).empreinte, m.empreinte);
   });
 
   test('une image sans métadonnées n\'en a simplement pas', () async {

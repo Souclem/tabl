@@ -140,9 +140,9 @@ void _grandEcran(WidgetTester tester) {
 
 /// Ouvre [ecran] par-dessus un écran témoin, qui note ce qu'il renvoie
 /// en se fermant.
-Future<List<bool?>> _ouvrir(WidgetTester tester, Widget ecran) async {
+Future<List<Object?>> _ouvrir(WidgetTester tester, Widget ecran) async {
   _grandEcran(tester);
-  final retours = <bool?>[];
+  final retours = <Object?>[];
   await tester.pumpWidget(
     MaterialApp(
       theme: TablTheme.sombre(),
@@ -153,7 +153,7 @@ Future<List<bool?>> _ouvrir(WidgetTester tester, Widget ecran) async {
               retours.add(
                 await Navigator.of(
                   context,
-                ).push<bool>(MaterialPageRoute(builder: (_) => ecran)),
+                ).push<Object?>(MaterialPageRoute(builder: (_) => ecran)),
               );
             },
             child: const Text('ouvrir'),
@@ -167,7 +167,7 @@ Future<List<bool?>> _ouvrir(WidgetTester tester, Widget ecran) async {
   return retours;
 }
 
-Future<List<bool?>> _ouvrirMenu(
+Future<List<Object?>> _ouvrirMenu(
   WidgetTester tester,
   _FauxSouvenirService service, {
   List<Uint8List> photos = const [],
@@ -181,7 +181,7 @@ Future<List<bool?>> _ouvrirMenu(
   ),
 );
 
-Future<List<bool?>> _ouvrirEditeur(
+Future<List<Object?>> _ouvrirEditeur(
   WidgetTester tester,
   _FauxSouvenirService service, {
   List<PhotoChoisie> photos = const [],
@@ -207,14 +207,17 @@ Future<void> _ajouter(WidgetTester tester) async {
 
 void main() {
   group('le menu', () {
-    testWidgets('les photos d\'abord, l\'import intelligent bientôt', (
+    testWidgets('les photos d\'abord, ou plusieurs repas d\'un coup', (
       tester,
     ) async {
       final service = _FauxSouvenirService();
       await _ouvrirMenu(tester, service, photos: [_photoA]);
 
       expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
-      expect(find.text('Bientôt'), findsOneWidget);
+      expect(
+        find.text('Ajouter plusieurs de manière intelligente'),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('Choisir des photos'));
       await tester.pumpAndSettle();
@@ -226,6 +229,23 @@ void main() {
       expect(find.text('Quand était-ce ?'), findsOneWidget);
       expect(_boutonAjouter(tester).onPresse, isNull);
     });
+
+    testWidgets(
+      '« Ajouter plusieurs de manière intelligente » ouvre l\'import',
+      (tester) async {
+        await _ouvrirMenu(tester, _FauxSouvenirService());
+
+        await tester.tap(
+          find.text('Ajouter plusieurs de manière intelligente'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Trois temps, et rien sans votre accord.'),
+          findsOneWidget,
+        );
+      },
+    );
 
     testWidgets('sélecteur fermé sans rien choisir : on reste au menu', (
       tester,
@@ -275,7 +295,7 @@ void main() {
       expect(ajoute.date.mois, maintenant.month);
       expect(ajoute.date.jour, isNull);
       expect(ajoute.photos, [_photoA]);
-      expect(retours, [true]);
+      expect(retours, [1]);
       expect(find.text('Comment retrouver vos souvenirs ?'), findsNothing);
     });
   });

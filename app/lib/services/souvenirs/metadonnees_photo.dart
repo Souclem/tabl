@@ -1,11 +1,18 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:exif/exif.dart';
 
 /// Ce qu'une photo dit d'elle-même : quand et où elle a été prise. Rien
 /// d'autre n'est lu — jamais le contenu de l'image.
 class MetadonneesPhoto {
-  const MetadonneesPhoto({this.prisLe, this.latitude, this.longitude});
+  const MetadonneesPhoto({
+    this.prisLe,
+    this.latitude,
+    this.longitude,
+    this.empreinte,
+  });
 
   static const aucune = MetadonneesPhoto();
 
@@ -14,6 +21,12 @@ class MetadonneesPhoto {
   final DateTime? prisLe;
   final double? latitude;
   final double? longitude;
+
+  /// Reconnaît la même photo d'un import à l'autre (même si elle a été
+  /// réduite autrement) : tirée de ses métadonnées d'origine — l'instant
+  /// à la fraction de seconde, l'appareil, la taille, la position —,
+  /// jamais de l'image. `null` sans date de prise de vue.
+  final String? empreinte;
 
   bool get aUnePosition => latitude != null && longitude != null;
 }
@@ -43,8 +56,14 @@ Future<MetadonneesPhoto> lireMetadonnees(Uint8List octets) async {
       tags['EXIF DateTimeOriginal'] ??
       tags['EXIF DateTimeDigitized'] ??
       tags['Image DateTime'];
+  final prisLe = date == null ? null : dateExif(date.printable);
   return MetadonneesPhoto(
-    prisLe: date == null ? null : dateExif(date.printable),
+    prisLe: prisLe,
+    empreinte: prisLe == null
+        ? null
+        : empreintePhoto([
+            for (final cle in _clesEmpreinte) tags[cle]?.printable ?? '',
+          ]),
     latitude: _coordonnee(tags['GPS GPSLatitude'], tags['GPS GPSLatitudeRef']),
     longitude: _coordonnee(
       tags['GPS GPSLongitude'],
@@ -52,6 +71,22 @@ Future<MetadonneesPhoto> lireMetadonnees(Uint8List octets) async {
     ),
   );
 }
+
+/// Ce qui distingue une photo d'une autre prise au même instant.
+const _clesEmpreinte = [
+  'EXIF DateTimeOriginal',
+  'EXIF SubSecTimeOriginal',
+  'Image Make',
+  'Image Model',
+  'EXIF ExifImageWidth',
+  'EXIF ExifImageLength',
+  'GPS GPSLatitude',
+  'GPS GPSLongitude',
+];
+
+/// Une empreinte courte et stable de [valeurs].
+String empreintePhoto(List<String> valeurs) =>
+    sha256.convert(utf8.encode(valeurs.join('|'))).toString().substring(0, 32);
 
 double? _coordonnee(IfdTag? valeur, IfdTag? reference) {
   final valeurs = valeur?.values;

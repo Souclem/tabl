@@ -140,15 +140,37 @@ class SouvenirServiceSupabase implements SouvenirService {
         .single();
 
     final souvenirId = cree['id'] as String;
-    if (chemins.length > 1) {
-      await _client.from('souvenirs_photos').insert([
-        for (var rang = 1; rang < chemins.length; rang++)
-          {'souvenir_id': souvenirId, 'rang': rang, 'chemin': chemins[rang]},
-      ]);
-    }
+    final empreintes = souvenir.empreintes.toSet();
+    await (
+      chemins.length > 1
+          ? _client.from('souvenirs_photos').insert([
+              for (var rang = 1; rang < chemins.length; rang++)
+                {
+                  'souvenir_id': souvenirId,
+                  'rang': rang,
+                  'chemin': chemins[rang],
+                },
+            ])
+          : Future<void>.value(),
+      empreintes.isNotEmpty
+          ? _client.from('souvenirs_empreintes').insert([
+              for (final e in empreintes)
+                {'souvenir_id': souvenirId, 'empreinte': e},
+            ])
+          : Future<void>.value(),
+    ).wait;
 
     await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
     return _associerTables(souvenirId, cible.tableIds.toList());
+  }
+
+  @override
+  Future<Set<String>> empreintesImportees() async {
+    // La RLS ne laisse lire que celles de ses propres souvenirs.
+    final lignes = await _client
+        .from('souvenirs_empreintes')
+        .select('empreinte');
+    return {for (final l in lignes) l['empreinte'] as String};
   }
 
   @override

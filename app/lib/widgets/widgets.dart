@@ -49,6 +49,7 @@ export 'selecteur_emotion.dart';
 export 'selecteur_personnes.dart';
 export 'separateur_texte.dart';
 export 'souvenirs/apercu_photos.dart';
+export 'souvenirs/import_souvenirs.dart';
 export 'souvenirs/methode_souvenir.dart';
 export 'souvenirs/panneau_souvenir.dart';
 export 'souvenirs/roues_date.dart';
