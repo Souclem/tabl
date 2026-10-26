@@ -63,8 +63,12 @@ class TablChampTexte extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(libelle, style: TablTokens.sousTitre),
-        const SizedBox(height: TablTokens.espaceS),
+        // Sans libellé (le titre autour dit déjà ce qu'on y tape) : pas
+        // d'espace vide au-dessus du champ.
+        if (libelle.isNotEmpty) ...[
+          Text(libelle, style: TablTokens.sousTitre),
+          const SizedBox(height: TablTokens.espaceS),
+        ],
         TextField(
           controller: controleur,
           obscureText: masque,

@@ -207,6 +207,13 @@ class _FausseRechercheLieu implements RechercheLieuService {
     double? latitude,
     double? longitude,
   }) async => const [];
+
+  @override
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+  }) async => const [];
 }
 
 class _FaussePosition implements PositionService {

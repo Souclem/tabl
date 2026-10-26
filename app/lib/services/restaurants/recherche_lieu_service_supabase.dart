@@ -3,8 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'lieu_restaurant.dart';
 import 'recherche_lieu_service.dart';
 
-/// Recherche adossée à la fonction `rechercher_lieux` (migration
-/// `20261017000000_annuaire_restaurants.sql`).
+/// Recherche adossée aux fonctions `rechercher_lieux` (migration
+/// `20261017000000_annuaire_restaurants.sql`) et `lieux_proches`
+/// (`20261026010000_lieux_proches.sql`).
 class RechercheLieuServiceSupabase implements RechercheLieuService {
   RechercheLieuServiceSupabase(this._client);
 
@@ -25,6 +26,27 @@ class RechercheLieuServiceSupabase implements RechercheLieuService {
         'p_longitude': longitude,
       },
     );
+    return _lieux(lignes);
+  }
+
+  @override
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+  }) async {
+    final lignes = await _client.rpc<List<dynamic>>(
+      'lieux_proches',
+      params: {
+        'p_latitude': latitude,
+        'p_longitude': longitude,
+        'p_rayon_m': rayonM,
+      },
+    );
+    return _lieux(lignes);
+  }
+
+  List<LieuRestaurant> _lieux(List<dynamic> lignes) {
     return [
       for (final l in lignes.cast<Map<String, dynamic>>())
         LieuRestaurant(

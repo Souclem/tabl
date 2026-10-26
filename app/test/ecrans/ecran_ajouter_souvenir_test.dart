@@ -69,39 +69,78 @@ class _FauxAbonnementService implements AbonnementService {
 }
 
 class _FausseRechercheLieu implements RechercheLieuService {
+  _FausseRechercheLieu({this.proches = const []});
+
+  final List<LieuRestaurant> proches;
+  final List<({double latitude, double longitude})> pointsDemandes = [];
+
   @override
   Future<List<LieuRestaurant>> rechercher(
     String texte, {
     double? latitude,
     double? longitude,
-  }) async => [_comoEnCasa];
+  }) async => [_leComptoir];
+
+  @override
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+  }) async {
+    pointsDemandes.add((latitude: latitude, longitude: longitude));
+    return proches;
+  }
 }
 
 const _comoEnCasa = LieuRestaurant(
   fsqPlaceId: 'fsq-como',
   nom: 'Como en Casa',
   ville: 'Liège',
-  adresse: 'Rue Hors-Château 76',
   latitude: 50.6471,
   longitude: 5.5802,
+  distanceM: 40,
 );
 
-/// Deux photos de 1 × 1 pixel, différentes pour qu'on les distingue.
+const _amarante = LieuRestaurant(
+  fsqPlaceId: 'fsq-amarante',
+  nom: 'Amarante',
+  ville: 'Liège',
+  distanceM: 120,
+);
+
+const _leComptoir = LieuRestaurant(
+  fsqPlaceId: 'fsq-comptoir',
+  nom: 'Le Comptoir',
+  ville: 'Liège',
+);
+
+/// Deux images de 1 × 1 pixel, distinctes pour qu'on les reconnaisse.
 final _photoA = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
 );
 final _photoB = Uint8List.fromList([..._photoA]);
 
-/// Ouvre le menu « Comment retrouver vos souvenirs ? » par-dessus un
-/// écran témoin, qui note ce que le menu renvoie en se fermant.
-Future<List<bool?>> _ouvrirMenu(
-  WidgetTester tester,
-  _FauxSouvenirService service,
-) async {
+/// Une photo prise chez Como en Casa, le 3 novembre 2023 à 20 h 41.
+PhotoChoisie _photoDuDiner(Uint8List octets) => (
+  octets: octets,
+  metadonnees: MetadonneesPhoto(
+    prisLe: DateTime(2023, 11, 3, 20, 41),
+    latitude: 50.64735,
+    longitude: 5.58045,
+  ),
+);
+
+void _grandEcran(WidgetTester tester) {
   tester.view.physicalSize = const Size(1000, 2400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+/// Ouvre [ecran] par-dessus un écran témoin, qui note ce qu'il renvoie
+/// en se fermant.
+Future<List<bool?>> _ouvrir(WidgetTester tester, Widget ecran) async {
+  _grandEcran(tester);
   final retours = <bool?>[];
   await tester.pumpWidget(
     MaterialApp(
@@ -111,15 +150,9 @@ Future<List<bool?>> _ouvrirMenu(
           builder: (context) => ElevatedButton(
             onPressed: () async {
               retours.add(
-                await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => EcranChoixSouvenir(
-                      souvenirService: service,
-                      abonnementService: _FauxAbonnementService(),
-                      rechercheLieuService: _FausseRechercheLieu(),
-                    ),
-                  ),
-                ),
+                await Navigator.of(
+                  context,
+                ).push<bool>(MaterialPageRoute(builder: (_) => ecran)),
               );
             },
             child: const Text('ouvrir'),
@@ -133,189 +166,263 @@ Future<List<bool?>> _ouvrirMenu(
   return retours;
 }
 
-/// Ouvre directement le formulaire, avec un sélecteur de photos factice.
-Future<List<bool?>> _ouvrirFormulaire(
+Future<List<bool?>> _ouvrirMenu(
   WidgetTester tester,
   _FauxSouvenirService service, {
   List<Uint8List> photos = const [],
-}) async {
-  tester.view.physicalSize = const Size(1000, 2400);
-  tester.view.devicePixelRatio = 1.0;
-  addTearDown(tester.view.resetPhysicalSize);
-  addTearDown(tester.view.resetDevicePixelRatio);
-  final retours = <bool?>[];
-  await tester.pumpWidget(
-    MaterialApp(
-      theme: TablTheme.sombre(),
-      home: Scaffold(
-        body: Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () async {
-              retours.add(
-                await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => EcranAjouterSouvenir(
-                      souvenirService: service,
-                      abonnementService: _FauxAbonnementService(),
-                      rechercheLieuService: _FausseRechercheLieu(),
-                      choisirPhotos: (restant) async => photos,
-                    ),
-                  ),
-                ),
-              );
-            },
-            child: const Text('ouvrir'),
-          ),
-        ),
-      ),
-    ),
-  );
-  await tester.tap(find.text('ouvrir'));
-  await tester.pumpAndSettle();
-  return retours;
-}
+}) => _ouvrir(
+  tester,
+  EcranChoixSouvenir(
+    souvenirService: service,
+    abonnementService: _FauxAbonnementService(),
+    rechercheLieuService: _FausseRechercheLieu(),
+    choisirPhotos: (restant) async => photos,
+  ),
+);
 
-Future<void> _choisirComoEnCasa(WidgetTester tester) async {
-  await tester.enterText(find.byType(TextField).first, 'Como');
-  await tester.pump(const Duration(milliseconds: 300));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Como en Casa'));
-  await tester.pumpAndSettle();
-}
-
-/// Ouvre les roues du « Quand ? » et valide ce qu'elles proposent : le
-/// mois en cours.
-Future<void> _validerLaDateProposee(WidgetTester tester) async {
-  await tester.tap(find.text('Mois'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Valider').last);
-  await tester.pumpAndSettle();
-}
+Future<List<bool?>> _ouvrirEditeur(
+  WidgetTester tester,
+  _FauxSouvenirService service, {
+  List<PhotoChoisie> photos = const [],
+  _FausseRechercheLieu? recherche,
+}) => _ouvrir(
+  tester,
+  EcranAjouterSouvenir(
+    souvenirService: service,
+    abonnementService: _FauxAbonnementService(),
+    photos: photos,
+    rechercheLieuService: recherche ?? _FausseRechercheLieu(),
+  ),
+);
 
 TablBouton _boutonAjouter(WidgetTester tester) => tester.widget<TablBouton>(
   find.widgetWithText(TablBouton, 'Ajouter à mon profil'),
 );
 
+Future<void> _ajouter(WidgetTester tester) async {
+  await tester.tap(find.text('Ajouter à mon profil'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets(
-    'le menu : un souvenir à la main, l\'import intelligent bientôt',
-    (tester) async {
+  group('le menu', () {
+    testWidgets('les photos d\'abord, l\'import intelligent bientôt', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirMenu(tester, service, photos: [_photoA]);
+
+      expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
+      expect(find.text('Bientôt'), findsOneWidget);
+
+      await tester.tap(find.text('Choisir des photos'));
+      await tester.pumpAndSettle();
+
+      // La photo choisie, en grand ; sans date ni lieu dedans, rien
+      // n'est deviné.
+      expect(find.byType(TablApercuPhotos), findsOneWidget);
+      expect(find.text('Quel restaurant ?'), findsOneWidget);
+      expect(find.text('Quand était-ce ?'), findsOneWidget);
+      expect(_boutonAjouter(tester).onPresse, isNull);
+    });
+
+    testWidgets('sélecteur fermé sans rien choisir : on reste au menu', (
+      tester,
+    ) async {
+      await _ouvrirMenu(tester, _FauxSouvenirService());
+
+      await tester.tap(find.text('Choisir des photos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
+    });
+
+    testWidgets('souvenir ajouté : l\'éditeur et le menu se referment', (
+      tester,
+    ) async {
       final service = _FauxSouvenirService();
       final retours = await _ouvrirMenu(tester, service);
 
-      expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
-      expect(
-        find.text('Ajouter plusieurs de manière intelligente'),
-        findsOneWidget,
+      await tester.tap(find.text('Pas de photo ? Ajouter à la main'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ajouter des photos'), findsOneWidget);
+
+      await tester.tap(find.text('Quel restaurant ?'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(TextField),
+        ),
+        'Comptoir',
       );
-      expect(find.text('Bientôt'), findsOneWidget);
-
-      await tester.tap(find.text('Ajouter un souvenir'));
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
-      await _choisirComoEnCasa(tester);
-      await _validerLaDateProposee(tester);
-      await tester.tap(find.text('Ajouter à mon profil'));
+      await tester.tap(find.text('Le Comptoir'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Quand était-ce ?'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Valider'));
+      await tester.pumpAndSettle();
+      await _ajouter(tester);
 
-      // Le formulaire et le menu se referment ensemble, sur « ajouté ».
-      expect(service.ajoutes, hasLength(1));
+      final ajoute = service.ajoutes.single;
+      final maintenant = DateTime.now();
+      expect(ajoute.lieu.nom, 'Le Comptoir');
+      expect(ajoute.date.annee, maintenant.year);
+      expect(ajoute.date.mois, maintenant.month);
+      expect(ajoute.date.jour, isNull);
+      expect(ajoute.photos, isEmpty);
       expect(retours, [true]);
       expect(find.text('Comment retrouver vos souvenirs ?'), findsNothing);
-    },
-  );
-
-  testWidgets('le restaurant et la date suffisent', (tester) async {
-    final service = _FauxSouvenirService();
-    await _ouvrirFormulaire(tester, service);
-
-    expect(_boutonAjouter(tester).onPresse, isNull);
-    await _choisirComoEnCasa(tester);
-    expect(_boutonAjouter(tester).onPresse, isNull);
-    await _validerLaDateProposee(tester);
-    expect(_boutonAjouter(tester).onPresse, isNotNull);
-
-    await tester.tap(find.text('Ajouter à mon profil'));
-    await tester.pumpAndSettle();
-
-    final ajoute = service.ajoutes.single;
-    final maintenant = DateTime.now();
-    expect(ajoute.lieu.nom, 'Como en Casa');
-    expect(ajoute.date.annee, maintenant.year);
-    expect(ajoute.date.mois, maintenant.month);
-    expect(ajoute.date.jour, isNull);
-    expect(ajoute.photos, isEmpty);
-    expect(ajoute.emotion, isNull);
-    expect(ajoute.legende, isNull);
-    expect(ajoute.moment, isNull);
+    });
   });
 
-  testWidgets('ressenti, mots et moment s\'ajoutent si on veut', (
-    tester,
-  ) async {
-    final service = _FauxSouvenirService();
-    await _ouvrirFormulaire(tester, service);
-    await _choisirComoEnCasa(tester);
-    await _validerLaDateProposee(tester);
+  group('d\'après les photos', () {
+    testWidgets('le restaurant le plus proche, le jour et le moment', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService();
+      final recherche = _FausseRechercheLieu(proches: [_comoEnCasa, _amarante]);
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: recherche,
+      );
 
-    await tester.tap(find.text('+ Ressenti'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('😍'));
-    await tester.tap(find.text('+ Mots'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'La burrata');
-    await tester.tap(find.text('+ Moment'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Dîner'));
-    await tester.pumpAndSettle();
+      expect(recherche.pointsDemandes.single.latitude, 50.64735);
+      expect(find.text('Como en Casa'), findsOneWidget);
+      expect(find.text('Liège · à 40 m de la photo'), findsOneWidget);
+      expect(find.text('3 novembre 2023 · Dîner'), findsOneWidget);
+      expect(find.text('D\'après vos photos · 20 h 41'), findsOneWidget);
 
-    await tester.tap(find.text('Ajouter à mon profil'));
-    await tester.pumpAndSettle();
+      await _ajouter(tester);
 
-    final ajoute = service.ajoutes.single;
-    expect(ajoute.emotion, Emotion.coupDeCoeur);
-    expect(ajoute.legende, 'La burrata');
-    expect(ajoute.moment, 'soir');
-  });
+      final ajoute = service.ajoutes.single;
+      expect(ajoute.lieu.nom, 'Como en Casa');
+      expect(ajoute.date.libelle, '3 novembre 2023');
+      expect(ajoute.moment, 'soir');
+      expect(ajoute.photos, [_photoA]);
+    });
 
-  testWidgets('photos : la touchée devient la principale, envoyée en tête', (
-    tester,
-  ) async {
-    final service = _FauxSouvenirService();
-    await _ouvrirFormulaire(tester, service, photos: [_photoA, _photoB]);
-    await _choisirComoEnCasa(tester);
-    await _validerLaDateProposee(tester);
+    testWidgets('le restaurant proposé se change : les proches d\'abord', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: _FausseRechercheLieu(proches: [_comoEnCasa, _amarante]),
+      );
 
-    await tester.tap(find.text('+ Photos'));
-    await tester.pumpAndSettle();
-    expect(find.text('2 photos sur 10'), findsOneWidget);
+      await tester.tap(find.text('Changer'));
+      await tester.pumpAndSettle();
+      expect(find.text('PRÈS DE VOS PHOTOS'), findsOneWidget);
+      await tester.tap(find.text('Amarante'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('En faire la photo principale'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Ajouter à mon profil'));
-    await tester.pumpAndSettle();
+      expect(find.text('Liège · à 120 m de la photo'), findsOneWidget);
+      await _ajouter(tester);
+      expect(service.ajoutes.single.lieu.nom, 'Amarante');
+    });
 
-    final photos = service.ajoutes.single.photos;
-    expect(photos, hasLength(2));
-    expect(identical(photos.first, _photoB), isTrue);
+    testWidgets('la date proposée se change', (tester) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: _FausseRechercheLieu(proches: [_comoEnCasa]),
+      );
+
+      await tester.tap(find.text('3 novembre 2023 · Dîner'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Déjeuner'));
+      await tester.tap(find.text('Valider'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('3 novembre 2023 · Déjeuner'), findsOneWidget);
+      // Choisie à la main : plus « d'après vos photos ».
+      expect(find.text('D\'après vos photos · 20 h 41'), findsNothing);
+      await _ajouter(tester);
+      expect(service.ajoutes.single.moment, 'midi');
+    });
+
+    testWidgets('« Principale » met la photo affichée en tête', (tester) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA), _photoDuDiner(_photoB)],
+        recherche: _FausseRechercheLieu(proches: [_comoEnCasa]),
+      );
+
+      expect(find.text('Principale'), findsNothing);
+      await tester.tap(find.bySemanticsLabel('Photo 2'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Principale'));
+      await tester.pumpAndSettle();
+      await _ajouter(tester);
+
+      final photos = service.ajoutes.single.photos;
+      expect(identical(photos.first, _photoB), isTrue);
+      expect(photos, hasLength(2));
+    });
+
+    testWidgets('ressenti et quelques mots, si on veut', (tester) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: _FausseRechercheLieu(proches: [_comoEnCasa]),
+      );
+
+      await tester.tap(find.text('😍'));
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(TablChampLegende),
+          matching: find.byType(TextField),
+        ),
+        'La burrata',
+      );
+      await tester.pumpAndSettle();
+      await _ajouter(tester);
+
+      final ajoute = service.ajoutes.single;
+      expect(ajoute.emotion, Emotion.coupDeCoeur);
+      expect(ajoute.legende, 'La burrata');
+    });
   });
 
   testWidgets('restaurant introuvable : nom et ville à la main', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirFormulaire(tester, service);
+    await _ouvrirEditeur(tester, service);
 
-    await tester.enterText(find.byType(TextField).first, 'Chez Lulu');
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Quel restaurant ?'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Je ne trouve pas mon restaurant'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).at(1), 'Namur');
+    // Les champs de la feuille, pas celui des quelques mots dessous.
+    final champs = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(champs.at(0), 'Chez Lulu');
+    await tester.enterText(champs.at(1), 'Namur');
     await tester.tap(find.text('Valider'));
     await tester.pumpAndSettle();
-    await _validerLaDateProposee(tester);
-    await tester.tap(find.text('Ajouter à mon profil'));
+
+    expect(find.text('Chez Lulu'), findsOneWidget);
+    await tester.tap(find.text('Quand était-ce ?'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    await _ajouter(tester);
 
     final lieu = service.ajoutes.single.lieu;
     expect(lieu.nom, 'Chez Lulu');

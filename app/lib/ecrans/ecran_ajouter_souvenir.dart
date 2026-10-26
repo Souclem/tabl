@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,66 +9,92 @@ import 'package:app/widgets/widgets.dart';
 import 'feuille_audience.dart';
 import 'recherche_lieu_en_direct.dart';
 
-/// Ajouter un souvenir à la main : un repas passé, avec ou sans photo.
-/// Le restaurant, le mois et l'année suffisent ; photos, ressenti,
-/// quelques mots et le moment s'ajoutent si on veut. Se ferme sur `true`
-/// une fois le souvenir ajouté.
+/// Choisit au plus `restant` photos dans la photothèque.
+typedef ChoisirPhotos = Future<List<Uint8List>> Function(int restant);
+
+/// Le sélecteur de photos du téléphone. Les photos sont réduites, mais
+/// gardent leur date et leur position (c'est d'elles que part le
+/// souvenir).
+Future<List<Uint8List>> photosDuTelephone(int restant) async {
+  if (restant <= 0) return const [];
+  final selecteur = ImagePicker();
+  // Le sélecteur multiple refuse une limite de 1.
+  final fichiers = restant == 1
+      ? [
+          ?await selecteur.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 80,
+            maxWidth: 1600,
+          ),
+        ]
+      : await selecteur.pickMultiImage(
+          imageQuality: 80,
+          maxWidth: 1600,
+          limit: restant,
+        );
+  return [for (final f in fichiers.take(restant)) await f.readAsBytes()];
+}
+
+/// Ajouter un souvenir : un repas passé, tel qu'il apparaîtra sur le
+/// profil. Les photos en grand d'abord ; d'elles, Tabl déduit le
+/// restaurant le plus proche, le jour et le moment — des propositions,
+/// toutes modifiables. Sans photo, on choisit tout soi-même. Se ferme
+/// sur `true` une fois le souvenir ajouté.
 class EcranAjouterSouvenir extends StatefulWidget {
   const EcranAjouterSouvenir({
     super.key,
     required this.souvenirService,
     required this.abonnementService,
+    this.photos = const [],
     this.tableService,
     this.rechercheLieuService,
     this.positionService,
-    this.choisirPhotos,
+    this.choisirPhotos = photosDuTelephone,
   });
 
   final SouvenirService souvenirService;
   final AbonnementService abonnementService;
+
+  /// Celles déjà choisies (la première est la principale) ; vide : un
+  /// souvenir sans photo, pour l'instant.
+  final List<PhotoChoisie> photos;
   final TableService? tableService;
 
-  /// `null` : seulement la saisie à la main (nom + ville).
+  /// `null` : ni lieu proposé, ni recherche (saisie à la main).
   final RechercheLieuService? rechercheLieuService;
 
-  /// `null` : suggestions non triées par proximité.
+  /// Sans photo localisée : la recherche est triée autour du téléphone.
   final PositionService? positionService;
-
-  /// Choisit au plus `restant` photos dans la photothèque ; `null` : le
-  /// sélecteur d'iOS / Android.
-  final Future<List<Uint8List>> Function(int restant)? choisirPhotos;
+  final ChoisirPhotos choisirPhotos;
 
   @override
   State<EcranAjouterSouvenir> createState() => _EcranAjouterSouvenirState();
 }
 
-class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
-    with RechercheLieuEnDirect<EcranAjouterSouvenir> {
-  @override
-  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
+class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
+  late final List<PhotoChoisie> _photos = List.of(widget.photos);
+  int _page = 0;
 
-  @override
-  PositionService? get positionService => widget.positionService;
-
-  late bool _saisieManuelle = widget.rechercheLieuService == null;
-  final _nomRestaurant = TextEditingController();
-  final _ville = TextEditingController();
-  String? _erreurNom;
-  String? _erreurVille;
+  /// Le centre des photos localisées : c'est autour de lui qu'on
+  /// cherche le restaurant.
+  Coordonnees? _positionPhotos;
+  List<LieuRestaurant> _lieuxProches = const [];
+  bool _rechercheProches = false;
 
   LieuRestaurant? _lieu;
+
+  /// La distance de [_lieu] est celle qui le sépare des photos.
+  bool _lieuDepuisPhotos = false;
+
   DateSouvenir? _date;
-  final List<Uint8List> _photos = [];
+  String? _moment;
+
+  /// L'heure de la première photo, quand le jour vient d'elles.
+  DateTime? _heurePhotos;
+
   Emotion? _emotion;
   final _legende = TextEditingController();
-  String? _moment;
   AudienceSouvenir _audience = AudienceSouvenir.toutLeMonde;
-
-  // Les rubriques facultatives ouvertes (« + Ressenti »…).
-  bool _ressentiOuvert = false;
-  bool _motsOuverts = false;
-  bool _momentOuvert = false;
-
   bool _enCours = false;
 
   late final Future<DonneesAudience> _futurAudience = chargerDonneesAudience(
@@ -75,99 +103,140 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
   );
 
   @override
+  void initState() {
+    super.initState();
+    _completerDepuisPhotos();
+  }
+
+  @override
   void dispose() {
-    _nomRestaurant.dispose();
-    _ville.dispose();
     _legende.dispose();
     super.dispose();
   }
 
-  void _choisirLieu(LieuRestaurant lieu) {
-    FocusScope.of(context).unfocus();
-    setState(() => _lieu = lieu);
+  /// Ce que les photos disent, pour ce qui n'est pas encore choisi :
+  /// jamais par-dessus un choix de l'utilisateur.
+  void _completerDepuisPhotos() {
+    final suggestion = precompleter([
+      for (final p in _photos) p.metadonnees,
+    ], maintenant: DateTime.now());
+    if (_date == null && suggestion.date != null) {
+      _date = suggestion.date;
+      _moment = suggestion.moment;
+      _heurePhotos = suggestion.premierePhoto;
+    }
+    final position = suggestion.position;
+    if (position != null && _positionPhotos == null) {
+      _positionPhotos = position;
+      _chercherLieuxProches(position);
+    }
   }
 
-  void _changerLieu() => setState(() => _lieu = null);
-
-  void _passerEnSaisieManuelle() {
-    setState(() {
-      _saisieManuelle = true;
-      if (_nomRestaurant.text.isEmpty) _nomRestaurant.text = recherche.text;
-    });
-  }
-
-  void _validerLieuManuel() {
-    final erreurNom = ValidationSouvenir.nomRestaurant(_nomRestaurant.text);
-    final erreurVille = ValidationSouvenir.ville(_ville.text);
-    setState(() {
-      _erreurNom = erreurNom;
-      _erreurVille = erreurVille;
-    });
-    if (erreurNom != null || erreurVille != null) return;
-    // Sans position : on n'est plus au restaurant, celle du téléphone
-    // le placerait au mauvais endroit sur la carte.
-    _choisirLieu(
-      LieuRestaurant.manuel(
-        nom: _nomRestaurant.text.trim(),
-        ville: _ville.text.trim(),
-      ),
-    );
-  }
-
-  Future<void> _choisirDate() async {
-    final maintenant = DateTime.now();
-    final choisie = await showModalBottomSheet<DateSouvenir>(
-      context: context,
-      backgroundColor: TablTokens.surface,
-      showDragHandle: true,
-      builder: (_) => _FeuilleDate(
-        initiale:
-            _date ??
-            DateSouvenir(annee: maintenant.year, mois: maintenant.month),
-        maintenant: maintenant,
-      ),
-    );
-    if (choisie != null && mounted) setState(() => _date = choisie);
+  Future<void> _chercherLieuxProches(Coordonnees position) async {
+    final service = widget.rechercheLieuService;
+    if (service == null) return;
+    // Appelé depuis initState : l'état ne change qu'après la première
+    // image.
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    setState(() => _rechercheProches = true);
+    try {
+      final proches = await service.lieuxProches(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lieuxProches = proches;
+        // Le plus proche, proposé : on peut en changer d'un tap.
+        if (_lieu == null && proches.isNotEmpty) {
+          _lieu = proches.first;
+          _lieuDepuisPhotos = true;
+        }
+      });
+    } catch (e) {
+      debugPrint('EcranAjouterSouvenir: lieux proches : $e');
+    } finally {
+      if (mounted) setState(() => _rechercheProches = false);
+    }
   }
 
   Future<void> _ajouterPhotos() async {
     final restant = nombreMaxPhotosSouvenir - _photos.length;
     if (restant <= 0) return;
     try {
-      final choisies = await (widget.choisirPhotos ?? _photosDuTelephone)(
-        restant,
-      );
-      if (!mounted || choisies.isEmpty) return;
-      setState(() => _photos.addAll(choisies.take(restant)));
+      final nouvelles = await lirePhotos(await widget.choisirPhotos(restant));
+      if (!mounted || nouvelles.isEmpty) return;
+      setState(() {
+        _photos.addAll(nouvelles.take(restant));
+        _completerDepuisPhotos();
+      });
     } catch (e) {
       debugPrint('EcranAjouterSouvenir: photos : $e');
       if (mounted) afficherMessage(context, messageErreurGenerique);
     }
   }
 
-  static Future<List<Uint8List>> _photosDuTelephone(int restant) async {
-    final selecteur = ImagePicker();
-    // Le sélecteur multiple refuse une limite de 1.
-    final fichiers = restant == 1
-        ? [
-            ?await selecteur.pickImage(
-              source: ImageSource.gallery,
-              imageQuality: 80,
-              maxWidth: 1600,
-            ),
-          ]
-        : await selecteur.pickMultiImage(
-            imageQuality: 80,
-            maxWidth: 1600,
-            limit: restant,
-          );
-    return [for (final f in fichiers) await f.readAsBytes()];
+  void _rendrePrincipale() {
+    if (_page == 0) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _photos.insert(0, _photos.removeAt(_page));
+      _page = 0;
+    });
   }
 
-  void _choisirPrincipale(int index) {
-    if (index == 0) return;
-    HapticFeedback.selectionClick();
-    setState(() => _photos.insert(0, _photos.removeAt(index)));
+  void _retirerPhoto() {
+    setState(() {
+      _photos.removeAt(_page);
+      _page = math.min(_page, math.max(_photos.length - 1, 0));
+    });
+  }
+
+  Future<void> _choisirLieu() async {
+    final position = _positionPhotos;
+    final choisi = await showModalBottomSheet<LieuRestaurant>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: TablTokens.surface,
+      showDragHandle: true,
+      builder: (_) => _FeuilleRestaurant(
+        rechercheLieuService: widget.rechercheLieuService,
+        positionService: position != null
+            ? _PositionFixe(position)
+            : widget.positionService,
+        proches: _lieuxProches,
+        depuisPhotos: position != null,
+      ),
+    );
+    if (choisi == null || !mounted) return;
+    setState(() {
+      _lieu = choisi;
+      _lieuDepuisPhotos = position != null && !choisi.estManuel;
+    });
+  }
+
+  Future<void> _choisirQuand() async {
+    final maintenant = DateTime.now();
+    final choisi =
+        await showModalBottomSheet<({DateSouvenir date, String? moment})>(
+          context: context,
+          backgroundColor: TablTokens.surface,
+          showDragHandle: true,
+          builder: (_) => _FeuilleQuand(
+            date:
+                _date ??
+                DateSouvenir(annee: maintenant.year, mois: maintenant.month),
+            moment: _moment,
+            maintenant: maintenant,
+          ),
+        );
+    if (choisi == null || !mounted) return;
+    setState(() {
+      _date = choisi.date;
+      _moment = choisi.moment;
+      _heurePhotos = null;
+    });
   }
 
   Future<void> _choisirAudience() async {
@@ -199,7 +268,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
         NouveauSouvenir(
           lieu: lieu,
           date: date,
-          photos: List.of(_photos),
+          photos: [for (final p in _photos) p.octets],
           emotion: _emotion,
           legende: legende.isEmpty ? null : legende,
           moment: _moment,
@@ -227,242 +296,425 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
 
   @override
   Widget build(BuildContext context) {
-    final date = _date;
+    final taille = MediaQuery.sizeOf(context);
+    final hauteurPhoto = math.min(taille.width * 1.12, taille.height * 0.56);
     final lieu = _lieu;
+    final date = _date;
+    final heurePhotos = _heurePhotos;
+    final peutAjouterPhotos = _photos.length < nombreMaxPhotosSouvenir;
+    final octets = [for (final p in _photos) p.octets];
+
     return Scaffold(
       backgroundColor: TablTokens.fond,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                TablTokens.espaceM,
-                TablTokens.espaceS,
-                TablTokens.espaceM,
-                0,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: TablBoutonRetour(
-                  onPresse: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL,
-                  TablTokens.espaceM,
-                  TablTokens.espaceL,
-                  TablTokens.espaceL,
-                ),
-                children: [
-                  const _Surtitre(texte: 'Souvenir'),
-                  const SizedBox(height: TablTokens.espaceS),
-                  Text('Ajouter un souvenir', style: TablTokens.grandTitre),
-                  const SizedBox(height: TablTokens.espaceL),
-                  if (lieu != null)
-                    _LieuChoisi(lieu: lieu, onChanger: _changerLieu)
-                  else if (_saisieManuelle)
-                    _LieuManuel(
-                      nom: _nomRestaurant,
-                      ville: _ville,
-                      erreurNom: _erreurNom,
-                      erreurVille: _erreurVille,
-                      onValider: _validerLieuManuel,
-                    )
-                  else
-                    _RechercheLieu(
-                      recherche: recherche,
-                      suggestions: suggestions,
-                      enCours: rechercheEnCours,
-                      onChange: rechercherAvecAttente,
-                      onChoisir: _choisirLieu,
-                      onIntrouvable: _passerEnSaisieManuelle,
-                    ),
-                  const SizedBox(height: TablTokens.espaceL),
-                  Text('Quand ?', style: TablTokens.legende),
-                  const SizedBox(height: TablTokens.espaceS),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 4,
-                        child: TablCaseDate(
-                          texte: date == null
-                              ? 'Mois'
-                              : majuscule(nomDuMois(date.mois)),
-                          vide: date == null,
-                          onPresse: _choisirDate,
-                        ),
-                      ),
-                      const SizedBox(width: TablTokens.espaceS),
-                      Expanded(
-                        flex: 3,
-                        child: TablCaseDate(
-                          texte: date == null ? 'Année' : '${date.annee}',
-                          vide: date == null,
-                          onPresse: _choisirDate,
-                        ),
-                      ),
-                      const SizedBox(width: TablTokens.espaceS),
-                      Expanded(
-                        flex: 4,
-                        child: TablCaseDate(
-                          texte: date?.jour == null
-                              ? 'Jour · facultatif'
-                              : '${date!.jour}',
-                          vide: date?.jour == null,
-                          onPresse: _choisirDate,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_photos.isNotEmpty) ...[
-                    const SizedBox(height: TablTokens.espaceL),
-                    TablPhotosSouvenir(
-                      photos: _photos,
-                      libelle:
-                          '${pluriel(_photos.length, 'photo')} '
-                          'sur $nombreMaxPhotosSouvenir',
-                      onChoisirPrincipale: _choisirPrincipale,
-                      onRetirer: (i) => setState(() => _photos.removeAt(i)),
-                      onAjouter: _photos.length < nombreMaxPhotosSouvenir
-                          ? _ajouterPhotos
-                          : null,
-                    ),
-                  ],
-                  if (_ressentiOuvert) ...[
-                    const SizedBox(height: TablTokens.espaceL),
-                    Text('Comment c\'était ?', style: TablTokens.legende),
-                    const SizedBox(height: TablTokens.espaceS),
-                    TablSelecteurEmotion(
-                      emojis: [for (final e in Emotion.values) e.emoji],
-                      selection: _emotion?.emoji,
-                      onSelection: (emoji) => setState(() {
-                        final choisie = Emotion.depuisEmoji(emoji);
-                        _emotion = choisie == _emotion ? null : choisie;
-                      }),
-                    ),
-                  ],
-                  if (_motsOuverts) ...[
-                    const SizedBox(height: TablTokens.espaceL),
-                    TablChampTexte(
-                      libelle: 'Quelques mots',
-                      controleur: _legende,
-                      indication: 'Ce que vous voulez vous rappeler',
-                      lignes: 2,
-                    ),
-                  ],
-                  if (_momentOuvert) ...[
-                    const SizedBox(height: TablTokens.espaceL),
-                    Text('Moment', style: TablTokens.legende),
-                    const SizedBox(height: TablTokens.espaceS),
-                    Wrap(
-                      spacing: TablTokens.espaceS,
-                      children: [
-                        for (final m in const ['midi', 'soir'])
-                          TablPuceSelection(
-                            libelle: libelleMomentRepas(m)!,
-                            selectionnee: _moment == m,
-                            onBascule: () => setState(
-                              () => _moment = _moment == m ? null : m,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  height: hauteurPhoto,
+                  child: _photos.isEmpty
+                      ? TablApercuSansPhoto(
+                          libelle: 'Ajouter des photos',
+                          onAjouter: _ajouterPhotos,
+                        )
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            TablApercuPhotos(
+                              photos: octets,
+                              page: _page,
+                              onPage: (page) => setState(() => _page = page),
                             ),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: TablTokens.espaceL),
-                  Wrap(
-                    spacing: TablTokens.espaceS,
-                    runSpacing: TablTokens.espaceS,
-                    children: [
-                      if (_photos.isEmpty)
-                        TablPuceSelection(
-                          libelle: '+ Photos',
-                          selectionnee: false,
-                          onBascule: _ajouterPhotos,
+                            Positioned(
+                              right: TablTokens.espaceM,
+                              bottom: TablTokens.espaceL + 22,
+                              child: Row(
+                                children: [
+                                  if (_page > 0) ...[
+                                    TablPiluleVerre(
+                                      icone: Icons.star_rounded,
+                                      libelle: 'Principale',
+                                      onPresse: _rendrePrincipale,
+                                    ),
+                                    const SizedBox(width: TablTokens.espaceS),
+                                  ],
+                                  TablPiluleVerre(
+                                    icone: Icons.delete_outline_rounded,
+                                    libelle: 'Retirer',
+                                    onPresse: _retirerPhoto,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      if (!_ressentiOuvert)
-                        TablPuceSelection(
-                          libelle: '+ Ressenti',
-                          selectionnee: false,
-                          onBascule: () =>
-                              setState(() => _ressentiOuvert = true),
-                        ),
-                      if (!_motsOuverts)
-                        TablPuceSelection(
-                          libelle: '+ Mots',
-                          selectionnee: false,
-                          onBascule: () => setState(() => _motsOuverts = true),
-                        ),
-                      if (!_momentOuvert)
-                        TablPuceSelection(
-                          libelle: '+ Moment',
-                          selectionnee: false,
-                          onBascule: () => setState(() => _momentOuvert = true),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: TablTokens.espaceL),
-                  FutureBuilder<DonneesAudience>(
-                    future: _futurAudience,
-                    builder: (context, snapshot) {
-                      final donnees = snapshot.data;
-                      return TablLigneAudience(
-                        libelle: libelleAudience(
-                          _audience,
-                          nomsTables: {
-                            for (final t
-                                in donnees?.tables ?? const <ResumeTable>[])
-                              t.id: t.nom,
-                          },
-                          pseudos: {
-                            for (final r
-                                in donnees?.relations ?? const <ProfilPublic>[])
-                              r.id: r.pseudo,
-                          },
-                        ),
-                        restreinte: _audience.mode != ModeAudience.toutLeMonde,
-                        onPresse: _choisirAudience,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: TablTokens.espaceS),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.nightlight_round,
-                        size: 14,
-                        color: TablTokens.texteDoux,
-                      ),
-                      const SizedBox(width: TablTokens.espaceS),
-                      Expanded(
-                        child: Text(
-                          'Visible sur votre profil, jamais dans le Feed.',
-                          style: TablTokens.legende,
-                        ),
-                      ),
-                    ],
+                ),
+                if (_photos.length > 1 ||
+                    (_photos.isNotEmpty && peutAjouterPhotos)) ...[
+                  const SizedBox(height: TablTokens.espaceXs),
+                  TablBandeVignettes(
+                    photos: octets,
+                    page: _page,
+                    onChoisir: (i) => setState(() => _page = i),
+                    onAjouter: peutAjouterPhotos ? _ajouterPhotos : null,
                   ),
                 ],
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TablTokens.espaceL - 4,
+                    TablTokens.espaceL,
+                    TablTokens.espaceL - 4,
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TablSurtitreSouvenir(
+                        texte: _lieuDepuisPhotos || heurePhotos != null
+                            ? 'Souvenir · d\'après vos photos'
+                            : 'Souvenir',
+                      ),
+                      const SizedBox(height: 10),
+                      TablTitreLieuSouvenir(
+                        nom: lieu?.nom,
+                        detail: lieu != null
+                            ? detailLieuSouvenir(
+                                lieu,
+                                depuisLaPhoto: _lieuDepuisPhotos,
+                              )
+                            : _rechercheProches
+                            ? 'Recherche du restaurant…'
+                            : null,
+                        indication: 'Quel restaurant ?',
+                        action: lieu == null ? 'Choisir' : 'Changer',
+                        onPresse: _choisirLieu,
+                      ),
+                      const SizedBox(height: TablTokens.espaceM),
+                      TablLigneQuandSouvenir(
+                        texte: date == null
+                            ? 'Quand était-ce ?'
+                            : [
+                                date.libelle,
+                                ?libelleMomentRepas(_moment ?? ''),
+                              ].join(' · '),
+                        detail: heurePhotos == null
+                            ? null
+                            : 'D\'après vos photos · '
+                                  '${heureLisible(heurePhotos)}',
+                        vide: date == null,
+                        onPresse: _choisirQuand,
+                      ),
+                      const SizedBox(height: TablTokens.espaceM),
+                      const Divider(height: 1, color: TablTokens.surface),
+                      const SizedBox(height: TablTokens.espaceL - 4),
+                      Text('Comment c\'était ?', style: TablTokens.legende),
+                      const SizedBox(height: TablTokens.espaceS),
+                      TablSelecteurEmotion(
+                        emojis: [for (final e in Emotion.values) e.emoji],
+                        selection: _emotion?.emoji,
+                        onSelection: (emoji) => setState(() {
+                          final choisie = Emotion.depuisEmoji(emoji);
+                          _emotion = choisie == _emotion ? null : choisie;
+                        }),
+                      ),
+                      const SizedBox(height: TablTokens.espaceL - 4),
+                      TablChampLegende(
+                        controleur: _legende,
+                        indication: 'Quelques mots, si vous le souhaitez',
+                      ),
+                      const SizedBox(height: TablTokens.espaceM),
+                      const Divider(height: 1, color: TablTokens.surface),
+                      const SizedBox(height: TablTokens.espaceM),
+                      FutureBuilder<DonneesAudience>(
+                        future: _futurAudience,
+                        builder: (context, snapshot) {
+                          final donnees = snapshot.data;
+                          return TablLigneAudience(
+                            libelle: libelleAudience(
+                              _audience,
+                              nomsTables: {
+                                for (final t
+                                    in donnees?.tables ?? const <ResumeTable>[])
+                                  t.id: t.nom,
+                              },
+                              pseudos: {
+                                for (final r
+                                    in donnees?.relations ??
+                                        const <ProfilPublic>[])
+                                  r.id: r.pseudo,
+                              },
+                            ),
+                            restreinte:
+                                _audience.mode != ModeAudience.toutLeMonde,
+                            onPresse: _choisirAudience,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: TablTokens.espaceS),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.nightlight_round,
+                            size: 13,
+                            color: TablTokens.texteDoux,
+                          ),
+                          const SizedBox(width: TablTokens.espaceS),
+                          Expanded(
+                            child: Text(
+                              'Visible sur votre profil, jamais dans le Feed.',
+                              style: TablTokens.legende.copyWith(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // La place du bouton, qui flotte par-dessus.
+                      SizedBox(
+                        height: 110 + MediaQuery.paddingOf(context).bottom,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceM,
+                  vertical: TablTokens.espaceS,
+                ),
+                child: Row(
+                  children: [
+                    TablBoutonVerre(
+                      icone: Icons.close_rounded,
+                      libelle: 'Fermer',
+                      onPresse: () => Navigator.of(context).pop(),
+                    ),
+                    const Spacer(),
+                    if (_photos.isNotEmpty && peutAjouterPhotos)
+                      TablBoutonVerre(
+                        icone: Icons.add_photo_alternate_outlined,
+                        libelle: 'Ajouter des photos',
+                        onPresse: _ajouterPhotos,
+                      ),
+                  ],
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                TablTokens.espaceL,
-                TablTokens.espaceS,
-                TablTokens.espaceL,
-                TablTokens.espaceM,
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    TablTokens.fond.withValues(alpha: 0),
+                    TablTokens.fond,
+                  ],
+                  stops: const [0, 0.22],
+                ),
               ),
-              child: TablBouton(
-                libelle: 'Ajouter à mon profil',
-                enCours: _enCours,
-                onPresse: lieu != null && date != null ? _ajouter : null,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TablTokens.espaceL - 4,
+                    TablTokens.espaceL,
+                    TablTokens.espaceL - 4,
+                    TablTokens.espaceS,
+                  ),
+                  child: TablBouton(
+                    libelle: 'Ajouter à mon profil',
+                    enCours: _enCours,
+                    onPresse: lieu != null && date != null ? _ajouter : null,
+                  ),
+                ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Une position qui ne bouge pas : celle des photos, pour trier la
+/// recherche autour d'elles plutôt qu'autour du téléphone.
+class _PositionFixe implements PositionService {
+  const _PositionFixe(this.position);
+
+  final Coordonnees position;
+
+  @override
+  Future<Coordonnees?> positionActuelle() async => position;
+}
+
+/// « Quel restaurant ? » : ceux près des photos d'abord, la recherche
+/// au fil de la frappe, et la saisie à la main en dernier recours.
+class _FeuilleRestaurant extends StatefulWidget {
+  const _FeuilleRestaurant({
+    required this.rechercheLieuService,
+    required this.positionService,
+    required this.proches,
+    required this.depuisPhotos,
+  });
+
+  final RechercheLieuService? rechercheLieuService;
+  final PositionService? positionService;
+  final List<LieuRestaurant> proches;
+  final bool depuisPhotos;
+
+  @override
+  State<_FeuilleRestaurant> createState() => _FeuilleRestaurantState();
+}
+
+class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
+    with RechercheLieuEnDirect<_FeuilleRestaurant> {
+  @override
+  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
+
+  @override
+  PositionService? get positionService => widget.positionService;
+
+  late bool _aLaMain = widget.rechercheLieuService == null;
+  final _nom = TextEditingController();
+  final _ville = TextEditingController();
+  String? _erreurNom;
+  String? _erreurVille;
+
+  @override
+  void dispose() {
+    _nom.dispose();
+    _ville.dispose();
+    super.dispose();
+  }
+
+  void _passerALaMain() => setState(() {
+    _aLaMain = true;
+    if (_nom.text.isEmpty) _nom.text = recherche.text;
+  });
+
+  void _validerALaMain() {
+    final erreurNom = ValidationSouvenir.nomRestaurant(_nom.text);
+    final erreurVille = ValidationSouvenir.ville(_ville.text);
+    setState(() {
+      _erreurNom = erreurNom;
+      _erreurVille = erreurVille;
+    });
+    if (erreurNom != null || erreurVille != null) return;
+    // Sans position : celle du téléphone placerait le restaurant au
+    // mauvais endroit sur la carte, on n'y est plus.
+    Navigator.of(context).pop(
+      LieuRestaurant.manuel(nom: _nom.text.trim(), ville: _ville.text.trim()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final aCherche = recherche.text.trim().length >= 2;
+    final lieux = aCherche ? suggestions : widget.proches;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.78,
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL - 4,
+            0,
+            TablTokens.espaceL - 4,
+            TablTokens.espaceL,
+          ),
+          children: [
+            Text(
+              'Quel restaurant ?',
+              style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+            ),
+            const SizedBox(height: TablTokens.espaceM),
+            if (_aLaMain) ...[
+              TablChampTexte(
+                libelle: 'Restaurant',
+                controleur: _nom,
+                indication: 'Le Comptoir',
+                erreur: _erreurNom,
+              ),
+              const SizedBox(height: TablTokens.espaceM),
+              TablChampTexte(
+                libelle: 'Ville',
+                controleur: _ville,
+                indication: 'Paris',
+                erreur: _erreurVille,
+                actionClavier: TextInputAction.done,
+                onSoumis: (_) => _validerALaMain(),
+              ),
+              const SizedBox(height: TablTokens.espaceL),
+              TablBouton(libelle: 'Valider', onPresse: _validerALaMain),
+            ] else ...[
+              TablChampTexte(
+                libelle: '',
+                controleur: recherche,
+                indication: 'Chercher un restaurant',
+                iconePrefixe: Icons.search_rounded,
+                onChanged: (texte) {
+                  setState(() {});
+                  rechercherAvecAttente(texte);
+                },
+              ),
+              if (rechercheEnCours)
+                const LinearProgressIndicator(
+                  minHeight: 2,
+                  color: TablTokens.primaire,
+                  backgroundColor: Colors.transparent,
+                ),
+              if (!aCherche && widget.proches.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: TablTokens.espaceM),
+                  child: Text(
+                    'PRÈS DE VOS PHOTOS',
+                    style: TablTokens.legende.copyWith(
+                      fontSize: 11,
+                      letterSpacing: 1.6,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              for (final lieu in lieux)
+                TablLigneSuggestionLieu(
+                  nom: lieu.nom,
+                  description: detailLieuSouvenir(
+                    lieu,
+                    depuisLaPhoto: widget.depuisPhotos,
+                  ),
+                  onSelection: () => Navigator.of(context).pop(lieu),
+                ),
+              if (aCherche && !rechercheEnCours && suggestions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: TablTokens.espaceM,
+                  ),
+                  child: Text(
+                    'Aucun restaurant trouvé.',
+                    style: TablTokens.legende,
+                  ),
+                ),
+              const SizedBox(height: TablTokens.espaceS),
+              TablBoutonTexte(
+                libelle: 'Je ne trouve pas mon restaurant',
+                onPresse: _passerALaMain,
+              ),
+            ],
           ],
         ),
       ),
@@ -470,186 +722,27 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
   }
 }
 
-/// « ☾ SOUVENIR » au-dessus du titre.
-class _Surtitre extends StatelessWidget {
-  const _Surtitre({required this.texte});
-
-  final String texte;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.nightlight_round, size: 14, color: TablTokens.texte),
-        const SizedBox(width: 6),
-        Text(
-          texte.toUpperCase(),
-          style: TablTokens.legende.copyWith(
-            fontSize: 12,
-            letterSpacing: 1.6,
-            fontWeight: FontWeight.w600,
-            color: TablTokens.texte,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RechercheLieu extends StatelessWidget {
-  const _RechercheLieu({
-    required this.recherche,
-    required this.suggestions,
-    required this.enCours,
-    required this.onChange,
-    required this.onChoisir,
-    required this.onIntrouvable,
+/// « Quand était-ce ? » : le mois et l'année, le jour si on s'en
+/// souvient, et le moment du repas. « Valider » reste éteint sur une
+/// date pas encore passée.
+class _FeuilleQuand extends StatefulWidget {
+  const _FeuilleQuand({
+    required this.date,
+    required this.moment,
+    required this.maintenant,
   });
 
-  final TextEditingController recherche;
-  final List<LieuRestaurant> suggestions;
-  final bool enCours;
-  final ValueChanged<String> onChange;
-  final ValueChanged<LieuRestaurant> onChoisir;
-  final VoidCallback onIntrouvable;
-
-  @override
-  Widget build(BuildContext context) {
-    final aCherche = recherche.text.trim().length >= 2;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TablChampTexte(
-          libelle: 'Restaurant',
-          controleur: recherche,
-          indication: 'Le Campus, ¡Toma!…',
-          iconePrefixe: Icons.search_rounded,
-          onChanged: onChange,
-        ),
-        if (enCours)
-          const LinearProgressIndicator(
-            minHeight: 2,
-            color: TablTokens.primaire,
-            backgroundColor: Colors.transparent,
-          ),
-        for (final lieu in suggestions.take(6))
-          TablLigneSuggestionLieu(
-            nom: lieu.nom,
-            description: lieu.description,
-            onSelection: () => onChoisir(lieu),
-          ),
-        if (aCherche && !enCours && suggestions.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
-            child: Text('Aucun restaurant trouvé.', style: TablTokens.legende),
-          ),
-        if (aCherche)
-          TablBoutonTexte(
-            libelle: 'Je ne trouve pas mon restaurant',
-            onPresse: onIntrouvable,
-          ),
-      ],
-    );
-  }
-}
-
-class _LieuManuel extends StatelessWidget {
-  const _LieuManuel({
-    required this.nom,
-    required this.ville,
-    required this.erreurNom,
-    required this.erreurVille,
-    required this.onValider,
-  });
-
-  final TextEditingController nom;
-  final TextEditingController ville;
-  final String? erreurNom;
-  final String? erreurVille;
-  final VoidCallback onValider;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TablChampTexte(
-          libelle: 'Restaurant',
-          controleur: nom,
-          indication: 'Le Comptoir',
-          erreur: erreurNom,
-        ),
-        const SizedBox(height: TablTokens.espaceM),
-        TablChampTexte(
-          libelle: 'Ville',
-          controleur: ville,
-          indication: 'Paris',
-          erreur: erreurVille,
-          actionClavier: TextInputAction.done,
-          onSoumis: (_) => onValider(),
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TablBoutonTexte(libelle: 'Valider', onPresse: onValider),
-        ),
-      ],
-    );
-  }
-}
-
-class _LieuChoisi extends StatelessWidget {
-  const _LieuChoisi({required this.lieu, required this.onChanger});
-
-  final LieuRestaurant lieu;
-  final VoidCallback onChanger;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(
-        TablTokens.espaceM,
-        TablTokens.espaceS,
-        TablTokens.espaceXs,
-        TablTokens.espaceS,
-      ),
-      decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
-        borderRadius: BorderRadius.circular(TablTokens.arrondiM),
-        border: Border.all(color: TablTokens.bordure),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(lieu.nom, style: TablTokens.sousTitre),
-                if (lieu.description.isNotEmpty)
-                  Text(lieu.description, style: TablTokens.legende),
-              ],
-            ),
-          ),
-          TablBoutonTexte(libelle: 'Changer', onPresse: onChanger),
-        ],
-      ),
-    );
-  }
-}
-
-/// Les roues du « Quand ? » : mois et année, le jour si on s'en
-/// souvient. « Valider » reste éteint sur une date pas encore passée.
-class _FeuilleDate extends StatefulWidget {
-  const _FeuilleDate({required this.initiale, required this.maintenant});
-
-  final DateSouvenir initiale;
+  final DateSouvenir date;
+  final String? moment;
   final DateTime maintenant;
 
   @override
-  State<_FeuilleDate> createState() => _FeuilleDateState();
+  State<_FeuilleQuand> createState() => _FeuilleQuandState();
 }
 
-class _FeuilleDateState extends State<_FeuilleDate> {
-  late DateSouvenir _date = widget.initiale;
+class _FeuilleQuandState extends State<_FeuilleQuand> {
+  late DateSouvenir _date = widget.date;
+  late String? _moment = widget.moment;
   late final List<int> _annees = anneesSouvenir(widget.maintenant);
 
   @override
@@ -659,16 +752,19 @@ class _FeuilleDateState extends State<_FeuilleDate> {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          TablTokens.espaceL,
+          TablTokens.espaceL - 4,
           0,
-          TablTokens.espaceL,
+          TablTokens.espaceL - 4,
           TablTokens.espaceM,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Quand ?', style: TablTokens.titre),
+            Text(
+              'Quand était-ce ?',
+              style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+            ),
             const SizedBox(height: TablTokens.espaceS),
             TablRouesDate(
               jours: ['—', for (var j = 1; j <= jours; j++) '$j'],
@@ -681,25 +777,44 @@ class _FeuilleDateState extends State<_FeuilleDate> {
               onMois: (i) =>
                   setState(() => _date = _date.copierAvec(mois: i + 1)),
               annees: [for (final a in _annees) '$a'],
-              indexAnnee: _annees.indexOf(_date.annee),
+              indexAnnee: math.max(_annees.indexOf(_date.annee), 0),
               onAnnee: (i) =>
                   setState(() => _date = _date.copierAvec(annee: _annees[i])),
             ),
+            const SizedBox(height: TablTokens.espaceS),
+            Wrap(
+              spacing: TablTokens.espaceS,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final m in const ['midi', 'soir'])
+                  TablPuceSelection(
+                    libelle: libelleMomentRepas(m)!,
+                    selectionnee: _moment == m,
+                    onBascule: () =>
+                        setState(() => _moment = _moment == m ? null : m),
+                  ),
+              ],
+            ),
             SizedBox(
-              height: 24,
+              height: 28,
               child: futur
-                  ? Text(
-                      'Cette date n\'est pas encore passée.',
-                      textAlign: TextAlign.center,
-                      style: TablTokens.legende.copyWith(
-                        color: TablTokens.erreur,
+                  ? Center(
+                      child: Text(
+                        'Cette date n\'est pas encore passée.',
+                        style: TablTokens.legende.copyWith(
+                          color: TablTokens.erreur,
+                        ),
                       ),
                     )
                   : null,
             ),
             TablBouton(
               libelle: 'Valider',
-              onPresse: futur ? null : () => Navigator.of(context).pop(_date),
+              onPresse: futur
+                  ? null
+                  : () => Navigator.of(
+                      context,
+                    ).pop((date: _date, moment: _moment)),
             ),
           ],
         ),

@@ -9,4 +9,12 @@ abstract interface class RechercheLieuService {
     double? latitude,
     double? longitude,
   });
+
+  /// Les lieux à moins de [rayonM] d'un point (là où une photo a été
+  /// prise), du plus proche au plus loin, avec leur distance à ce point.
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+  });
 }

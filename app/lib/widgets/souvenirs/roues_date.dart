@@ -2,51 +2,6 @@ import 'package:flutter/cupertino.dart';
 
 import '../../theme/tokens.dart';
 
-/// Une case du « Quand ? » d'un souvenir (« Mars », « 2023 », « Jour ·
-/// facultatif ») : un tap ouvre les roues.
-class TablCaseDate extends StatelessWidget {
-  const TablCaseDate({
-    super.key,
-    required this.texte,
-    required this.onPresse,
-    this.vide = false,
-  });
-
-  final String texte;
-
-  /// Rien de choisi : le texte est une indication, en plus doux.
-  final bool vide;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        onTap: onPresse,
-        child: Container(
-          height: TablTokens.hauteurControle,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceS),
-          decoration: BoxDecoration(
-            color: TablTokens.surfaceBasse,
-            borderRadius: BorderRadius.circular(TablTokens.arrondiM),
-            border: Border.all(color: TablTokens.bordure),
-          ),
-          child: Text(
-            texte,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: vide
-                ? TablTokens.legende
-                : TablTokens.corps.copyWith(color: TablTokens.texte),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Les roues jour / mois / année d'un souvenir, côte à côte. Chaque roue
 /// reçoit ses libellés prêts (« — » pour « pas de jour ») et l'index
 /// choisi ; un changement repart par son callback.

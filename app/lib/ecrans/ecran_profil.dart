@@ -79,6 +79,9 @@ class _EcranProfilState extends State<EcranProfil>
               RechercheLieuServiceSupabase(TablBackend.client),
           positionService:
               widget.positionService ?? PositionServiceGeolocator(),
+          photosRecentes: [
+            for (final s in souvenirs ?? const <SouvenirFeed>[]) ?s.photoUrl,
+          ].take(3).toList(),
         ),
       ),
     );

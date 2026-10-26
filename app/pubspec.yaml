@@ -19,6 +19,7 @@ dependencies:
   video_player: ^2.9.2
   geolocator: ^14.1.1
   mapbox_maps_flutter: ^3.33.0
+  exif: ^3.3.0
 
 dev_dependencies:
   flutter_test:

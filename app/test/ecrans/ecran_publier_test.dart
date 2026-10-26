@@ -313,6 +313,13 @@ class _FausseRechercheLieu implements RechercheLieuService {
     final t = texte.toLowerCase();
     return lieux.where((l) => l.nom.toLowerCase().contains(t)).toList();
   }
+
+  @override
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+  }) async => const [];
 }
 
 class _FaussePosition implements PositionService {
