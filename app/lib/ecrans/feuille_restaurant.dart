@@ -4,71 +4,60 @@ import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
 
-/// Les tailles de la feuille d'un restaurant, en fraction de la hauteur
-/// disponible : réduite (l'en-tête seulement) et ouverte.
-const tailleFeuilleReduite = 0.34;
-const tailleFeuilleOuverte = 0.94;
-
-/// Ouvre la feuille d'un restaurant par-dessus l'écran courant (Feed,
-/// Profil, liste de la carte) : une sous-page, pas une nouvelle page.
+/// Ouvre la fiche d'un restaurant, en page : d'où qu'on vienne (Explorer,
+/// Feed, profil), c'est la même. Voir [FicheRestaurant].
 Future<void> ouvrirFeuilleRestaurant(
   BuildContext context, {
   required String nom,
   required String sousTitre,
   required SouvenirService souvenirService,
   AbonnementService? abonnementService,
+  TableService? tableService,
   String? restaurantId,
   String? resume,
+  String? photoUrl,
   bool estEnvie = false,
   Future<String> Function()? entrerDansTabl,
+  VoidCallback? onVoirSurLaCarte,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => DraggableScrollableSheet(
-      initialChildSize: tailleFeuilleOuverte,
-      maxChildSize: tailleFeuilleOuverte,
-      minChildSize: 0.4,
-      expand: false,
-      builder: (contexteFeuille, defilement) => FeuilleRestaurant(
+  return Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => FicheRestaurant(
         nom: nom,
         sousTitre: sousTitre,
         resume: resume,
+        photoUrl: photoUrl,
         restaurantId: restaurantId,
         estEnvie: estEnvie,
         entrerDansTabl: entrerDansTabl,
         souvenirService: souvenirService,
         abonnementService: abonnementService,
-        defilement: defilement,
-        onFermer: () => Navigator.of(contexteFeuille).pop(),
+        tableService: tableService,
+        onVoirSurLaCarte: onVoirSurLaCarte,
       ),
     ),
   );
 }
 
-/// Le contenu de la page d'un restaurant, dans une feuille qui monte du
-/// bas : en haut le restaurant (nom, type, qui y est allé, envie), puis
-/// les avis de mon réseau du plus récent au plus ancien, en version
-/// compacte (photo à gauche). Un tap sur un avis l'agrandit sur place en
-/// publication complète, comme dans le Feed — jamais une autre page.
-class FeuilleRestaurant extends StatefulWidget {
-  const FeuilleRestaurant({
+/// La fiche d'un restaurant, d'après le prototype : sa photo en grand,
+/// Garder · Proposer · Carte, puis ce que mon cercle en dit — l'avis du
+/// cercle sur 5, qui le connaît, qui y retourne, qui l'a découvert le
+/// premier —, mon histoire ici, ce qui ressort, et les moments de mon
+/// cercle, qu'on agrandit sur place comme dans le Feed.
+class FicheRestaurant extends StatefulWidget {
+  const FicheRestaurant({
     super.key,
     required this.nom,
     required this.sousTitre,
     required this.souvenirService,
-    required this.defilement,
     this.abonnementService,
+    this.tableService,
     this.resume,
+    this.photoUrl,
     this.restaurantId,
     this.estEnvie = false,
     this.entrerDansTabl,
-    this.onFermer,
-    this.onToucherEntete,
-    this.onEnvieChangee,
-    this.flottante = false,
+    this.onVoirSurLaCarte,
   });
 
   final String nom;
@@ -78,44 +67,40 @@ class FeuilleRestaurant extends StatefulWidget {
 
   /// "Emma et 2 autres y sont allés", si connu.
   final String? resume;
+
+  /// Une photo déjà connue, en attendant celles des moments.
+  final String? photoUrl;
   final SouvenirService souvenirService;
 
-  /// Pour ouvrir le profil des auteurs des avis.
+  /// Pour ouvrir le profil des proches.
   final AbonnementService? abonnementService;
 
-  /// Le défilement de la feuille (fourni par DraggableScrollableSheet).
-  final ScrollController defilement;
+  /// Pour « Proposer » à une Table. `null` : pas de bouton.
+  final TableService? tableService;
 
   /// `null` pour un lieu qui n'est encore que dans l'annuaire : aucun avis.
   final String? restaurantId;
   final bool estEnvie;
 
   /// Pour un lieu de l'annuaire : le fait entrer dans Tabl et renvoie son
-  /// identifiant (nécessaire pour le mettre en envie).
+  /// identifiant (nécessaire pour le garder).
   final Future<String> Function()? entrerDansTabl;
-  final VoidCallback? onFermer;
 
-  /// Tap sur l'en-tête — sur la carte, agrandit la feuille réduite.
-  final VoidCallback? onToucherEntete;
-
-  /// L'envie a changé (la carte se met à jour).
-  final ValueChanged<bool>? onEnvieChangee;
-
-  /// Posée sur la carte : arrondie aux quatre coins. Sinon (feuille qui
-  /// monte du bord de l'écran), seulement en haut.
-  final bool flottante;
+  /// « Carte » : le montre sur la carte. `null` : pas de bouton.
+  final VoidCallback? onVoirSurLaCarte;
 
   @override
-  State<FeuilleRestaurant> createState() => _FeuilleRestaurantState();
+  State<FicheRestaurant> createState() => _FicheRestaurantState();
 }
 
-class _FeuilleRestaurantState extends State<FeuilleRestaurant>
-    with ActionsPublications<FeuilleRestaurant> {
+class _FicheRestaurantState extends State<FicheRestaurant>
+    with ActionsPublications<FicheRestaurant> {
   late String? _restaurantId = widget.restaurantId;
   late bool _estEnvie = widget.estEnvie;
   bool _envieEnCours = false;
   bool _chargement = true;
   bool _erreur = false;
+  List<ResumeTable> _tables = const [];
 
   @override
   SouvenirService get souvenirService => widget.souvenirService;
@@ -127,6 +112,7 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
   void initState() {
     super.initState();
     recharger();
+    _chargerTables();
   }
 
   @override
@@ -140,20 +126,35 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
       return;
     }
     try {
-      final avis = await widget.souvenirService.souvenirsDuRestaurant(id);
+      final moments = await widget.souvenirService.souvenirsDuRestaurant(id);
       if (!mounted) return;
       setState(() {
-        souvenirs = avis;
+        souvenirs = moments;
         _chargement = false;
         _erreur = false;
       });
     } catch (e) {
-      debugPrint('FeuilleRestaurant: $e');
-      if (mounted) setState(() => _erreur = true);
+      debugPrint('FicheRestaurant: $e');
+      if (mounted) {
+        setState(() {
+          _erreur = true;
+          _chargement = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _chargerTables() async {
+    try {
+      final tables = await widget.tableService?.mesTables() ?? const [];
+      if (mounted) setState(() => _tables = tables);
+    } catch (e) {
+      debugPrint('FicheRestaurant: tables : $e');
     }
   }
 
   Future<void> _basculerEnvieRestaurant() async {
+    if (_envieEnCours) return;
     setState(() => _envieEnCours = true);
     try {
       final id = _restaurantId ?? await widget.entrerDansTabl?.call();
@@ -165,137 +166,297 @@ class _FeuilleRestaurantState extends State<FeuilleRestaurant>
         _restaurantId = id;
         _estEnvie = envie;
       });
-      widget.onEnvieChangee?.call(envie);
+      afficherMessage(
+        context,
+        envie ? 'Gardée dans vos envies.' : 'Retirée de vos envies.',
+      );
     } catch (e) {
-      debugPrint('FeuilleRestaurant: envie : $e');
+      debugPrint('FicheRestaurant: envie : $e');
       if (mounted) afficherMessage(context, messageErreurGenerique);
     } finally {
       if (mounted) setState(() => _envieEnCours = false);
     }
   }
 
+  /// La ville, celle de la fiche (« Italien · Rue du Pont 16, Liège » →
+  /// « Liège »), pour proposer le restaurant à une Table.
+  String get _ville {
+    final morceaux = widget.sousTitre.split(',');
+    return morceaux.length > 1 ? morceaux.last.trim() : '';
+  }
+
+  Future<void> _proposer() async {
+    final service = widget.tableService;
+    if (service == null || _tables.isEmpty) return;
+    final table = await showModalBottomSheet<ResumeTable>(
+      context: context,
+      backgroundColor: const Color(0xFF111216),
+      showDragHandle: true,
+      builder: (contexte) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL - 4,
+            0,
+            TablTokens.espaceL - 4,
+            TablTokens.espaceM,
+          ),
+          children: [
+            Text(
+              'Proposer ${widget.nom}',
+              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'À quelle Table ? Elle répondra GO ou non, puis on trouvera la date.',
+              style: TablTokens.legende,
+            ),
+            const SizedBox(height: TablTokens.espaceM),
+            for (final t in _tables)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Text(
+                  t.emoji ?? '🍽',
+                  style: const TextStyle(fontSize: 22),
+                ),
+                title: Text(t.nom, style: TablTokens.corps),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: TablTokens.texteDoux,
+                ),
+                onTap: () => Navigator.of(contexte).pop(t),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (table == null || !mounted) return;
+    try {
+      final resultat = await service.proposer(
+        tableId: table.id,
+        nomRestaurant: widget.nom,
+        ville: _ville,
+      );
+      if (!mounted) return;
+      afficherMessage(
+        context,
+        resultat.dejaExistante
+            ? 'Déjà proposé à ${table.nom}.'
+            : 'Proposé à ${table.nom}.',
+      );
+    } catch (e) {
+      debugPrint('FicheRestaurant: proposer : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+    }
+  }
+
+  /// La liste de ceux qui le connaissent (ou y retournent).
+  void _voirProches(String titre, List<ProcheFiche> proches) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF111216),
+      showDragHandle: true,
+      builder: (contexte) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL - 4,
+            0,
+            TablTokens.espaceL - 4,
+            TablTokens.espaceM,
+          ),
+          children: [
+            Text(
+              titre,
+              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+            ),
+            const SizedBox(height: TablTokens.espaceS),
+            for (final p in proches)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: TablAvatar(
+                  pseudo: p.pseudo,
+                  photoUrl: p.photoUrl,
+                  rayon: 20,
+                ),
+                title: Text(p.pseudo, style: TablTokens.corps),
+                subtitle: Text(
+                  p.fois == 1 ? 'Une fois' : '${p.fois} fois',
+                  style: TablTokens.legende,
+                ),
+                onTap: abonnementService == null
+                    ? null
+                    : () {
+                        Navigator.of(contexte).pop();
+                        ouvrirProfilDe(p.id, p.pseudo);
+                      },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final avis = souvenirs ?? const <SouvenirFeed>[];
-    return Material(
-      color: TablTokens.surface,
-      elevation: widget.flottante ? 10 : 0,
-      shadowColor: Colors.black,
-      borderRadius: widget.flottante
-          ? BorderRadius.circular(TablTokens.arrondiL)
-          : const BorderRadius.vertical(
-              top: Radius.circular(TablTokens.arrondiL),
-            ),
-      clipBehavior: Clip.antiAlias,
-      child: ListView(
-        controller: widget.defilement,
-        padding: const EdgeInsets.only(bottom: TablTokens.espaceXl),
+    final moments = souvenirs ?? const <SouvenirFeed>[];
+    final r = resumerFiche(moments);
+    final note = r.note;
+    final maintenant = DateTime.now();
+    final derniere = r.maDerniere;
+    final detailAvis = [
+      if (r.avis > 0) r.avis == 1 ? '1 avis' : '${r.avis} avis',
+      if (r.sansAvis > 0)
+        r.sansAvis == 1
+            ? '1 passage sans avis'
+            : '${r.sansAvis} passages sans avis',
+    ].join(' · ');
+    final premiere = r.premiereDecouverte;
+    return Scaffold(
+      backgroundColor: TablTokens.fond,
+      body: ListView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom + TablTokens.espaceXl,
+        ),
         children: [
-          _enTete(avis.length),
-          if (_erreur)
-            const _Message(texte: messageErreurGenerique)
-          else if (_chargement)
-            const Padding(
-              padding: EdgeInsets.all(TablTokens.espaceXl),
-              child: Center(
-                child: CircularProgressIndicator(color: TablTokens.primaire),
-              ),
-            )
-          else if (avis.isEmpty)
-            const _Message(
-              texte:
-                  'Personne de votre réseau n\'y est encore allé. '
-                  'Ajoutez-le à vos envies pour ne pas l\'oublier.',
-            )
-          else
-            for (final a in avis)
+          TablHerosFiche(
+            nom: widget.nom,
+            sousTitre: widget.sousTitre,
+            photoUrl: r.photoUrl ?? widget.photoUrl,
+            mention: r.mesFois >= 3
+                ? 'Votre adresse · ${r.mesFois} fois'
+                : null,
+            onRetour: () => Navigator.of(context).pop(),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: TablTokens.espaceL - 4,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TablActionsFiche(
+                  actions: [
+                    ActionFiche(
+                      icone: _estEnvie
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      libelle: _estEnvie ? 'Gardée' : 'Garder',
+                      active: _estEnvie,
+                      onPresse: _basculerEnvieRestaurant,
+                    ),
+                    if (widget.tableService != null && _tables.isNotEmpty)
+                      ActionFiche(
+                        icone: Icons.person_add_alt_1_outlined,
+                        libelle: 'Proposer',
+                        onPresse: _proposer,
+                      ),
+                    if (widget.onVoirSurLaCarte != null)
+                      ActionFiche(
+                        icone: Icons.map_outlined,
+                        libelle: 'Carte',
+                        onPresse: () {
+                          Navigator.of(context).pop();
+                          widget.onVoirSurLaCarte!();
+                        },
+                      ),
+                  ],
+                ),
+                const SizedBox(height: TablTokens.espaceM),
+                if (_erreur)
+                  const _Message(texte: messageErreurGenerique)
+                else if (_chargement)
+                  const Padding(
+                    padding: EdgeInsets.all(TablTokens.espaceXl),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: TablTokens.primaire,
+                      ),
+                    ),
+                  )
+                else if (r.estVide)
+                  const _Message(
+                    texte:
+                        'Personne de votre cercle n\'y est encore allé. '
+                        'Gardez-la pour ne pas l\'oublier.',
+                  )
+                else ...[
+                  if (r.connaissent.isNotEmpty) ...[
+                    TablAvisCercle(
+                      note: note == null ? null : noteLisible(note),
+                      emoji: r.emojiDominant,
+                      detailAvis: detailAvis.isEmpty
+                          ? 'Aucun ressenti donné'
+                          : detailAvis,
+                      connaissent: r.connaissent.length,
+                      visagesConnaissent: [
+                        for (final p in r.connaissent.take(3))
+                          BullePersonne(pseudo: p.pseudo, photoUrl: p.photoUrl),
+                      ],
+                      yRetournent: r.yRetournent.length,
+                      onConnaissent: () => _voirProches(
+                        r.connaissent.length == 1
+                            ? 'La connaît'
+                            : 'Ils la connaissent',
+                        r.connaissent,
+                      ),
+                      onYRetournent: r.yRetournent.isEmpty
+                          ? null
+                          : () =>
+                                _voirProches('Ils y retournent', r.yRetournent),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (premiere != null) ...[
+                    TablPremiereDecouverte(
+                      visage: BullePersonne(
+                        pseudo: premiere.proche.pseudo,
+                        photoUrl: premiere.proche.photoUrl,
+                      ),
+                      annee: '${premiere.annee}',
+                      onPresse: abonnementService == null
+                          ? null
+                          : () => ouvrirProfilDe(
+                              premiere.proche.id,
+                              premiere.proche.pseudo,
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  TablMonHistoireFiche(
+                    fois: r.mesFois,
+                    depuis: derniere == null
+                        ? null
+                        : tempsDepuis(derniere, maintenant),
+                    detail: monHistoireIci(r),
+                  ),
+                  if (r.ceQuiRessort.isNotEmpty) ...[
+                    const SizedBox(height: TablTokens.espaceL),
+                    const TablEtiquetteFiche(texte: 'Ce qui ressort'),
+                    const SizedBox(height: TablTokens.espaceM - 4),
+                    TablCeQuiRessort(impressions: r.ceQuiRessort),
+                  ],
+                  const SizedBox(height: TablTokens.espaceL),
+                  TablEtiquetteFiche(
+                    texte: moments.length == 1
+                        ? 'Le moment du cercle ici'
+                        : 'Les moments du cercle ici',
+                  ),
+                  const SizedBox(height: TablTokens.espaceS),
+                ],
+              ],
+            ),
+          ),
+          if (!_chargement && !_erreur)
+            for (final m in parDateDecroissante(moments))
               publicationDepliable(
-                a,
+                m,
                 contexte: ContextePublication.feed,
                 titreAuteur: true,
                 // On est déjà sur ce restaurant.
                 onOuvrirLieu: () {},
               ),
         ],
-      ),
-    );
-  }
-
-  Widget _enTete(int nombreAvis) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onToucherEntete,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          TablTokens.espaceL,
-          TablTokens.espaceS,
-          TablTokens.espaceS,
-          TablTokens.espaceM,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: TablTokens.bordure,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: TablTokens.espaceM),
-                    child: Text(widget.nom, style: TablTokens.titre),
-                  ),
-                ),
-                if (widget.onFermer != null)
-                  IconButton(
-                    onPressed: widget.onFermer,
-                    tooltip: 'Fermer',
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    color: TablTokens.texteDoux,
-                  ),
-              ],
-            ),
-            if (widget.sousTitre.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(widget.sousTitre, style: TablTokens.legende),
-              ),
-            if (widget.resume != null)
-              Padding(
-                padding: const EdgeInsets.only(top: TablTokens.espaceS),
-                child: Text(
-                  widget.resume!,
-                  style: TablTokens.legende.copyWith(
-                    color: TablTokens.primaire,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            const SizedBox(height: TablTokens.espaceM),
-            TablPuceFiltre(
-              libelle: _estEnvie ? 'Dans mes envies' : 'Ajouter à mes envies',
-              actif: _estEnvie,
-              onPresse: _envieEnCours ? () {} : _basculerEnvieRestaurant,
-            ),
-            if (nombreAvis > 0) ...[
-              const SizedBox(height: TablTokens.espaceL),
-              Text(
-                nombreAvis == 1
-                    ? '1 avis de votre réseau'
-                    : '$nombreAvis avis de votre réseau',
-                style: TablTokens.sousTitre,
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -309,11 +470,11 @@ class _Message extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(TablTokens.espaceXl),
+      padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXl),
       child: Text(
         texte,
         textAlign: TextAlign.center,
-        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+        style: TablTokens.titreAffichage.copyWith(fontSize: 19, height: 1.35),
       ),
     );
   }

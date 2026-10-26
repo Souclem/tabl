@@ -468,9 +468,14 @@ class _EcranCarteState extends State<EcranCarte> {
       resume: lieu.duReseau ? lieu.resumeVisites : null,
       restaurantId: lieu.restaurantId,
       estEnvie: lieu.estEnvie,
+      photoUrl: _photo(lieu),
       souvenirService: souvenirs,
       abonnementService: widget.abonnementService,
+      tableService: widget.tableService,
       entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
+      onVoirSurLaCarte: widget.afficherCarte
+          ? () => _montrerSurLaCarte(lieu)
+          : null,
     );
     if (mounted) _charger();
   }
@@ -652,10 +657,15 @@ class _EcranCarteState extends State<EcranCarte> {
       case 'envie':
         _basculerEnvie(lieu);
       case 'carte':
-        setState(() => _enListe = false);
-        await _controleur.centrerSur(lieu.latitude, lieu.longitude, zoom: 15.5);
-        if (mounted) _choisir(lieu, voisinsDepuis: lieu);
+        _montrerSurLaCarte(lieu);
     }
+  }
+
+  /// Sur la carte, de près, l'aperçu du lieu ouvert.
+  Future<void> _montrerSurLaCarte(LieuCarte lieu) async {
+    setState(() => _enListe = false);
+    await _controleur.centrerSur(lieu.latitude, lieu.longitude, zoom: 15.5);
+    if (mounted) _choisir(lieu, voisinsDepuis: lieu);
   }
 
   // ---------------------------------------------------------------
