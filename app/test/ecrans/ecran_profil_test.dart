@@ -10,6 +10,9 @@ import 'package:app/ecrans/ecran_profil.dart';
 /// Seules les méthodes réellement appelées par le Profil sont
 /// implémentées ; toute autre lève, ce qui signale un appel inattendu.
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
+      throw UnimplementedError();
   _FauxSouvenirService(this.mesSouvenirs);
 
   final List<SouvenirFeed> mesSouvenirs;
@@ -187,12 +190,28 @@ Future<_FauxSouvenirService> _ouvrirProfil(
           utilisateur: _moi,
           tableService: _FauxTableService(),
           retourService: retourService,
+          rechercheLieuService: _FausseRechercheLieu(),
+          positionService: _FaussePosition(),
         ),
       ),
     );
     await tester.pumpAndSettle();
   });
   return service;
+}
+
+class _FausseRechercheLieu implements RechercheLieuService {
+  @override
+  Future<List<LieuRestaurant>> rechercher(
+    String texte, {
+    double? latitude,
+    double? longitude,
+  }) async => const [];
+}
+
+class _FaussePosition implements PositionService {
+  @override
+  Future<Coordonnees?> positionActuelle() async => null;
 }
 
 /// Ouvre l'onglet Souvenirs (le Bilan est ouvert à l'arrivée).
@@ -405,10 +424,30 @@ void main() {
     );
   });
 
-  testWidgets('aucune publication : message dédié', (tester) async {
+  testWidgets('aucune publication : une invitation à retrouver ses souvenirs', (
+    tester,
+  ) async {
     await _ouvrirProfil(tester, []);
 
-    expect(find.text("Vous n'avez encore rien publié."), findsOneWidget);
+    expect(
+      find.text('Votre histoire gastronomique commence ici'),
+      findsOneWidget,
+    );
     expect(find.text('Souvenirs'), findsNothing);
+
+    await tester.tap(find.text('Retrouver mes souvenirs'));
+    await tester.pumpAndSettle();
+    expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
+  });
+
+  testWidgets('« Ajouter un souvenir » en tête de ses souvenirs', (
+    tester,
+  ) async {
+    await _ouvrirProfil(tester, [_monSouvenir('1', 'Bibo')]);
+    await _allerAuxSouvenirs(tester);
+
+    await tester.tap(find.text('Ajouter un souvenir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Comment retrouver vos souvenirs ?'), findsOneWidget);
   });
 }

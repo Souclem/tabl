@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../bouton_verre.dart';
 import '../bulles_personnes.dart';
+import '../indicateur_page.dart';
 import '../publication.dart';
 import 'commentaires_moment.dart';
 import 'grille_moments.dart';
 
 /// Un moment agrandi depuis la grille d'un profil : la photo en grand
-/// en haut (elle arrive de sa tuile, voir [TuileMoment.cleHero]), puis
+/// en haut (elle arrive de sa tuile, voir [TuileMoment.cleHero]) — les
+/// suivantes d'un souvenir se font défiler du doigt —, puis
 /// le lieu, ceux qui étaient là, la légende, les impressions, les
 /// actions habituelles, puis les commentaires et de quoi en ajouter un
 /// (« Commenter » y place directement le curseur).
@@ -42,10 +44,18 @@ class TablVisionneuseMoment extends StatefulWidget {
     this.onEnregistrer,
     this.onOptions,
     this.audienceRestreinte = false,
+    this.autresPhotosUrls = const [],
+    this.estSouvenir = false,
   });
 
   final Object cleHero;
   final String? photoUrl;
+
+  /// Après [photoUrl], dans l'ordre.
+  final List<String> autresPhotosUrls;
+
+  /// Un repas passé : « ☾ Souvenir » au-dessus du nom.
+  final bool estSouvenir;
   final String restaurantNom;
 
   /// "Liège · 16 octobre 2026 · Dîner".
@@ -89,6 +99,9 @@ class TablVisionneuseMoment extends StatefulWidget {
 class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
   final _focusCommentaire = FocusNode();
 
+  /// La photo affichée, quand il y en a plusieurs.
+  int _page = 0;
+
   @override
   void dispose() {
     _focusCommentaire.dispose();
@@ -118,11 +131,49 @@ class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
               children: [
                 SizedBox(
                   height: hauteurPhoto,
-                  child: Hero(
-                    tag: v.cleHero,
-                    createRectTween: volEnLigneDroite,
-                    child: TablPhotoMoment(url: v.photoUrl),
-                  ),
+                  child: v.autresPhotosUrls.isEmpty
+                      ? Hero(
+                          tag: v.cleHero,
+                          createRectTween: volEnLigneDroite,
+                          child: TablPhotoMoment(url: v.photoUrl),
+                        )
+                      : Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Hero(
+                                tag: v.cleHero,
+                                createRectTween: volEnLigneDroite,
+                                // Le vol montre la principale, celle de
+                                // la tuile, quelle que soit la page.
+                                flightShuttleBuilder: (_, _, _, _, _) =>
+                                    TablPhotoMoment(url: v.photoUrl),
+                                child: PageView(
+                                  onPageChanged: (page) =>
+                                      setState(() => _page = page),
+                                  children: [
+                                    TablPhotoMoment(url: v.photoUrl),
+                                    for (final url in v.autresPhotosUrls)
+                                      TablPhotoMoment(url: url),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: TablTokens.espaceM,
+                              child: FadeTransition(
+                                opacity: arrivee,
+                                child: Center(
+                                  child: TablIndicateurPage(
+                                    total: v.autresPhotosUrls.length + 1,
+                                    index: _page,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
                 FadeTransition(
                   opacity: arrivee,
@@ -198,6 +249,27 @@ class _Panneau extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (v.estSouvenir) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.nightlight_round,
+                  size: 13,
+                  color: TablTokens.texteDoux,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'SOUVENIR',
+                  style: TablTokens.legende.copyWith(
+                    fontSize: 11,
+                    letterSpacing: 1.6,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

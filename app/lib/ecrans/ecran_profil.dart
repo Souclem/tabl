@@ -8,6 +8,7 @@ import 'contenu_profil.dart';
 import 'ecran_accueil.dart';
 import 'ecran_aide.dart';
 import 'ecran_abonnes.dart';
+import 'ecran_choix_souvenir.dart';
 import 'feuille_audience.dart';
 
 /// Onglet Profil : en haut, qui on est (photo, prénom, moments, abonnés,
@@ -23,6 +24,8 @@ class EcranProfil extends StatefulWidget {
     required this.utilisateur,
     this.tableService,
     this.retourService,
+    this.rechercheLieuService,
+    this.positionService,
   });
 
   final AuthService authService;
@@ -40,6 +43,11 @@ class EcranProfil extends StatefulWidget {
   /// même principe que [tableService].
   final RetourService? retourService;
 
+  /// `null` par défaut : construits à l'ouverture d'« Ajouter un
+  /// souvenir », même principe que [tableService].
+  final RechercheLieuService? rechercheLieuService;
+  final PositionService? positionService;
+
   @override
   State<EcranProfil> createState() => _EcranProfilState();
 }
@@ -53,6 +61,32 @@ class _EcranProfilState extends State<EcranProfil>
 
   @override
   void Function(SouvenirFeed)? get optionsMoment => _ouvrirOptions;
+
+  @override
+  VoidCallback get onAjouterSouvenir => _ajouterDesSouvenirs;
+
+  /// Le menu « Comment retrouver vos souvenirs ? » ; au retour d'un
+  /// souvenir ajouté, ses souvenirs se rechargent et s'affichent.
+  Future<void> _ajouterDesSouvenirs() async {
+    final ajoute = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EcranChoixSouvenir(
+          souvenirService: widget.souvenirService,
+          abonnementService: widget.abonnementService,
+          tableService: _tableService,
+          rechercheLieuService:
+              widget.rechercheLieuService ??
+              RechercheLieuServiceSupabase(TablBackend.client),
+          positionService:
+              widget.positionService ?? PositionServiceGeolocator(),
+        ),
+      ),
+    );
+    if (ajoute != true || !mounted) return;
+    recharger();
+    setState(() => rubrique = RubriqueProfil.souvenirs);
+    afficherMessage(context, 'Souvenir ajouté.');
+  }
 
   /// Remplace la photo de l'utilisateur dès qu'il en a choisi une
   /// nouvelle, sans attendre une reconnexion.
@@ -471,9 +505,22 @@ class _EcranProfilState extends State<EcranProfil>
                     child: _MessageListe(texte: messageErreurGenerique),
                   )
                 else if (mesSouvenirs.isEmpty)
-                  const SliverToBoxAdapter(
-                    child: _MessageListe(
-                      texte: "Vous n'avez encore rien publié.",
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        TablTokens.espaceL - 4,
+                        TablTokens.espaceL,
+                        TablTokens.espaceL - 4,
+                        0,
+                      ),
+                      child: TablInvitationSouvenirs(
+                        titre: 'Votre histoire gastronomique commence ici',
+                        texte:
+                            'Ajoutez vos repas passés : ils se rangent à '
+                            'leur date sur votre profil.',
+                        libelleBouton: 'Retrouver mes souvenirs',
+                        onPresse: _ajouterDesSouvenirs,
+                      ),
                     ),
                   )
                 else

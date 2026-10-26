@@ -39,14 +39,19 @@ String nomPersonne(PersonnePresente personne) =>
 /// 2026 · Dîner".
 String detailsMoment(SouvenirFeed s) => [
   if (s.ville.isNotEmpty) s.ville,
-  '${s.dateVisite.day} ${nomDuMois(s.dateVisite.month)} ${s.dateVisite.year}',
+  [
+    if (s.jourConnu) s.dateVisite.day,
+    nomDuMois(s.dateVisite.month),
+    s.dateVisite.year,
+  ].join(' '),
   ?libelleMomentRepas(s.moment),
 ].join(' · ');
 
 /// "Forno Rosso, 16 octobre" — ce que lit un lecteur d'écran sur sa
 /// tuile.
 String libelleTuileMoment(SouvenirFeed s) =>
-    '${s.restaurantNom}, ${dateLisibleSouvenir(s.dateVisite)}';
+    '${s.restaurantNom}, '
+    '${dateLisibleSouvenir(s.dateVisite, jourConnu: s.jourConnu)}';
 
 /// "avec Arthur et toi" ; `null` si personne n'est tagué.
 String? avecQuiMoment(SouvenirFeed s) => s.presents.isEmpty
@@ -81,7 +86,7 @@ List<MoisJournal> journalParMois(List<SouvenirFeed> souvenirs) {
       MoisJournal(
         annee: annee,
         mois: mois,
-        titre: _majuscule(nomDuMois(mois)),
+        titre: majuscule(nomDuMois(mois)),
         compte: pluriel(duMois.length, 'moment'),
         souvenirs: duMois,
         indexVedette: indexVedette(duMois),
@@ -89,7 +94,8 @@ List<MoisJournal> journalParMois(List<SouvenirFeed> souvenirs) {
   ];
 }
 
-String _majuscule(String mot) => '${mot[0].toUpperCase()}${mot.substring(1)}';
+/// "octobre" → "Octobre".
+String majuscule(String mot) => '${mot[0].toUpperCase()}${mot.substring(1)}';
 
 /// Les personnes présentes dans [souvenirs], de la plus fréquente à la
 /// moins fréquente (à égalité : la plus récente d'abord).
@@ -180,7 +186,8 @@ DuoProfils? duoAvec({
     resume:
         '${pluriel(ensemble.length, 'moment')} ensemble, dans '
         '${pluriel(adresses, 'adresse')}. Le dernier : '
-        '${dernier.restaurantNom}, le ${dernier.dateVisite.day} '
+        '${dernier.restaurantNom}, '
+        '${dernier.jourConnu ? 'le ${dernier.dateVisite.day}' : 'en'} '
         '${nomDuMois(dernier.dateVisite.month)}.',
     souvenirs: ensemble,
   );

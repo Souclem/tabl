@@ -11,6 +11,7 @@ import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
+import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
@@ -104,6 +105,46 @@ class SouvenirServiceSupabase implements SouvenirService {
       await _client.from('souvenirs_amis_tagues').insert([
         for (final profilId in amisTaguesIds)
           {'souvenir_id': souvenirId, 'profil_id': profilId},
+      ]);
+    }
+
+    await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
+    return _associerTables(souvenirId, cible.tableIds.toList());
+  }
+
+  @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) async {
+    final cible = souvenir.audience.normalisee();
+    // Toutes ensemble : dix photos l'une après l'autre feraient attendre.
+    final chemins = await Future.wait([
+      for (var i = 0; i < souvenir.photos.length; i++)
+        _deposerPhoto(souvenir.photos[i], suffixe: '$i'),
+    ]);
+    final restaurantId = await _restaurants.idPour(souvenir.lieu);
+
+    final cree = await _client
+        .from('souvenirs')
+        .insert({
+          'auteur_id': _monId,
+          'restaurant_id': restaurantId,
+          'photo_url': chemins.firstOrNull,
+          'legende': souvenir.legende,
+          'emotion': souvenir.emotion?.emoji,
+          'moment': souvenir.moment,
+          'date_visite': _formaterDate(souvenir.date.date),
+          'jour_connu': souvenir.date.jour != null,
+          'est_souvenir': true,
+          'statut': 'publie',
+          'visibilite': cible.mode.valeur,
+        })
+        .select('id')
+        .single();
+
+    final souvenirId = cree['id'] as String;
+    if (chemins.length > 1) {
+      await _client.from('souvenirs_photos').insert([
+        for (var rang = 1; rang < chemins.length; rang++)
+          {'souvenir_id': souvenirId, 'rang': rang, 'chemin': chemins[rang]},
       ]);
     }
 
@@ -239,7 +280,7 @@ class SouvenirServiceSupabase implements SouvenirService {
   }
 
   @override
-  Future<List<SouvenirFeed>> feed() => _souvenirsPublies();
+  Future<List<SouvenirFeed>> feed() => _souvenirsPublies(sansSouvenirs: true);
 
   @override
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
@@ -257,10 +298,12 @@ class SouvenirServiceSupabase implements SouvenirService {
   /// restriction des auteurs change, tout le reste (réactions,
   /// commentaires, URLs signées) est résolu de la même façon.
   /// [avecPresent] : seulement les moments où cette personne est taguée.
+  /// [sansSouvenirs] : sans les repas passés ajoutés après coup (Feed).
   Future<List<SouvenirFeed>> _souvenirsPublies({
     String? auteurId,
     String? restaurantId,
     String? avecPresent,
+    bool sansSouvenirs = false,
   }) async {
     final presentsFiltres = avecPresent == null
         ? ''
@@ -269,12 +312,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         .from('souvenirs')
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
-          'impressions, visibilite, restaurant_id, '
+          'impressions, visibilite, restaurant_id, est_souvenir, jour_connu, '
           'restaurants(nom, ville, categories), '
+          'souvenirs_photos(rang, chemin), '
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)'
           '$presentsFiltres',
         )
         .eq('statut', 'publie');
+    if (sansSouvenirs) requete = requete.eq('est_souvenir', false);
     if (restaurantId != null) {
       requete = requete.eq('restaurant_id', restaurantId);
     }
@@ -296,6 +341,16 @@ class SouvenirServiceSupabase implements SouvenirService {
         .limit(nombreMaxSouvenirsCharges);
 
     final ids = lignes.map((l) => l['id'] as String).toList();
+    // Les photos après la principale, dans leur ordre.
+    final autresChemins = {
+      for (final l in lignes)
+        l['id'] as String: [
+          for (final p in [
+            ...?l['souvenirs_photos'] as List?,
+          ]..sort((a, b) => (a['rang'] as int).compareTo(b['rang'] as int)))
+            p['chemin'] as String,
+        ],
+    };
 
     // Indépendantes les unes des autres : envoyées ensemble, on n'attend
     // que la plus lente au lieu de la somme des cinq.
@@ -306,14 +361,10 @@ class SouvenirServiceSupabase implements SouvenirService {
       presents,
       envies,
     ) = await (
-      liensSignes(
-        _client,
-        'souvenirs',
-        lignes
-            .map((l) => l['photo_url'] as String?)
-            .whereType<String>()
-            .toList(),
-      ),
+      liensSignes(_client, 'souvenirs', [
+        ...lignes.map((l) => l['photo_url'] as String?).whereType<String>(),
+        for (final chemins in autresChemins.values) ...chemins,
+      ]),
       _reactionsParSouvenir(ids),
       _nombreCommentairesParSouvenir(ids),
       _presentsParSouvenir(ids),
@@ -356,6 +407,12 @@ class SouvenirServiceSupabase implements SouvenirService {
           miniature: true,
         ),
         estEnvie: envies.contains(l['restaurant_id']),
+        autresPhotosUrls: [
+          for (final c in autresChemins[id] ?? const <String>[])
+            ?urlParChemin[c],
+        ],
+        estSouvenir: l['est_souvenir'] as bool? ?? false,
+        jourConnu: l['jour_connu'] as bool? ?? true,
       );
     }).toList();
   }

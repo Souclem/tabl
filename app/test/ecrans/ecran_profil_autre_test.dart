@@ -7,6 +7,9 @@ import 'package:app/widgets/widgets.dart';
 import 'package:app/ecrans/ecran_profil_autre.dart';
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
+      throw UnimplementedError();
   _FauxSouvenirService(this.publications);
 
   final List<SouvenirFeed> publications;

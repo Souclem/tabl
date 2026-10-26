@@ -7,6 +7,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'feuille_audience.dart';
+import 'recherche_lieu_en_direct.dart';
 
 /// Les 4 emoji parmi lesquels choisir à la finalisation — ensemble et
 /// ordre exacts du prototype fonctionnel (`emotionOptions` dans
@@ -67,7 +68,14 @@ class EcranPublier extends StatefulWidget {
   State<EcranPublier> createState() => _EcranPublierState();
 }
 
-class _EcranPublierState extends State<EcranPublier> {
+class _EcranPublierState extends State<EcranPublier>
+    with RechercheLieuEnDirect<EcranPublier> {
+  @override
+  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
+
+  @override
+  PositionService? get positionService => widget.positionService;
+
   final _nomRestaurant = TextEditingController();
   final _ville = TextEditingController();
   final _legende = TextEditingController();
@@ -77,12 +85,7 @@ class _EcranPublierState extends State<EcranPublier> {
 
   // Étape Lieu : recherche dans l'annuaire, ou saisie à la main si le
   // restaurant est introuvable (ou la recherche indisponible).
-  final _recherche = TextEditingController();
-  Timer? _attenteRecherche;
-  List<LieuRestaurant> _suggestions = const [];
-  bool _rechercheEnCours = false;
   late bool _saisieManuelle = widget.rechercheLieuService == null;
-  Coordonnees? _position;
   LieuRestaurant? _lieu;
   Uint8List? _photo;
   Uint8List? _boissonPhoto;
@@ -115,55 +118,6 @@ class _EcranPublierState extends State<EcranPublier> {
     setState(() => _audience = choisie);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _localiser();
-  }
-
-  Future<void> _localiser() async {
-    final position = await widget.positionService?.positionActuelle();
-    if (!mounted || position == null) return;
-    setState(() => _position = position);
-    // Une recherche tapée avant que la position n'arrive est relancée
-    // pour profiter du tri par proximité.
-    if (_recherche.text.trim().length >= 2) _rechercher(_recherche.text);
-  }
-
-  void _rechercherAvecAttente(String texte) {
-    _attenteRecherche?.cancel();
-    _attenteRecherche = Timer(
-      const Duration(milliseconds: 250),
-      () => _rechercher(texte),
-    );
-  }
-
-  Future<void> _rechercher(String texte) async {
-    final service = widget.rechercheLieuService;
-    if (service == null) return;
-    if (texte.trim().length < 2) {
-      setState(() => _suggestions = const []);
-      return;
-    }
-    setState(() => _rechercheEnCours = true);
-    try {
-      final resultats = await service.rechercher(
-        texte,
-        latitude: _position?.latitude,
-        longitude: _position?.longitude,
-      );
-      // Une réponse plus ancienne que la frappe actuelle est ignorée.
-      if (!mounted || _recherche.text != texte) return;
-      setState(() => _suggestions = resultats);
-    } catch (e) {
-      debugPrint('EcranPublier: recherche de lieu : $e');
-      if (!mounted) return;
-      afficherMessage(context, messageErreurGenerique);
-    } finally {
-      if (mounted) setState(() => _rechercheEnCours = false);
-    }
-  }
-
   void _choisirLieu(LieuRestaurant lieu) {
     FocusScope.of(context).unfocus();
     setState(() {
@@ -176,14 +130,12 @@ class _EcranPublierState extends State<EcranPublier> {
     setState(() {
       _saisieManuelle = true;
       // On reprend ce qui a déjà été tapé comme nom.
-      if (_nomRestaurant.text.isEmpty) _nomRestaurant.text = _recherche.text;
+      if (_nomRestaurant.text.isEmpty) _nomRestaurant.text = recherche.text;
     });
   }
 
   @override
   void dispose() {
-    _attenteRecherche?.cancel();
-    _recherche.dispose();
     _nomRestaurant.dispose();
     _ville.dispose();
     _legende.dispose();
@@ -205,8 +157,8 @@ class _EcranPublierState extends State<EcranPublier> {
       LieuRestaurant.manuel(
         nom: _nomRestaurant.text.trim(),
         ville: _ville.text.trim(),
-        latitude: _position?.latitude,
-        longitude: _position?.longitude,
+        latitude: position?.latitude,
+        longitude: position?.longitude,
       ),
     );
   }
@@ -346,11 +298,11 @@ class _EcranPublierState extends State<EcranPublier> {
       body: SafeArea(
         child: switch (_etape) {
           _Etape.lieu when !_saisieManuelle => _EtapeRechercheLieu(
-            recherche: _recherche,
-            suggestions: _suggestions,
-            enCours: _rechercheEnCours,
+            recherche: recherche,
+            suggestions: suggestions,
+            enCours: rechercheEnCours,
             onAnnuler: () => Navigator.of(context).pop(),
-            onChange: _rechercherAvecAttente,
+            onChange: rechercherAvecAttente,
             onChoisir: _choisirLieu,
             onIntrouvable: _passerEnSaisieManuelle,
           ),

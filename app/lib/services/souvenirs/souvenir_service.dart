@@ -4,6 +4,7 @@ import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
+import 'nouveau_souvenir.dart';
 import 'souvenir_feed.dart';
 
 /// Publier un souvenir : le cœur du Feed.
@@ -50,6 +51,11 @@ abstract interface class SouvenirService {
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   });
 
+  /// Ajoute un repas passé à son profil ([NouveauSouvenir]) : il se range
+  /// à sa date sur le profil et la carte, jamais dans le Feed. Même
+  /// retour que [publier] : les Tables dont l'association a échoué.
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir);
+
   /// L'audience actuelle d'un souvenir déjà publié, et les amis tagués
   /// (pour l'avertissement "ne verra pas ce moment") — pour préremplir
   /// la feuille "Qui peut voir ?". Réservé à l'auteur (RLS).
@@ -70,6 +76,7 @@ abstract interface class SouvenirService {
   /// Le Feed : les souvenirs qu'on a le droit de voir (les siens, et ceux
   /// des abonnements acceptés — la RLS de `souvenirs` s'en charge, ce
   /// service n'a rien à filtrer lui-même), du plus récent au plus ancien.
+  /// Sans les repas passés ajoutés après coup ([ajouterSouvenir]).
   Future<List<SouvenirFeed>> feed();
 
   /// Les souvenirs publiés d'un seul auteur, même ordre que [feed] —

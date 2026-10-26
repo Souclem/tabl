@@ -7,6 +7,9 @@ import 'package:app/widgets/widgets.dart';
 import 'package:app/ecrans/feuille_restaurant.dart';
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
+      throw UnimplementedError();
   _FauxSouvenirService(this.avis);
 
   final List<SouvenirFeed> avis;

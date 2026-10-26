@@ -44,8 +44,14 @@ String listeDeNoms(List<String> noms) {
 
 /// Date d'un souvenir telle qu'affichée sur une publication : "12 mars"
 /// cette année, "3 novembre 2025" sinon (sans l'année, une liste du plus
-/// récent au plus ancien semblerait en désordre).
-String dateLisibleSouvenir(DateTime date, {DateTime? maintenant}) {
+/// récent au plus ancien semblerait en désordre). Sans [jourConnu] (un
+/// souvenir ajouté sans son jour) : "mars 2023", toujours avec l'année.
+String dateLisibleSouvenir(
+  DateTime date, {
+  bool jourConnu = true,
+  DateTime? maintenant,
+}) {
+  if (!jourConnu) return '${_moisAnnee[date.month - 1]} ${date.year}';
   final jour = '${date.day} ${_moisAnnee[date.month - 1]}';
   final annee = (maintenant ?? DateTime.now()).year;
   return date.year == annee ? jour : '$jour ${date.year}';

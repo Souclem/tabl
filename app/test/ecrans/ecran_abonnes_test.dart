@@ -96,6 +96,9 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
+      throw UnimplementedError();
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 

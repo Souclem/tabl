@@ -157,7 +157,10 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
         titre: titreAuteur ? souvenir.auteurPseudo : souvenir.restaurantNom,
         avatarPseudo: titreAuteur ? souvenir.auteurPseudo : null,
         avatarPhotoUrl: titreAuteur ? souvenir.auteurPhotoUrl : null,
-        dateLisible: dateLisibleSouvenir(souvenir.dateVisite),
+        dateLisible: dateLisibleSouvenir(
+          souvenir.dateVisite,
+          jourConnu: souvenir.jourConnu,
+        ),
         photoUrl: souvenir.photoUrl,
         emoji: souvenir.emotion?.emoji,
         legende: legendeAffichee(souvenir.legende),
@@ -202,7 +205,10 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       contexte: contexte,
       auteurPseudo: souvenir.auteurPseudo,
       auteurPhotoUrl: souvenir.auteurPhotoUrl,
-      dateLisible: dateLisibleSouvenir(souvenir.dateVisite),
+      dateLisible: dateLisibleSouvenir(
+        souvenir.dateVisite,
+        jourConnu: souvenir.jourConnu,
+      ),
       photoUrl: souvenir.photoUrl,
       restaurantNom: souvenir.restaurantNom,
       ville: souvenir.ville,

@@ -12,6 +12,9 @@ import 'package:app/ecrans/ecran_commentaires.dart';
 /// comme le ferait le vrai service.
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
+      throw UnimplementedError();
+  @override
   Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
       throw UnimplementedError();
   @override

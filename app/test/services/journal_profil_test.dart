@@ -15,6 +15,7 @@ SouvenirFeed _moment(
   String? photo,
   List<PersonnePresente> presents = const [],
   List<String> categories = const [],
+  bool jourConnu = true,
 }) => SouvenirFeed(
   id: id,
   photoUrl: photo,
@@ -31,6 +32,7 @@ SouvenirFeed _moment(
   presents: presents,
   categories: categories,
   restaurantId: restaurant,
+  jourConnu: jourConnu,
 );
 
 void main() {
@@ -114,6 +116,12 @@ void main() {
       expect(detailsMoment(s), 'Liège · 16 octobre 2026 · Dîner');
       expect(avecQuiMoment(s), 'avec Arthur et toi');
       expect(avecQuiMoment(_moment('2', DateTime(2026))), isNull);
+    });
+
+    test('un souvenir sans son jour se lit au mois', () {
+      final s = _moment('1', DateTime(2023, 3), moment: '', jourConnu: false);
+      expect(detailsMoment(s), 'Liège · mars 2023');
+      expect(libelleTuileMoment(s), 'Bibo, mars 2023');
     });
   });
 

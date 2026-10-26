@@ -162,6 +162,8 @@ class _PageMomentState extends State<_PageMoment> {
       body: TablVisionneuseMoment(
         cleHero: widget.cleHero,
         photoUrl: s.photoUrl,
+        autresPhotosUrls: s.autresPhotosUrls,
+        estSouvenir: s.estSouvenir,
         restaurantNom: s.restaurantNom,
         details: detailsMoment(s),
         emojiEmotion: s.emotion?.emoji,

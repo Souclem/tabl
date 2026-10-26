@@ -38,6 +38,10 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
   /// Le menu « ⋯ » d'un moment agrandi ; `null` : aucun.
   void Function(SouvenirFeed)? get optionsMoment => null;
 
+  /// « Ajouter un souvenir » en tête des souvenirs (son propre profil) ;
+  /// `null` : aucun.
+  VoidCallback? get onAjouterSouvenir => null;
+
   /// « Revoir vos moments » : les Souvenirs, réduits aux moments à deux.
   void revoirMomentsADeux(List<SouvenirFeed> ensemble) => setState(() {
     rubrique = RubriqueProfil.souvenirs;
@@ -75,7 +79,26 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
   }
 
   List<Widget> _slivresSouvenirs(List<SouvenirFeed> souvenirs) {
+    final ajouter = onAjouterSouvenir;
     return [
+      if (ajouter != null && momentsADeux == null)
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              TablTokens.espaceL - 4,
+              TablTokens.espaceM,
+              TablTokens.espaceL - 4,
+              TablTokens.espaceXs,
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TablPiluleAjoutSouvenir(
+                libelle: 'Ajouter un souvenir',
+                onPresse: ajouter,
+              ),
+            ),
+          ),
+        ),
       const SliverToBoxAdapter(child: SizedBox(height: TablTokens.espaceS)),
       for (final mois in journalParMois(souvenirs))
         SliverMainAxisGroup(

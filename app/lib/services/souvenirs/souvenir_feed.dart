@@ -28,6 +28,9 @@ class SouvenirFeed {
     this.estEnvie = false,
     this.auteurPhotoUrl,
     this.auteurId,
+    this.autresPhotosUrls = const [],
+    this.estSouvenir = false,
+    this.jourConnu = true,
   });
 
   final String id;
@@ -94,6 +97,17 @@ class SouvenirFeed {
   /// Le restaurant est dans mes envies ("Enregistrer").
   final bool estEnvie;
 
+  /// Les photos après la principale ([photoUrl]), dans leur ordre — un
+  /// souvenir en garde jusqu'à 10 en tout.
+  final List<String> autresPhotosUrls;
+
+  /// Un repas passé, ajouté après coup : jamais dans le Feed.
+  final bool estSouvenir;
+
+  /// `false` : seuls le mois et l'année sont connus ([dateVisite] est
+  /// alors le 1er du mois).
+  final bool jourConnu;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -127,6 +141,9 @@ class SouvenirFeed {
       auteurId: auteurId,
       estEnvie: estEnvie ?? this.estEnvie,
       auteurPhotoUrl: auteurPhotoUrl,
+      autresPhotosUrls: autresPhotosUrls,
+      estSouvenir: estSouvenir,
+      jourConnu: jourConnu,
     );
   }
 }
