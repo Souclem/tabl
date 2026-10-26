@@ -80,9 +80,26 @@ class TablRouesDate extends StatelessWidget {
       height: 200,
       child: Row(
         children: [
-          Expanded(flex: 2, child: _Roue(jours, indexJour, onJour)),
-          Expanded(flex: 4, child: _Roue(mois, indexMois, onMois)),
-          Expanded(flex: 3, child: _Roue(annees, indexAnnee, onAnnee)),
+          // Une seule bande de sélection pour les trois, comme les roues
+          // de date d'iOS : arrondie aux deux bouts seulement.
+          Expanded(
+            flex: 2,
+            child: _Roue(jours, indexJour, onJour, arrondiFin: false),
+          ),
+          Expanded(
+            flex: 4,
+            child: _Roue(
+              mois,
+              indexMois,
+              onMois,
+              arrondiDebut: false,
+              arrondiFin: false,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: _Roue(annees, indexAnnee, onAnnee, arrondiDebut: false),
+          ),
         ],
       ),
     );
@@ -90,11 +107,19 @@ class TablRouesDate extends StatelessWidget {
 }
 
 class _Roue extends StatefulWidget {
-  const _Roue(this.libelles, this.index, this.onChange);
+  const _Roue(
+    this.libelles,
+    this.index,
+    this.onChange, {
+    this.arrondiDebut = true,
+    this.arrondiFin = true,
+  });
 
   final List<String> libelles;
   final int index;
   final ValueChanged<int> onChange;
+  final bool arrondiDebut;
+  final bool arrondiFin;
 
   @override
   State<_Roue> createState() => _RoueState();
@@ -132,6 +157,8 @@ class _RoueState extends State<_Roue> {
       itemExtent: 38,
       selectionOverlay: CupertinoPickerDefaultSelectionOverlay(
         background: TablTokens.primaire.withValues(alpha: 0.13),
+        capStartEdge: widget.arrondiDebut,
+        capEndEdge: widget.arrondiFin,
       ),
       onSelectedItemChanged: widget.onChange,
       children: [
