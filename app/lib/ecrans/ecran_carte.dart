@@ -370,12 +370,13 @@ class _EcranCarteState extends State<EcranCarte> {
   };
 
   /// La liste : les lieux de la zone regardée — ou, pendant une
-  /// recherche, tous ceux du mode dont le nom correspond —, dans l'ordre
-  /// du tri.
+  /// recherche, tous ceux du mode dont le nom correspond ; pour « Ma
+  /// carte », tous —, dans l'ordre du tri.
   List<LieuCarte> get _lieuxListe {
     final texte = normaliserPourRecherche(_recherche.text.trim());
+    // « Ma carte » en liste raconte toute mon histoire, ville par ville.
     final base = texte.isEmpty
-        ? _lieuxVisibles
+        ? (_mode == ModeExplorer.maCarte ? _lieux : _lieuxVisibles)
         : [
             for (final l in _lieux)
               if (normaliserPourRecherche(l.nom).contains(texte)) l,
