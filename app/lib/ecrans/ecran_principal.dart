@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -70,6 +72,32 @@ class EcranPrincipal extends StatefulWidget {
 class _EcranPrincipalState extends State<EcranPrincipal> {
   TablOnglet _onglet = TablOnglet.feed;
 
+  /// La barre se tasse pendant qu'on descend dans une liste, et reprend
+  /// sa taille dès qu'on s'arrête un instant.
+  bool _barreCompacte = false;
+  Timer? _reprise;
+  double _derniereHauteur = 0;
+
+  bool _defilement(ScrollUpdateNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) return false;
+    final y = notification.metrics.pixels;
+    final descend = y > _derniereHauteur + 2;
+    _derniereHauteur = y;
+    final compacte = descend && y > 80;
+    if (compacte != _barreCompacte) setState(() => _barreCompacte = compacte);
+    _reprise?.cancel();
+    _reprise = Timer(const Duration(milliseconds: 700), () {
+      if (mounted && _barreCompacte) setState(() => _barreCompacte = false);
+    });
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _reprise?.cancel();
+    super.dispose();
+  }
+
   // Les onglets Tables et Carte ne sont construits qu'une fois réellement
   // ouverts : IndexedStack construit sinon tous ses enfants dès le
   // premier affichage, ce qui déclencherait des appels réseau (et, sans
@@ -121,45 +149,48 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
       // bord — voir la note de classe de TablBarreNavigation.
       body: Stack(
         children: [
-          IndexedStack(
-            index: _onglet.index,
-            children: [
-              EcranFeed(
-                souvenirService: widget.souvenirService,
-                abonnementService: widget.abonnementService,
-                instantService: widget.instantService,
-              ),
-              _ongletsConstruits.contains(TablOnglet.tables)
-                  ? EcranTables(
-                      tableService: _tableService,
-                      abonnementService: widget.abonnementService,
-                      souvenirService: widget.souvenirService,
-                      estOnglet: true,
-                    )
-                  : const SizedBox.shrink(),
-              _ongletsConstruits.contains(TablOnglet.carte)
-                  ? EcranCarte(
-                      carteService: _carteService,
-                      positionService: _positionService,
-                      tableService: _tableService,
-                      abonnementService: widget.abonnementService,
-                      souvenirService: widget.souvenirService,
-                    )
-                  : const SizedBox.shrink(),
-              EcranProfil(
-                authService: widget.authService,
-                abonnementService: widget.abonnementService,
-                souvenirService: widget.souvenirService,
-                utilisateur: widget.utilisateur,
-                // `widget.tableService` (nullable) et non `_tableService` :
-                // EcranProfil est construit eagerly (pas de lazy comme
-                // Explorer) — `_tableService` y accéderait dès le premier
-                // build et construirait `TableServiceSupabase` avant que
-                // Supabase soit forcément initialisé. EcranProfil a déjà
-                // son propre fallback paresseux (au tap de "Vos Tables").
-                tableService: widget.tableService,
-              ),
-            ],
+          NotificationListener<ScrollUpdateNotification>(
+            onNotification: _defilement,
+            child: IndexedStack(
+              index: _onglet.index,
+              children: [
+                EcranFeed(
+                  souvenirService: widget.souvenirService,
+                  abonnementService: widget.abonnementService,
+                  instantService: widget.instantService,
+                ),
+                _ongletsConstruits.contains(TablOnglet.tables)
+                    ? EcranTables(
+                        tableService: _tableService,
+                        abonnementService: widget.abonnementService,
+                        souvenirService: widget.souvenirService,
+                        estOnglet: true,
+                      )
+                    : const SizedBox.shrink(),
+                _ongletsConstruits.contains(TablOnglet.carte)
+                    ? EcranCarte(
+                        carteService: _carteService,
+                        positionService: _positionService,
+                        tableService: _tableService,
+                        abonnementService: widget.abonnementService,
+                        souvenirService: widget.souvenirService,
+                      )
+                    : const SizedBox.shrink(),
+                EcranProfil(
+                  authService: widget.authService,
+                  abonnementService: widget.abonnementService,
+                  souvenirService: widget.souvenirService,
+                  utilisateur: widget.utilisateur,
+                  // `widget.tableService` (nullable) et non `_tableService` :
+                  // EcranProfil est construit eagerly (pas de lazy comme
+                  // Explorer) — `_tableService` y accéderait dès le premier
+                  // build et construirait `TableServiceSupabase` avant que
+                  // Supabase soit forcément initialisé. EcranProfil a déjà
+                  // son propre fallback paresseux (au tap de "Vos Tables").
+                  tableService: widget.tableService,
+                ),
+              ],
+            ),
           ),
           Positioned(
             left: 0,
@@ -169,6 +200,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
               ongletActif: _onglet,
               onSelection: _selectionnerOnglet,
               onPublier: _publier,
+              compacte: _barreCompacte,
             ),
           ),
         ],
