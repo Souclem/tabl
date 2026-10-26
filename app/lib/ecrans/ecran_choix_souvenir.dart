@@ -5,7 +5,7 @@ import 'package:app/widgets/widgets.dart';
 import 'ecran_ajouter_souvenir.dart';
 
 /// « Comment retrouver vos souvenirs ? » : un repas à partir de ses
-/// photos (ou, à défaut, à la main), ou plusieurs d'un coup. Se ferme
+/// photos (pas de souvenir sans photo), ou plusieurs d'un coup. Se ferme
 /// sur `true` dès qu'un souvenir a été ajouté.
 class EcranChoixSouvenir extends StatelessWidget {
   const EcranChoixSouvenir({
@@ -104,8 +104,6 @@ class EcranChoixSouvenir extends StatelessWidget {
                   'vérifier.',
               libelleBouton: 'Choisir des photos',
               onChoisirPhotos: () => _choisirPhotos(context),
-              libelleSansPhoto: 'Pas de photo ? Ajouter à la main',
-              onSansPhoto: () => _ouvrir(context, const []),
               photosUrls: photosRecentes,
             ),
             const SizedBox(height: TablTokens.espaceM),

@@ -97,6 +97,11 @@ abstract interface class SouvenirService {
   /// Ajoute le restaurant à mes envies ("Enregistrer") ou l'en retire.
   Future<void> basculerEnvie(String restaurantId, {required bool envie});
 
+  /// Supprime l'un de ses souvenirs ou de ses moments, définitivement :
+  /// ses photos, réactions, commentaires et Instants partent avec lui.
+  /// Réservé à l'auteur (RLS).
+  Future<void> supprimer(String souvenirId);
+
   /// Ajoute sa réaction ("j'aime") si [reagir] est vrai, la retire sinon.
   Future<void> basculerReaction(String souvenirId, {required bool reagir});
 

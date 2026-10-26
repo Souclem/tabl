@@ -242,11 +242,12 @@ void main() {
       tester,
     ) async {
       final service = _FauxSouvenirService();
-      final retours = await _ouvrirMenu(tester, service);
+      final retours = await _ouvrirMenu(tester, service, photos: [_photoA]);
 
-      await tester.tap(find.text('Pas de photo ? Ajouter à la main'));
+      // Pas de souvenir sans photo : plus d'ajout « à la main ».
+      expect(find.text('Pas de photo ? Ajouter à la main'), findsNothing);
+      await tester.tap(find.text('Choisir des photos'));
       await tester.pumpAndSettle();
-      expect(find.text('Ajouter des photos'), findsOneWidget);
 
       await tester.tap(find.text('Quel restaurant ?'));
       await tester.pumpAndSettle();
@@ -273,7 +274,7 @@ void main() {
       expect(ajoute.date.annee, maintenant.year);
       expect(ajoute.date.mois, maintenant.month);
       expect(ajoute.date.jour, isNull);
-      expect(ajoute.photos, isEmpty);
+      expect(ajoute.photos, [_photoA]);
       expect(retours, [true]);
       expect(find.text('Comment retrouver vos souvenirs ?'), findsNothing);
     });
@@ -434,11 +435,34 @@ void main() {
     });
   });
 
+  testWidgets('toutes les photos retirées : impossible d\'ajouter', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrirEditeur(
+      tester,
+      service,
+      photos: [_photoDuDiner(_photoA)],
+      recherche: _FausseRechercheLieu(proches: [_comoEnCasa]),
+    );
+    expect(_boutonAjouter(tester).onPresse, isNotNull);
+
+    await tester.tap(find.text('Retirer'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ajouter des photos'), findsOneWidget);
+    expect(_boutonAjouter(tester).onPresse, isNull);
+  });
+
   testWidgets('restaurant introuvable : nom et ville à la main', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirEditeur(tester, service);
+    await _ouvrirEditeur(
+      tester,
+      service,
+      photos: [(octets: _photoA, metadonnees: MetadonneesPhoto.aucune)],
+    );
 
     await tester.tap(find.text('Quel restaurant ?'));
     await tester.pumpAndSettle();

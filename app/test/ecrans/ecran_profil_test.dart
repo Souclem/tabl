@@ -31,6 +31,13 @@ class _FauxSouvenirService implements SouvenirService {
   }) async {}
 
   final List<AudienceSouvenir> audiencesModifiees = [];
+  final List<String> supprimes = [];
+
+  @override
+  Future<void> supprimer(String souvenirId) async {
+    supprimes.add(souvenirId);
+    mesSouvenirs.removeWhere((s) => s.id == souvenirId);
+  }
 
   @override
   Future<({AudienceSouvenir audience, Set<String> amisTaguesIds})>
@@ -375,6 +382,46 @@ void main() {
     expect(audience.mode, ModeAudience.seulement);
     expect(audience.personneIds, {'sarah-id'});
     expect(find.text('Audience mise à jour.'), findsOneWidget);
+    semantique.dispose();
+  });
+
+  testWidgets('"⋯" → "Supprimer", après confirmation seulement', (
+    tester,
+  ) async {
+    final semantique = tester.ensureSemantics();
+    final service = await _ouvrirProfil(tester, [
+      _monSouvenir('1', 'Bibo'),
+      _monSouvenir('2', 'Le Comptoir'),
+    ]);
+    await _allerAuxSouvenirs(tester);
+
+    await mockNetworkImagesFor(() async {
+      await tester.tap(_tuile('Bibo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Supprimer ce moment ?'), findsOneWidget);
+      await tester.tap(find.text('Annuler'));
+      await tester.pumpAndSettle();
+      expect(service.supprimes, isEmpty);
+
+      await tester.tap(find.byTooltip('Options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer').last);
+      await tester.pumpAndSettle();
+    });
+
+    expect(service.supprimes, ['1']);
+    // Le moment agrandi s'est refermé, le journal ne le montre plus.
+    expect(find.byTooltip('Options'), findsNothing);
+    expect(find.text('Moment supprimé.'), findsOneWidget);
+    expect(_tuile('Bibo'), findsNothing);
+    expect(_tuile('Le Comptoir'), findsOneWidget);
     semantique.dispose();
   });
 

@@ -370,9 +370,68 @@ class _EcranProfilState extends State<EcranProfil>
                 _modifierAudience(souvenir);
               },
             ),
+            ListTile(
+              leading: const Icon(
+                Icons.delete_outline_rounded,
+                color: TablTokens.erreur,
+              ),
+              title: const Text(
+                'Supprimer',
+                style: TextStyle(color: TablTokens.erreur),
+              ),
+              onTap: () {
+                Navigator.of(contexteSheet).pop();
+                _supprimer(souvenir);
+              },
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// Après confirmation : c'est définitif.
+  Future<void> _supprimer(SouvenirFeed souvenir) async {
+    final quoi = souvenir.estSouvenir ? 'ce souvenir' : 'ce moment';
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (contexteDialogue) => AlertDialog(
+        backgroundColor: TablTokens.surface,
+        title: Text('Supprimer $quoi ?'),
+        content: const Text(
+          'Il disparaîtra de votre profil, avec ses photos, ses réactions '
+          'et ses commentaires. C\'est définitif.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(true),
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: TablTokens.erreur),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true || !mounted) return;
+    try {
+      await widget.souvenirService.supprimer(souvenir.id);
+    } catch (e) {
+      debugPrint('EcranProfil: suppression : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    if (!mounted) return;
+    // Le moment agrandi, s'il était ouvert, n'a plus rien à montrer.
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    recharger();
+    afficherMessage(
+      context,
+      souvenir.estSouvenir ? 'Souvenir supprimé.' : 'Moment supprimé.',
     );
   }
 

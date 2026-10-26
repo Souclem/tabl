@@ -36,10 +36,10 @@ Future<List<Uint8List>> photosDuTelephone(int restant) async {
 }
 
 /// Ajouter un souvenir : un repas passé, tel qu'il apparaîtra sur le
-/// profil. Les photos en grand d'abord ; d'elles, Tabl déduit le
-/// restaurant le plus proche, le jour et le moment — des propositions,
-/// toutes modifiables. Sans photo, on choisit tout soi-même. Se ferme
-/// sur `true` une fois le souvenir ajouté.
+/// profil. Les photos en grand d'abord — il en faut au moins une ;
+/// d'elles, Tabl déduit le restaurant le plus proche, le jour et le
+/// moment, des propositions toutes modifiables. Se ferme sur `true` une
+/// fois le souvenir ajouté.
 class EcranAjouterSouvenir extends StatefulWidget {
   const EcranAjouterSouvenir({
     super.key,
@@ -55,8 +55,8 @@ class EcranAjouterSouvenir extends StatefulWidget {
   final SouvenirService souvenirService;
   final AbonnementService abonnementService;
 
-  /// Celles déjà choisies (la première est la principale) ; vide : un
-  /// souvenir sans photo, pour l'instant.
+  /// Celles déjà choisies (la première est la principale). Toutes
+  /// retirées, il faut en rajouter une pour pouvoir ajouter le souvenir.
   final List<PhotoChoisie> photos;
   final TableService? tableService;
 
@@ -550,7 +550,9 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
                   child: TablBouton(
                     libelle: 'Ajouter à mon profil',
                     enCours: _enCours,
-                    onPresse: lieu != null && date != null ? _ajouter : null,
+                    onPresse: _photos.isNotEmpty && lieu != null && date != null
+                        ? _ajouter
+                        : null,
                   ),
                 ),
               ),

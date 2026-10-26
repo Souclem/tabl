@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../restaurants/lieu_restaurant.dart';
@@ -420,6 +419,54 @@ class SouvenirServiceSupabase implements SouvenirService {
   @override
   Future<void> basculerEnvie(String restaurantId, {required bool envie}) =>
       EnviesRestaurants(_client).basculer(restaurantId, envie: envie);
+
+  @override
+  Future<void> supprimer(String souvenirId) async {
+    // Les fichiers sont repérés avant : une fois la ligne partie, plus
+    // rien ne dirait lesquels étaient les siens.
+    final (ligne, instants) = await (
+      _client
+          .from('souvenirs')
+          .select('photo_url, boisson_photo_url, souvenirs_photos(chemin)')
+          .eq('id', souvenirId)
+          .single(),
+      _client
+          .from('instants')
+          .select('media_url')
+          .eq('parent_experience_id', souvenirId)
+          .eq('owner_user_id', _monId),
+    ).wait;
+
+    // Les lignes liées (réactions, commentaires, Instants…) suivent.
+    await _client.from('souvenirs').delete().eq('id', souvenirId);
+
+    // Seuls ses propres fichiers (son dossier) : les photos de
+    // démonstration ou les Instants des autres ne sont pas à lui. Un
+    // échec ici n'annule rien — plus aucune ligne ne rend ces fichiers
+    // visibles.
+    bool aMoi(String? chemin) => chemin?.startsWith('$_monId/') ?? false;
+    final photos = [
+      ligne['photo_url'] as String?,
+      ligne['boisson_photo_url'] as String?,
+      for (final p in (ligne['souvenirs_photos'] as List?) ?? const [])
+        p['chemin'] as String?,
+    ].where(aMoi).cast<String>().toList();
+    final medias = [
+      for (final i in instants) i['media_url'] as String?,
+    ].where(aMoi).cast<String>().toList();
+    try {
+      await (
+        photos.isEmpty
+            ? Future.value(const <FileObject>[])
+            : _client.storage.from('souvenirs').remove(photos),
+        medias.isEmpty
+            ? Future.value(const <FileObject>[])
+            : _client.storage.from('instants').remove(medias),
+      ).wait;
+    } catch (e) {
+      debugPrint('SouvenirServiceSupabase: fichiers de $souvenirId : $e');
+    }
+  }
 
   @override
   Future<void> basculerReaction(

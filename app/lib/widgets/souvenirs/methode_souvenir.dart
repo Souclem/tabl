@@ -103,8 +103,8 @@ class _Cadre extends StatelessWidget {
 }
 
 /// La façon principale d'ajouter un souvenir : par ses photos. Une pile
-/// de photos, un titre, ce que Tabl en fera, le bouton pour les choisir
-/// et, plus discret, l'ajout sans photo.
+/// de photos, un titre, ce que Tabl en fera, et le bouton pour les
+/// choisir.
 class TablCarteAjoutSouvenir extends StatelessWidget {
   const TablCarteAjoutSouvenir({
     super.key,
@@ -112,8 +112,6 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
     required this.texte,
     required this.libelleBouton,
     required this.onChoisirPhotos,
-    required this.libelleSansPhoto,
-    required this.onSansPhoto,
     this.photosUrls = const [],
   });
 
@@ -121,8 +119,6 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
   final String texte;
   final String libelleBouton;
   final VoidCallback onChoisirPhotos;
-  final String libelleSansPhoto;
-  final VoidCallback onSansPhoto;
 
   /// De quoi garnir la pile : ses dernières photos.
   final List<String> photosUrls;
@@ -134,7 +130,7 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
         TablTokens.espaceL - 4,
         TablTokens.espaceL,
         TablTokens.espaceL - 4,
-        TablTokens.espaceS,
+        TablTokens.espaceL - 4,
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(TablTokens.arrondiL + 4),
@@ -171,8 +167,6 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
           ),
           const SizedBox(height: TablTokens.espaceL - 4),
           TablBouton(libelle: libelleBouton, onPresse: onChoisirPhotos),
-          const SizedBox(height: 2),
-          TablBoutonTexte(libelle: libelleSansPhoto, onPresse: onSansPhoto),
         ],
       ),
     );

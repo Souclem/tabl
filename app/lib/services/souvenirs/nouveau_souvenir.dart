@@ -8,8 +8,9 @@ import 'emotion.dart';
 /// Au plus, par souvenir : la principale et 9 autres.
 const nombreMaxPhotosSouvenir = 10;
 
-/// Un repas passé à ajouter à son profil. Seuls le lieu et la date sont
-/// obligatoires : un souvenir sans photo ni ressenti reste un souvenir.
+/// Un repas passé à ajouter à son profil : toujours au moins une photo
+/// (pas de souvenir sans photo), un lieu et une date ; le reste est
+/// facultatif.
 class NouveauSouvenir {
   const NouveauSouvenir({
     required this.lieu,
@@ -19,7 +20,7 @@ class NouveauSouvenir {
     this.legende,
     this.moment,
     this.audience = AudienceSouvenir.toutLeMonde,
-  }) : assert(photos.length <= nombreMaxPhotosSouvenir);
+  }) : assert(photos.length >= 1 && photos.length <= nombreMaxPhotosSouvenir);
 
   final LieuRestaurant lieu;
   final DateSouvenir date;
