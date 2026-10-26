@@ -29,7 +29,11 @@ class _FauxCarteService implements CarteService {
     modes.add(mode);
     return [
       for (final l in lieux)
-        if ((mode == ModeExplorer.envies ? l.estEnvie : l.amis > 0) &&
+        if (switch (mode) {
+              ModeExplorer.envies => l.estEnvie,
+              ModeExplorer.maCarte => l.visiteParMoi,
+              ModeExplorer.cercle => l.amis > 0,
+            } &&
             (!filtres.coupsDeCoeur || l.coupsDeCoeur > 0) &&
             (filtres.personneId == null || l.amiPseudo == 'Emma'))
           l,
@@ -299,9 +303,54 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(service.modes.last, ModeExplorer.envies);
-    expect(find.text('1 adresse gardée pour plus tard'), findsOneWidget);
+    expect(find.text('Les adresses que vous gardez pour plus tard.'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('explorer_mode'), 'envies');
+  });
+
+  testWidgets('« Ma carte » : ma Constellation, et mes adresses par ville', (
+    tester,
+  ) async {
+    final service = await _ouvrir(tester, [
+      LieuCarte(
+        restaurantId: 'r1',
+        nom: 'Le Comptoir',
+        ville: 'Liège',
+        latitude: 50.64,
+        longitude: 5.57,
+        visiteParMoi: true,
+        mesVisites: 6,
+        maPremiereVisite: DateTime(2024, 1, 1),
+        maDerniereVisite: DateTime(2026, 8, 1),
+      ),
+      LieuCarte(
+        restaurantId: 'r2',
+        nom: 'Osteria Bella',
+        ville: 'Milan',
+        latitude: 45.46,
+        longitude: 9.19,
+        visiteParMoi: true,
+        mesVisites: 2,
+        maPremiereVisite: DateTime(2025, 7, 1),
+        maDerniereVisite: DateTime(2026, 7, 1),
+      ),
+    ]);
+
+    await tester.tap(find.text('Ma carte'));
+    await tester.pumpAndSettle();
+    expect(service.modes.last, ModeExplorer.maCarte);
+    expect(find.text('Constellation'), findsOneWidget);
+    expect(find.text('Votre histoire, table par table.'), findsOneWidget);
+
+    await _enListe(tester);
+    // Par ville, la plus fréquentée d'abord ; pas de tri à choisir.
+    expect(find.text('Ils y retournent'), findsNothing);
+    expect(find.text('1 table · 6 repas'), findsOneWidget);
+    expect(find.text('6 repas · août 2026'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Liège').first).dy,
+      lessThan(tester.getTopLeft(find.text('Milan').first).dy),
+    );
   });
 
   testWidgets('« Où cherchez-vous ? » : les villes du cercle', (tester) async {

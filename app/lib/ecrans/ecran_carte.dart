@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -332,9 +333,27 @@ class _EcranCarteState extends State<EcranCarte> {
       _villeRegardee?.nom ??
       switch (_mode) {
         ModeExplorer.cercle => 'Votre cercle',
-        ModeExplorer.envies => 'Vos envies',
-        ModeExplorer.maCarte => 'Votre carte',
+        ModeExplorer.envies => 'Envies',
+        ModeExplorer.maCarte => 'Constellation',
       };
+
+  /// Sous le titre : ce qu'on trouve dans la zone regardée — ou, pour ma
+  /// Constellation vue de loin, ce qu'elle raconte.
+  String _sousTitre(int nombre) {
+    if (_mode == ModeExplorer.maCarte) {
+      final ville = _villeRegardee;
+      if (ville == null) return 'Votre histoire, table par table.';
+      final ici = lieuxDeLaVille(_lieux, ville.nom);
+      return tablesEtRepas(
+        ici.length,
+        ici.fold(0, (n, l) => n + math.max(l.mesVisites, 1)),
+      );
+    }
+    if (_mode == ModeExplorer.envies && _villeRegardee == null) {
+      return 'Les adresses que vous gardez pour plus tard.';
+    }
+    return _compte(nombre);
+  }
 
   String _compte(int n) => switch (_mode) {
     ModeExplorer.cercle => adressesDuCercle(n),
@@ -417,6 +436,25 @@ class _EcranCarteState extends State<EcranCarte> {
 
   void _tapLieu(String cle) {
     _fermetureEnAttente?.cancel();
+    // Une ville de ma Constellation : on s'en approche.
+    if (cle.startsWith('ville:')) {
+      final nom = cle.substring('ville:'.length);
+      final ville = villesConstellation(
+        _lieux,
+      ).where((v) => v.nom == nom).firstOrNull;
+      if (ville != null) {
+        _controleur.cadrer(
+          sud: ville.zone.sud,
+          ouest: ville.zone.ouest,
+          nord: ville.zone.nord,
+          est: ville.zone.est,
+          haut: _hauteurEnTete,
+          bas: _margeBarre,
+          zoomMax: 14.5,
+        );
+      }
+      return;
+    }
     final lieu = _lieux.where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
     _choisir(lieu, voisinsDepuis: lieu);
@@ -800,7 +838,7 @@ class _EcranCarteState extends State<EcranCarte> {
                         sousTitre: _enErreur && !_chargeUneFois
                             ? 'Les adresses n\'ont pas pu être chargées'
                             : _chargeUneFois
-                            ? _compte(nombre)
+                            ? _sousTitre(nombre)
                             : 'Chargement…',
                         onPresse: _ouvrirOuChercher,
                       ),
@@ -878,15 +916,18 @@ class _EcranCarteState extends State<EcranCarte> {
                     },
                   ),
                 ),
-                const SizedBox(height: TablTokens.espaceS),
-                TablOngletsDefilants(
-                  libelles: [for (final t in TriCercle.values) t.libelle],
-                  index: _tri.index,
-                  onChoisir: (i) {
-                    setState(() => _tri = TriCercle.values[i]);
-                    _demanderPhotos();
-                  },
-                ),
+                // Ma carte se lit par ville : pas de tri.
+                if (_mode != ModeExplorer.maCarte) ...[
+                  const SizedBox(height: TablTokens.espaceS),
+                  TablOngletsDefilants(
+                    libelles: [for (final t in TriCercle.values) t.libelle],
+                    index: _tri.index,
+                    onChoisir: (i) {
+                      setState(() => _tri = TriCercle.values[i]);
+                      _demanderPhotos();
+                    },
+                  ),
+                ],
               ],
               SizedBox(
                 height: 2,
@@ -908,9 +949,16 @@ class _EcranCarteState extends State<EcranCarte> {
     if (!widget.afficherCarte) {
       return const ColoredBox(color: TablTokens.surface);
     }
+    final constellation = _mode == ModeExplorer.maCarte;
     return TablCarteMapbox(
       // Tous les lieux : la carte les regroupe elle-même selon le zoom.
-      geojsonLieux: geojsonLieux(_lieux, cleChoisie: _selection?.cle),
+      // « Ma carte » a sa propre façon de les montrer.
+      geojsonLieux: constellation
+          ? TablCarteMapbox.geojsonVide
+          : geojsonLieux(_lieux, cleChoisie: _selection?.cle),
+      geojsonConstellation: constellation
+          ? geojsonConstellation(_lieux, cleChoisie: _selection?.cle)
+          : TablCarteMapbox.geojsonVide,
       // Belgique, avant de connaître la position.
       latitudeInitiale: 50.5,
       longitudeInitiale: 4.6,
@@ -944,7 +992,37 @@ class _EcranCarteState extends State<EcranCarte> {
           ),
         ),
       if (selection == null &&
+          _mode == ModeExplorer.maCarte &&
+          _lieux.isNotEmpty)
+        Positioned(
+          left: TablTokens.espaceL - 4,
+          // Au-dessus du logo de Mapbox.
+          bottom: _margeBarre + 44,
+          child: Builder(
+            builder: (_) {
+              final c = compteursConstellation(_lieux);
+              return TablCompteursConstellation(
+                chiffres: [
+                  (nombre: '${c.repas}', libelle: 'repas'),
+                  (
+                    nombre: '${c.villes}',
+                    libelle: c.villes == 1 ? 'ville' : 'villes',
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      if (selection == null && _chargeUneFois && _lieux.isEmpty && !_enErreur)
+        Positioned(
+          left: TablTokens.espaceL,
+          right: TablTokens.espaceL,
+          bottom: _margeBarre + 76,
+          child: _MessageCarte(texte: _rienDuTout),
+        ),
+      if (selection == null &&
           _chargeUneFois &&
+          _mode != ModeExplorer.maCarte &&
           _lieuxVisibles.isEmpty &&
           _lieux.isNotEmpty)
         Positioned(
@@ -998,14 +1076,22 @@ class _EcranCarteState extends State<EcranCarte> {
         for (final v in lieu.visages)
           BullePersonne(pseudo: v.pseudo, photoUrl: v.photoUrl),
       ],
-      quiLaConnait: lieu.amis > 0
+      quiLaConnait: _mode == ModeExplorer.maCarte
+          ? (moi <= 1
+                ? 'Vous y êtes allé une fois'
+                : 'Vous y êtes allé $moi fois')
+          : lieu.amis > 0
           ? quiLaConnait(lieu)
           : lieu.estEnvie
           ? 'Dans vos envies'
           : 'Vous y êtes allé',
-      signal: signalLieu(lieu, maintenant),
-      ressentis: lieu.ressentis,
-      dejaAlle: moi == 0
+      signal: _mode == ModeExplorer.maCarte
+          ? (derniere == null
+                ? null
+                : 'La dernière fois ${ilYA(derniere, maintenant)}')
+          : signalLieu(lieu, maintenant),
+      ressentis: _mode == ModeExplorer.maCarte ? const [] : lieu.ressentis,
+      dejaAlle: moi == 0 || _mode == ModeExplorer.maCarte
           ? null
           : [
               moi == 1
@@ -1022,6 +1108,74 @@ class _EcranCarteState extends State<EcranCarte> {
           : null,
       onSuivant: () => _voisin(1),
       onPrecedent: () => _voisin(-1),
+    );
+  }
+
+  /// Rien du tout dans ce mode (pas seulement ici).
+  String get _rienDuTout => switch (_mode) {
+    ModeExplorer.cercle =>
+      _filtres.nombreActifs > 0
+          ? 'Aucune adresse de vos proches ne correspond à ces filtres.'
+          : 'Vos proches n\'ont encore partagé aucune adresse.',
+    ModeExplorer.envies =>
+      'Aucune envie pour l\'instant. Gardez une adresse pour la retrouver ici.',
+    ModeExplorer.maCarte =>
+      'Vos souvenirs apparaîtront ici, à leur place sur la carte.',
+  };
+
+  /// « Ma carte » en liste : mes adresses par ville, la plus fréquentée
+  /// d'abord.
+  Widget _listeParVille(List<LieuCarte> lieux, double haut) {
+    final villes = villesConstellation(lieux)
+      ..sort((a, b) => b.repas.compareTo(a.repas));
+    final sansVille = [
+      for (final l in lieux)
+        if (l.ville.trim().isEmpty) l,
+    ];
+    Widget ligne(LieuCarte l) => TablLigneCercle(
+      key: ValueKey('ligne-${l.cle}'),
+      nom: l.nom,
+      photoUrl: _photo(l),
+      raison: repasEtDerniere(l),
+      detail: cuisineEtQuartier(l),
+      onPresse: () => _ouvrirFiche(l),
+      onOptions: () => _options(l),
+    );
+    return ColoredBox(
+      color: TablTokens.fond,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          TablTokens.espaceL - 4,
+          haut + TablTokens.espaceS,
+          TablTokens.espaceL - 4,
+          _margeBarre + TablTokens.espaceL,
+        ),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          for (final v in villes) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: TablTokens.espaceM),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    v.nom,
+                    style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    tablesEtRepas(v.tables, v.repas),
+                    style: TablTokens.legende.copyWith(fontSize: 12.5),
+                  ),
+                ],
+              ),
+            ),
+            for (final l in lieuxDeLaVille(lieux, v.nom)) ligne(l),
+          ],
+          for (final l in sansVille) ligne(l),
+        ],
+      ),
     );
   }
 
@@ -1048,16 +1202,7 @@ class _EcranCarteState extends State<EcranCarte> {
                     : texte.isNotEmpty
                     ? 'Aucune adresse ne correspond à « $texte ».'
                     : _lieux.isEmpty
-                    ? switch (_mode) {
-                        ModeExplorer.cercle =>
-                          _filtres.nombreActifs > 0
-                              ? 'Aucune adresse de vos proches ne correspond à ces filtres.'
-                              : 'Vos proches n\'ont encore partagé aucune adresse.',
-                        ModeExplorer.envies =>
-                          'Aucune envie pour l\'instant. Enregistrez une adresse pour la retrouver ici.',
-                        ModeExplorer.maCarte =>
-                          'Vos souvenirs apparaîtront ici, à leur place sur la carte.',
-                      }
+                    ? _rienDuTout
                     : _compte(0),
                 textAlign: TextAlign.center,
                 style: TablTokens.titreAffichage.copyWith(
@@ -1077,6 +1222,7 @@ class _EcranCarteState extends State<EcranCarte> {
         ),
       );
     }
+    if (_mode == ModeExplorer.maCarte) return _listeParVille(lieux, haut);
     final vedette = lieux.first;
     final suite = lieux.skip(1).toList();
     String? raison(LieuCarte l) =>
@@ -1140,15 +1286,11 @@ class _EcranCarteState extends State<EcranCarte> {
 
 /// Un message posé sur la carte, avec de quoi aller ailleurs.
 class _MessageCarte extends StatelessWidget {
-  const _MessageCarte({
-    required this.texte,
-    required this.action,
-    required this.onAction,
-  });
+  const _MessageCarte({required this.texte, this.action, this.onAction});
 
   final String texte;
-  final String action;
-  final VoidCallback onAction;
+  final String? action;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -1167,7 +1309,10 @@ class _MessageCarte extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TablTokens.titreAffichage.copyWith(fontSize: 18),
           ),
-          TablBoutonTexte(libelle: action, onPresse: onAction),
+          if (action != null)
+            TablBoutonTexte(libelle: action!, onPresse: onAction)
+          else
+            const SizedBox(height: 10),
         ],
       ),
     );

@@ -10,6 +10,7 @@ export 'auth/utilisateur.dart';
 export 'auth/validation.dart';
 export 'carte/carte_service.dart';
 export 'carte/carte_service_supabase.dart';
+export 'carte/constellation.dart';
 export 'carte/fiche_restaurant.dart';
 export 'carte/filtres_carte.dart';
 export 'carte/geojson_carte.dart';

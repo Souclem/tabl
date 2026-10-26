@@ -135,6 +135,12 @@ const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 /// monde. Un point marqué `repere` (l'endroit d'une photo) est un rond
 /// blanc cerclé d'or, qu'on ne touche pas.
 ///
+/// [geojsonConstellation] dessine ma Constellation (« Ma carte ») : de
+/// loin, mes villes en points lumineux reliés par un fil doré dans
+/// l'ordre où je les ai découvertes, avec leur nom ; de près, chaque
+/// restaurant en étoile, d'autant plus grande que j'y suis allé souvent.
+/// Un tap sur une ville renvoie sa clé (`ville:Liège`).
+///
 /// Composant pur : reçoit les lieux déjà choisis (au format GeoJSON) et
 /// renvoie le tap sur un lieu ([onTapLieu], avec sa clé) et la zone
 /// visible après chaque déplacement ([onZoneVisible]).
@@ -152,7 +158,13 @@ class TablCarteMapbox extends StatefulWidget {
     this.margeBas = 0,
     this.avecMaPosition = true,
     this.dansUneFeuille = false,
+    this.geojsonConstellation = geojsonVide,
   });
+
+  /// Aucun point.
+  static const geojsonVide = '{"type":"FeatureCollection","features":[]}';
+
+  final String geojsonConstellation;
 
   final String geojsonLieux;
   final double latitudeInitiale;
@@ -201,6 +213,19 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   static const _coucheHalo = 'tabl-lieux-halo';
   static const _coucheEtincelles = 'tabl-lieux-etincelles';
   static const _coucheRepere = 'tabl-repere';
+  static const _sourceConstellation = 'tabl-constellation';
+  static const _coucheSillage = 'tabl-sillage';
+  static const _coucheVillesHalo = 'tabl-villes-halo';
+  static const _coucheVilles = 'tabl-villes';
+  static const _coucheVillesNoms = 'tabl-villes-noms';
+  static const _coucheVillesToucher = 'tabl-villes-toucher';
+  static const _coucheEtoilesHalo = 'tabl-etoiles-halo';
+  static const _coucheEtoiles = 'tabl-etoiles';
+  static const _coucheEtoilesToucher = 'tabl-etoiles-toucher';
+
+  /// De loin les villes, de près les étoiles : elles se relaient autour
+  /// de ce zoom.
+  static const _zoomEtoiles = 9.0;
 
   /// Distance à l'écran (pt) sous laquelle des lieux se regroupent.
   static const _rayonGroupes = 46.0;
@@ -433,9 +458,19 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
+    await _ajouterConstellation(carte);
+
     carte.addInteraction(
       TapInteraction.onMap((_) => widget.onTapCarte?.call()),
     );
+    for (final couche in [_coucheVillesToucher, _coucheEtoilesToucher]) {
+      carte.addInteraction(
+        TapInteraction(FeaturesetDescriptor(layerId: couche), (lieu, _) {
+          final cle = lieu.properties['cle'];
+          if (cle is String) widget.onTapLieu(cle);
+        }),
+      );
+    }
     carte.addInteraction(
       TapInteraction(FeaturesetDescriptor(layerId: _coucheToucher), (lieu, _) {
         final cle = lieu.properties['cle'];
@@ -454,7 +489,171 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     _styleCharge = true;
     widget.controleur?._carteChargee(carte);
     _mettreAJour(widget.geojsonLieux);
+    _mettreAJourConstellation(widget.geojsonConstellation);
     _signalerZone();
+  }
+
+  Future<void> _ajouterConstellation(MapboxMap carte) async {
+    await carte.addSource(GeoJsonSource(id: _sourceConstellation));
+    const estSillage = [
+      '==',
+      ['get', 'type'],
+      'sillage',
+    ];
+    const estVille = [
+      '==',
+      ['get', 'type'],
+      'ville',
+    ];
+    const estEtoile = [
+      '==',
+      ['get', 'type'],
+      'etoile',
+    ];
+    const choisie = [
+      'to-boolean',
+      ['get', 'choisi'],
+    ];
+
+    // Le fil de mon histoire, de ville en ville.
+    await carte.addLayer(
+      LineLayer(
+        id: _coucheSillage,
+        sourceId: _sourceConstellation,
+        filter: estSillage,
+        maxZoom: _zoomEtoiles + 0.5,
+        lineColor: TablTokens.primaire.toARGB32(),
+        lineWidth: 1.3,
+        lineOpacity: 0.55,
+        lineBlur: 0.6,
+      ),
+    );
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheVillesHalo,
+        sourceId: _sourceConstellation,
+        filter: estVille,
+        maxZoom: _zoomEtoiles + 0.5,
+        circleColor: TablTokens.primaire.withValues(alpha: 0.3).toARGB32(),
+        circleRadiusExpression: [
+          'interpolate',
+          ['linear'],
+          ['get', 'repas'],
+          1,
+          9.0,
+          40,
+          22.0,
+        ],
+        circleBlur: 1.0,
+      ),
+    );
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheVilles,
+        sourceId: _sourceConstellation,
+        filter: estVille,
+        maxZoom: _zoomEtoiles + 0.5,
+        circleColor: const Color(0xFFFFF6E6).toARGB32(),
+        circleRadiusExpression: [
+          'interpolate',
+          ['linear'],
+          ['get', 'repas'],
+          1,
+          2.6,
+          40,
+          4.6,
+        ],
+      ),
+    );
+    await carte.addLayer(
+      SymbolLayer(
+        id: _coucheVillesNoms,
+        sourceId: _sourceConstellation,
+        filter: estVille,
+        maxZoom: _zoomEtoiles + 0.5,
+        textFieldExpression: ['get', 'etiquette'],
+        textFont: _police,
+        textSize: 10.5,
+        textLetterSpacing: 0.12,
+        textOffset: [0.0, 1.5],
+        textAnchor: TextAnchor.TOP,
+        textColor: TablTokens.texte.withValues(alpha: 0.86).toARGB32(),
+        textHaloColor: const Color(0xCC06080C).toARGB32(),
+        textHaloWidth: 1.2,
+        textAllowOverlap: true,
+      ),
+    );
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheVillesToucher,
+        sourceId: _sourceConstellation,
+        filter: estVille,
+        maxZoom: _zoomEtoiles + 0.5,
+        circleColor: const Color(0x03FFFFFF).toARGB32(),
+        circleRadius: 26.0,
+      ),
+    );
+
+    // Mes restaurants, en étoiles.
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheEtoilesHalo,
+        sourceId: _sourceConstellation,
+        filter: estEtoile,
+        minZoom: _zoomEtoiles - 0.5,
+        circleColorExpression: [
+          'case',
+          choisie,
+          TablTokens.primaire.withValues(alpha: 0.55).toARGB32(),
+          TablTokens.primaire.withValues(alpha: 0.26).toARGB32(),
+        ],
+        circleRadiusExpression: [
+          'interpolate',
+          ['linear'],
+          ['get', 'fois'],
+          1,
+          8.0,
+          10,
+          24.0,
+        ],
+        circleBlur: 1.0,
+      ),
+    );
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheEtoiles,
+        sourceId: _sourceConstellation,
+        filter: estEtoile,
+        minZoom: _zoomEtoiles - 0.5,
+        circleColor: const Color(0xFFFFF6E6).toARGB32(),
+        circleRadiusExpression: [
+          'interpolate',
+          ['linear'],
+          ['get', 'fois'],
+          1,
+          2.4,
+          10,
+          5.2,
+        ],
+        circleStrokeColorExpression: [
+          'case',
+          choisie,
+          TablTokens.primaire.toARGB32(),
+          const Color(0x00000000).toARGB32(),
+        ],
+        circleStrokeWidth: 2.0,
+      ),
+    );
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheEtoilesToucher,
+        sourceId: _sourceConstellation,
+        filter: estEtoile,
+        minZoom: _zoomEtoiles - 0.5,
+        circleColor: const Color(0x03FFFFFF).toARGB32(),
+        circleRadius: 18.0,
+      ),
+    );
   }
 
   /// Zoome sur le groupe touché, juste assez pour qu'il s'ouvre (le zoom
@@ -516,11 +715,19 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     if (ancien.geojsonLieux != widget.geojsonLieux) {
       _mettreAJour(widget.geojsonLieux);
     }
+    if (ancien.geojsonConstellation != widget.geojsonConstellation) {
+      _mettreAJourConstellation(widget.geojsonConstellation);
+    }
   }
 
   /// Mapbox refait les groupes lui-même à chaque nouvelle donnée.
   Future<void> _mettreAJour(String geojson) async {
     final source = await _carte?.getSource(_source);
+    if (source is GeoJsonSource) await source.updateGeoJSON(geojson);
+  }
+
+  Future<void> _mettreAJourConstellation(String geojson) async {
+    final source = await _carte?.getSource(_sourceConstellation);
     if (source is GeoJsonSource) await source.updateGeoJSON(geojson);
   }
 
