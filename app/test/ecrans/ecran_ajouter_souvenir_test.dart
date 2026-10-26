@@ -69,9 +69,10 @@ class _FauxAbonnementService implements AbonnementService {
 }
 
 class _FausseRechercheLieu implements RechercheLieuService {
-  _FausseRechercheLieu({this.proches = const []});
+  _FausseRechercheLieu({this.proches = const [], this.mesLieux = const []});
 
   final List<LieuRestaurant> proches;
+  final List<LieuRestaurant> mesLieux;
   final List<({double latitude, double longitude})> pointsDemandes = [];
 
   @override
@@ -91,6 +92,9 @@ class _FausseRechercheLieu implements RechercheLieuService {
     pointsDemandes.add((latitude: latitude, longitude: longitude));
     return proches;
   }
+
+  @override
+  Future<List<LieuRestaurant>> mesLieuxPersonnels() async => mesLieux;
 }
 
 const _comoEnCasa = LieuRestaurant(
@@ -472,6 +476,84 @@ void main() {
 
     expect(find.text('Ajouter des photos'), findsOneWidget);
     expect(_boutonAjouter(tester).onPresse, isNull);
+  });
+
+  group('lieux personnels', () {
+    testWidgets('« Créer un lieu personnel » : un nom, jamais d\'adresse', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: _FausseRechercheLieu(proches: [_comoEnCasa]),
+      );
+
+      await tester.tap(find.text('Changer'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Créer un lieu personnel'));
+      await tester.pumpAndSettle();
+      expect(find.text('Liste'), findsNothing);
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(TextField),
+        ),
+        'Chez mes parents',
+      );
+      await tester.tap(find.text('Créer ce lieu'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chez mes parents'), findsOneWidget);
+      expect(find.text('Lieu personnel · jamais public'), findsOneWidget);
+      await _ajouter(tester);
+
+      final lieu = service.ajoutes.single.lieu;
+      expect(lieu.personnel, isTrue);
+      expect(lieu.latitude, isNull);
+      expect(lieu.ville, isEmpty);
+    });
+
+    testWidgets('ses lieux, dans « Mes lieux » et dans la recherche', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService();
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [_photoDuDiner(_photoA)],
+        recherche: _FausseRechercheLieu(
+          proches: [_comoEnCasa],
+          mesLieux: const [
+            LieuRestaurant.personnel(
+              nom: 'Chez mes parents',
+              restaurantId: 'r-parents',
+            ),
+          ],
+        ),
+      );
+
+      await tester.tap(find.text('Changer'));
+      await tester.pumpAndSettle();
+      expect(find.text('MES LIEUX'), findsOneWidget);
+
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.byType(TextField),
+        ),
+        'parents',
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.text('MES LIEUX'), findsOneWidget);
+      await tester.tap(find.text('Chez mes parents'));
+      await tester.pumpAndSettle();
+      await _ajouter(tester);
+
+      expect(service.ajoutes.single.lieu.restaurantId, 'r-parents');
+    });
   });
 
   testWidgets('restaurant introuvable : nom et ville à la main', (

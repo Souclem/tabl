@@ -162,6 +162,9 @@ class _FausseRechercheLieu implements RechercheLieuService {
     double rayonM = 250,
     int limite = 8,
   }) async => [if (latitude > 50.8) _laMaison else _comoEnCasa];
+
+  @override
+  Future<List<LieuRestaurant>> mesLieuxPersonnels() async => const [];
 }
 
 const _comoEnCasa = LieuRestaurant(

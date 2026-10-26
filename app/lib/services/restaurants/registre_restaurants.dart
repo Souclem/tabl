@@ -20,6 +20,8 @@ class RegistreRestaurants {
     final dejaDansTabl = lieu.restaurantId;
     if (dejaDansTabl != null) return dejaDansTabl;
 
+    if (lieu.personnel) return _lieuPersonnel(lieu.nom.trim());
+
     final fsqId = lieu.fsqPlaceId;
     if (fsqId != null) {
       final existant = await _parFsqId(fsqId);
@@ -41,12 +43,38 @@ class RegistreRestaurants {
         .from('restaurants')
         .select('id')
         .isFilter('fsq_place_id', null)
+        .eq('prive', false)
         .ilike('nom', _echapperJokers(nom))
         .ilike('ville', _echapperJokers(ville))
         .limit(1)
         .maybeSingle();
     if (existant != null) return existant['id'] as String;
     return _creer(lieu);
+  }
+
+  /// Le sien, du même nom, ou un nouveau : jamais celui d'un autre.
+  Future<String> _lieuPersonnel(String nom) async {
+    final existant = await _client
+        .from('restaurants')
+        .select('id')
+        .eq('prive', true)
+        .eq('cree_par', _monId)
+        .ilike('nom', _echapperJokers(nom))
+        .limit(1)
+        .maybeSingle();
+    if (existant != null) return existant['id'] as String;
+    final cree = await _client
+        .from('restaurants')
+        .insert({
+          'nom': nom,
+          'ville': '',
+          'nom_recherche': normaliserPourRecherche(nom),
+          'cree_par': _monId,
+          'prive': true,
+        })
+        .select('id')
+        .single();
+    return cree['id'] as String;
   }
 
   Future<String?> _parFsqId(String fsqId) async {

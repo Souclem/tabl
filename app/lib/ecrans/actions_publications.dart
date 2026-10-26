@@ -99,6 +99,8 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   /// l'écran ; à sa fermeture, la liste est rechargée (une envie, une
   /// réaction ont pu changer).
   Future<void> ouvrirRestaurant(SouvenirFeed souvenir) async {
+    // Un lieu personnel n'a pas de page : ni adresse, ni avis à lire.
+    if (souvenir.lieuPersonnel) return;
     await ouvrirFeuilleRestaurant(
       context,
       nom: souvenir.restaurantNom,

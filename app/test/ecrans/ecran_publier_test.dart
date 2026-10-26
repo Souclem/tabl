@@ -325,6 +325,9 @@ class _FausseRechercheLieu implements RechercheLieuService {
     double rayonM = 250,
     int limite = 8,
   }) async => const [];
+
+  @override
+  Future<List<LieuRestaurant>> mesLieuxPersonnels() async => const [];
 }
 
 class _FaussePosition implements PositionService {

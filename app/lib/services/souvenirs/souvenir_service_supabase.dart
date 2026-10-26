@@ -334,7 +334,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, est_souvenir, jour_connu, '
-          'restaurants(nom, ville, categories), '
+          'restaurants(nom, ville, categories, prive), '
           'souvenirs_photos(rang, chemin), '
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)'
           '$presentsFiltres',
@@ -434,6 +434,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         ],
         estSouvenir: l['est_souvenir'] as bool? ?? false,
         jourConnu: l['jour_connu'] as bool? ?? true,
+        lieuPersonnel: restaurant?['prive'] as bool? ?? false,
       );
     }).toList();
   }

@@ -110,5 +110,12 @@ void main() {
     );
     expect(detailLieuSouvenir(lieu, depuisLaPhoto: false), endsWith('Liège'));
     expect(heureLisible(DateTime(2023, 1, 1, 20, 5)), '20 h 05');
+    expect(
+      detailLieuSouvenir(
+        const LieuRestaurant.personnel(nom: 'Chez mes parents'),
+        depuisLaPhoto: true,
+      ),
+      'Lieu personnel · jamais public',
+    );
   });
 }

@@ -8,9 +8,10 @@ import 'recherche_lieu_en_direct.dart';
 
 /// « Quel restaurant ? » pour un souvenir : ceux près des [endroits] des
 /// photos d'abord (un par liste de [prochesParEndroit]), en liste ou sur
-/// la carte, la recherche au fil de la frappe — triée autour des photos,
-/// sinon du téléphone ([positionService]) —, et la saisie à la main en
-/// dernier recours. `null` : fermée sans choisir.
+/// la carte, ses lieux personnels (« Mes lieux »), la recherche au fil
+/// de la frappe — triée autour des photos, sinon du téléphone
+/// ([positionService]) —, la saisie à la main en dernier recours, ou un
+/// nouveau lieu personnel. `null` : fermée sans choisir.
 Future<LieuRestaurant?> choisirRestaurant(
   BuildContext context, {
   required RechercheLieuService? rechercheLieuService,
@@ -88,6 +89,14 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   String? _erreurNom;
   String? _erreurVille;
 
+  /// « Créer un lieu personnel » : seulement un nom.
+  bool _nouveauLieuPersonnel = false;
+  final _nomLieuPersonnel = TextEditingController();
+  String? _erreurLieuPersonnel;
+
+  /// Mes lieux personnels, jamais proposés par la recherche.
+  List<LieuRestaurant> _mesLieux = const [];
+
   bool _surLaCarte = false;
 
   /// Les restaurants de la carte : ceux près des photos, puis ceux de la
@@ -100,10 +109,52 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   int _derniereZone = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _chargerMesLieux();
+  }
+
+  Future<void> _chargerMesLieux() async {
+    try {
+      final mesLieux = await widget.rechercheLieuService?.mesLieuxPersonnels();
+      if (mounted && mesLieux != null) setState(() => _mesLieux = mesLieux);
+    } catch (e) {
+      debugPrint('choisirRestaurant: mes lieux : $e');
+    }
+  }
+
+  @override
   void dispose() {
     _nom.dispose();
     _ville.dispose();
+    _nomLieuPersonnel.dispose();
     super.dispose();
+  }
+
+  void _creerUnLieuPersonnel() => setState(() {
+    _nouveauLieuPersonnel = true;
+    _surLaCarte = false;
+    if (_nomLieuPersonnel.text.isEmpty) {
+      _nomLieuPersonnel.text = recherche.text.trim();
+    }
+  });
+
+  void _validerLieuPersonnel() {
+    final nom = _nomLieuPersonnel.text.trim();
+    final erreur = nom.isEmpty
+        ? 'Donnez-lui un nom.'
+        : nom.length > 60
+        ? '60 caractères au plus.'
+        : null;
+    setState(() => _erreurLieuPersonnel = erreur);
+    if (erreur != null) return;
+    // Le même nom qu'un de ses lieux : c'est lui.
+    final existant = _mesLieux.where(
+      (l) => normaliserPourRecherche(l.nom) == normaliserPourRecherche(nom),
+    );
+    Navigator.of(
+      context,
+    ).pop(existant.firstOrNull ?? LieuRestaurant.personnel(nom: nom));
   }
 
   static List<LieuRestaurant> _sansDoublon(Iterable<LieuRestaurant> lieux) =>
@@ -199,7 +250,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
                       style: TablTokens.titreAffichage.copyWith(fontSize: 26),
                     ),
                   ),
-                  if (!_aLaMain)
+                  if (!_aLaMain && !_nouveauLieuPersonnel)
                     TablSegmentModeCarte(
                       options: const ['Liste', 'Carte'],
                       selectionne: _surLaCarte ? 1 : 0,
@@ -212,7 +263,9 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
               ),
             ),
             Expanded(
-              child: _aLaMain
+              child: _nouveauLieuPersonnel
+                  ? _vueLieuPersonnel()
+                  : _aLaMain
                   ? _vueALaMain()
                   : _surLaCarte
                   ? _vueCarte()
@@ -254,8 +307,61 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
     );
   }
 
+  Widget _vueLieuPersonnel() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceL - 4,
+        0,
+        TablTokens.espaceL - 4,
+        TablTokens.espaceL,
+      ),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: Icon(
+                Icons.lock_outline_rounded,
+                size: 15,
+                color: TablTokens.texteDoux,
+              ),
+            ),
+            const SizedBox(width: TablTokens.espaceS),
+            Expanded(
+              child: Text(
+                'Un lieu à vous, comme « Chez mes parents ». Seul son nom '
+                'apparaît sur vos souvenirs : jamais d\'adresse ni de '
+                'position, et personne d\'autre ne le retrouve.',
+                style: TablTokens.legende.copyWith(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: TablTokens.espaceM),
+        TablChampTexte(
+          libelle: 'Nom du lieu',
+          controleur: _nomLieuPersonnel,
+          indication: 'Chez mes parents',
+          erreur: _erreurLieuPersonnel,
+          actionClavier: TextInputAction.done,
+          onSoumis: (_) => _validerLieuPersonnel(),
+        ),
+        const SizedBox(height: TablTokens.espaceL),
+        TablBouton(libelle: 'Créer ce lieu', onPresse: _validerLieuPersonnel),
+      ],
+    );
+  }
+
   Widget _vueListe() {
     final aCherche = recherche.text.trim().length >= 2;
+    final texte = normaliserPourRecherche(recherche.text.trim());
+    final mesLieux = aCherche
+        ? [
+            for (final l in _mesLieux)
+              if (normaliserPourRecherche(l.nom).contains(texte)) l,
+          ]
+        : _mesLieux;
     Widget section(String titre) => Padding(
       padding: const EdgeInsets.only(top: TablTokens.espaceM),
       child: Text(
@@ -297,9 +403,13 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
             color: TablTokens.primaire,
             backgroundColor: Colors.transparent,
           ),
+        if (aCherche && mesLieux.isNotEmpty) ...[
+          section('MES LIEUX'),
+          for (final lieu in mesLieux) ligne(lieu),
+        ],
         if (aCherche) ...[
           for (final lieu in suggestions) ligne(_depuisPhotos(lieu)),
-          if (!rechercheEnCours && suggestions.isEmpty)
+          if (!rechercheEnCours && suggestions.isEmpty && mesLieux.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
               child: Text(
@@ -315,10 +425,18 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
               ),
               for (final lieu in widget.prochesParEndroit[i]) ligne(lieu),
             ],
+        if (!aCherche && mesLieux.isNotEmpty) ...[
+          section('MES LIEUX'),
+          for (final lieu in mesLieux) ligne(lieu),
+        ],
         const SizedBox(height: TablTokens.espaceS),
         TablBoutonTexte(
           libelle: 'Je ne trouve pas mon restaurant',
           onPresse: _passerALaMain,
+        ),
+        TablBoutonTexte(
+          libelle: 'Créer un lieu personnel',
+          onPresse: _creerUnLieuPersonnel,
         ),
       ],
     );

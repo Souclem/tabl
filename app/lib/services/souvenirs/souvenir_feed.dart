@@ -31,6 +31,7 @@ class SouvenirFeed {
     this.autresPhotosUrls = const [],
     this.estSouvenir = false,
     this.jourConnu = true,
+    this.lieuPersonnel = false,
   });
 
   final String id;
@@ -108,6 +109,10 @@ class SouvenirFeed {
   /// alors le 1er du mois).
   final bool jourConnu;
 
+  /// Un lieu personnel (« Chez mes parents ») : rien à ouvrir, pas de
+  /// page de restaurant.
+  final bool lieuPersonnel;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -144,6 +149,7 @@ class SouvenirFeed {
       autresPhotosUrls: autresPhotosUrls,
       estSouvenir: estSouvenir,
       jourConnu: jourConnu,
+      lieuPersonnel: lieuPersonnel,
     );
   }
 }

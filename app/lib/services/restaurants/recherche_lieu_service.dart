@@ -18,4 +18,8 @@ abstract interface class RechercheLieuService {
     double rayonM = 250,
     int limite = 8,
   });
+
+  /// Mes lieux personnels (« Chez mes parents »), par ordre alphabétique :
+  /// la recherche ne les propose jamais, à personne.
+  Future<List<LieuRestaurant>> mesLieuxPersonnels();
 }

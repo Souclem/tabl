@@ -151,6 +151,7 @@ String heureLisible(DateTime heure) =>
 /// qui le sépare de l'endroit des photos (sinon, du téléphone : elle ne
 /// dit rien du souvenir, on la tait).
 String detailLieuSouvenir(LieuRestaurant lieu, {required bool depuisLaPhoto}) {
+  if (lieu.personnel) return 'Lieu personnel · jamais public';
   final distance = lieu.distanceM;
   return [
     if (lieu.categories.isNotEmpty) libelleCategorie(lieu.categories.first),

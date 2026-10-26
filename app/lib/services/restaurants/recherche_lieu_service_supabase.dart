@@ -48,6 +48,25 @@ class RechercheLieuServiceSupabase implements RechercheLieuService {
     return _lieux(lignes);
   }
 
+  @override
+  Future<List<LieuRestaurant>> mesLieuxPersonnels() async {
+    final moi = _client.auth.currentUser?.id;
+    if (moi == null) return const [];
+    final lignes = await _client
+        .from('restaurants')
+        .select('id, nom')
+        .eq('prive', true)
+        .eq('cree_par', moi)
+        .order('nom');
+    return [
+      for (final l in lignes)
+        LieuRestaurant.personnel(
+          nom: l['nom'] as String,
+          restaurantId: l['id'] as String,
+        ),
+    ];
+  }
+
   List<LieuRestaurant> _lieux(List<dynamic> lignes) {
     return [
       for (final l in lignes.cast<Map<String, dynamic>>())

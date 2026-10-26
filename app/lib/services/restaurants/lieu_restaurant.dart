@@ -16,6 +16,7 @@ class LieuRestaurant {
     this.longitude,
     this.categories = const [],
     this.distanceM,
+    this.personnel = false,
   });
 
   /// Un restaurant introuvable, ajouté à la main.
@@ -28,7 +29,21 @@ class LieuRestaurant {
        fsqPlaceId = null,
        adresse = null,
        categories = const [],
-       distanceM = null;
+       distanceM = null,
+       personnel = false;
+
+  /// Un lieu à soi (« Chez mes parents ») : son nom se lit sur les
+  /// souvenirs qu'on y a, jamais son adresse ni sa position — il n'en a
+  /// pas.
+  const LieuRestaurant.personnel({required this.nom, this.restaurantId})
+    : ville = '',
+      fsqPlaceId = null,
+      adresse = null,
+      latitude = null,
+      longitude = null,
+      categories = const [],
+      distanceM = null,
+      personnel = true;
 
   final String nom;
   final String ville;
@@ -50,13 +65,17 @@ class LieuRestaurant {
   /// Distance depuis la position de l'utilisateur, si connue.
   final double? distanceM;
 
-  bool get estManuel => restaurantId == null && fsqPlaceId == null;
+  /// Un lieu personnel ([LieuRestaurant.personnel]).
+  final bool personnel;
+
+  bool get estManuel =>
+      restaurantId == null && fsqPlaceId == null && !personnel;
 
   /// Le même lieu, avec sa distance à [latitude], [longitude] (l'endroit
   /// d'une photo, plutôt que le téléphone) ; inchangé sans position.
   LieuRestaurant aDistanceDe(double latitude, double longitude) {
     final lat = this.latitude, lng = this.longitude;
-    if (lat == null || lng == null) return this;
+    if (lat == null || lng == null || personnel) return this;
     return LieuRestaurant(
       nom: nom,
       ville: ville,
