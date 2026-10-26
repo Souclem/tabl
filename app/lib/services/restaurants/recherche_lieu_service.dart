@@ -16,5 +16,6 @@ abstract interface class RechercheLieuService {
     required double latitude,
     required double longitude,
     double rayonM = 250,
+    int limite = 8,
   });
 }

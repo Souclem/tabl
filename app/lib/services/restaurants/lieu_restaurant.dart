@@ -52,6 +52,28 @@ class LieuRestaurant {
 
   bool get estManuel => restaurantId == null && fsqPlaceId == null;
 
+  /// Le même lieu, avec sa distance à [latitude], [longitude] (l'endroit
+  /// d'une photo, plutôt que le téléphone) ; inchangé sans position.
+  LieuRestaurant aDistanceDe(double latitude, double longitude) {
+    final lat = this.latitude, lng = this.longitude;
+    if (lat == null || lng == null) return this;
+    return LieuRestaurant(
+      nom: nom,
+      ville: ville,
+      restaurantId: restaurantId,
+      fsqPlaceId: fsqPlaceId,
+      adresse: adresse,
+      latitude: lat,
+      longitude: lng,
+      categories: categories,
+      distanceM: distanceEnMetres(latitude, longitude, lat, lng),
+    );
+  }
+
+  /// Ce qui le distingue des autres, même entré à la main.
+  String get cle =>
+      restaurantId ?? fsqPlaceId ?? '$nom|$ville|$latitude|$longitude';
+
   /// "Italien · Rue du Pont 16, Liège · 350 m" — tout ce qui aide à
   /// reconnaître le bon lieu dans une liste de suggestions.
   String get description {

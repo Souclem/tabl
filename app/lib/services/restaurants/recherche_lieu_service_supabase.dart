@@ -34,6 +34,7 @@ class RechercheLieuServiceSupabase implements RechercheLieuService {
     required double latitude,
     required double longitude,
     double rayonM = 250,
+    int limite = 8,
   }) async {
     final lignes = await _client.rpc<List<dynamic>>(
       'lieux_proches',
@@ -41,6 +42,7 @@ class RechercheLieuServiceSupabase implements RechercheLieuService {
         'p_latitude': latitude,
         'p_longitude': longitude,
         'p_rayon_m': rayonM,
+        'p_limite': limite,
       },
     );
     return _lieux(lignes);

@@ -12,6 +12,7 @@ class Precompletion {
     this.date,
     this.moment,
     this.position,
+    this.autresEndroits = const [],
     this.premierePhoto,
   });
 
@@ -22,28 +23,38 @@ class Precompletion {
   /// `'midi'` ou `'soir'`, `null` si l'heure ne le dit pas.
   final String? moment;
 
-  /// Le centre des photos qui ont une position.
+  /// Le centre de l'endroit où la plupart des photos ont été prises.
   final Coordonnees? position;
+
+  /// Les autres endroits des photos, s'il y en a (une photo dans la rue,
+  /// une autre ailleurs) : on y cherche aussi, au cas où.
+  final List<Coordonnees> autresEndroits;
 
   /// L'heure de la première photo du repas.
   final DateTime? premierePhoto;
 }
 
-/// Le repas commence à la première photo : c'est elle qui donne le jour
-/// et le moment. Une date encore à venir (horloge d'appareil fausse)
-/// n'est pas retenue.
+/// Les photos d'un repas, même choisies un peu large (une photo dans la
+/// rue, une autre chez soi après), ont surtout été prises au restaurant :
+/// l'endroit retenu est celui où les photos sont les plus nombreuses
+/// ([endroitDesPhotos]). Le repas commence à la première photo de cet
+/// endroit (toutes, si aucune n'a de position) : elle donne le jour et
+/// le moment. Une date encore à venir (horloge d'appareil fausse) n'est
+/// pas retenue.
 Precompletion precompleter(
   Iterable<MetadonneesPhoto> photos, {
   required DateTime maintenant,
 }) {
-  final dates = [
+  final valables = [
     for (final p in photos)
-      if (p.prisLe case final d? when !d.isAfter(maintenant)) d,
-  ]..sort();
-  final placees = [
-    for (final p in photos)
-      if (p.aUnePosition) (latitude: p.latitude!, longitude: p.longitude!),
+      if (p.prisLe?.isAfter(maintenant) ?? false)
+        MetadonneesPhoto(latitude: p.latitude, longitude: p.longitude)
+      else
+        p,
   ];
+  final endroits = endroitsDesPhotos(valables);
+  final duRepas = endroits.firstOrNull?.photos ?? valables;
+  final dates = [for (final p in duRepas) ?p.prisLe]..sort();
   final premiere = dates.firstOrNull;
   return Precompletion(
     date: premiere == null
@@ -55,17 +66,71 @@ Precompletion precompleter(
           ),
     moment: premiere == null ? null : momentDApresHeure(premiere),
     premierePhoto: premiere,
-    position: placees.isEmpty
-        ? null
-        : (
-            latitude:
-                placees.map((p) => p.latitude).reduce((a, b) => a + b) /
-                placees.length,
-            longitude:
-                placees.map((p) => p.longitude).reduce((a, b) => a + b) /
-                placees.length,
-          ),
+    position: endroits.firstOrNull?.position,
+    autresEndroits: [for (final e in endroits.skip(1)) e.position],
   );
+}
+
+/// Les endroits où les photos ont été prises, le principal d'abord :
+/// chaque photo compte celles prises à moins de [rayonM] d'elle, le
+/// groupe le plus fourni forme le premier endroit — à égalité, celui de
+/// la photo la plus ancienne —, puis on recommence avec les autres
+/// photos. Deux photos prises à deux endroits : deux endroits, celui de
+/// la première d'abord. Vide si aucune n'a de position.
+List<({Coordonnees position, List<MetadonneesPhoto> photos})> endroitsDesPhotos(
+  Iterable<MetadonneesPhoto> photos, {
+  double rayonM = 150,
+}) {
+  final sansDate = DateTime(9999);
+  // Les plus anciennes d'abord, pour qu'elles gagnent les égalités.
+  final restantes = [
+    for (final p in photos)
+      if (p.aUnePosition) p,
+  ]..sort((a, b) => (a.prisLe ?? sansDate).compareTo(b.prisLe ?? sansDate));
+  bool proches(MetadonneesPhoto a, MetadonneesPhoto b) =>
+      distanceEnMetres(a.latitude!, a.longitude!, b.latitude!, b.longitude!) <=
+      rayonM;
+
+  final endroits = <({Coordonnees position, List<MetadonneesPhoto> photos})>[];
+  while (restantes.isNotEmpty) {
+    List<MetadonneesPhoto>? groupe;
+    for (final centre in restantes) {
+      final voisines = [
+        for (final p in restantes)
+          if (proches(centre, p)) p,
+      ];
+      if (groupe == null || voisines.length > groupe.length) groupe = voisines;
+    }
+    final membres = groupe!;
+    restantes.removeWhere(membres.contains);
+    double moyenne(double Function(MetadonneesPhoto) valeur) =>
+        membres.map(valeur).reduce((a, b) => a + b) / membres.length;
+    endroits.add((
+      position: (
+        latitude: moyenne((p) => p.latitude!),
+        longitude: moyenne((p) => p.longitude!),
+      ),
+      photos: membres,
+    ));
+  }
+  return endroits;
+}
+
+/// [lieu] avec sa distance au plus proche des [endroits] des photos ;
+/// inchangé s'il n'y en a pas.
+LieuRestaurant aDistanceDesPhotos(
+  LieuRestaurant lieu,
+  List<Coordonnees> endroits,
+) {
+  LieuRestaurant? meilleur;
+  for (final e in endroits) {
+    final candidat = lieu.aDistanceDe(e.latitude, e.longitude);
+    final d = candidat.distanceM;
+    if (d != null && (meilleur == null || d < meilleur.distanceM!)) {
+      meilleur = candidat;
+    }
+  }
+  return meilleur ?? lieu;
 }
 
 /// Déjeuner de 10 h à 17 h, dîner de 17 h à 3 h du matin ; entre les

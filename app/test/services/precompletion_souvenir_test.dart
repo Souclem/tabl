@@ -25,15 +25,66 @@ void main() {
     expect(p.moment, isNull);
   });
 
-  test('l\'endroit : le centre des photos qui ont une position', () {
+  test('l\'endroit : là où la plupart des photos ont été prises', () {
+    // Deux au restaurant, une dans la rue avant, une chez soi après.
     final p = precompleter([
-      const MetadonneesPhoto(latitude: 50.0, longitude: 5.0),
-      const MetadonneesPhoto(latitude: 50.2, longitude: 5.4),
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 19, 50),
+        latitude: 50.6400,
+        longitude: 5.5700,
+      ),
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 20, 41),
+        latitude: 50.64735,
+        longitude: 5.58045,
+      ),
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 21, 10),
+        latitude: 50.64745,
+        longitude: 5.58055,
+      ),
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 23, 30),
+        latitude: 50.6100,
+        longitude: 5.5100,
+      ),
+    ], maintenant: maintenant);
+
+    expect(p.position?.latitude, closeTo(50.6474, 1e-4));
+    expect(p.position?.longitude, closeTo(5.5805, 1e-4));
+    // Le repas commence à la première photo du restaurant, pas de la rue.
+    expect(p.premierePhoto, DateTime(2023, 11, 3, 20, 41));
+  });
+
+  test('à égalité, l\'endroit de la première photo', () {
+    final p = precompleter([
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 21),
+        latitude: 50.70,
+        longitude: 5.60,
+      ),
+      MetadonneesPhoto(
+        prisLe: DateTime(2023, 11, 3, 20),
+        latitude: 50.60,
+        longitude: 5.50,
+      ),
+    ], maintenant: maintenant);
+
+    expect(p.position?.latitude, 50.60);
+    // L'autre endroit n'est pas oublié : on y cherche aussi.
+    expect(p.autresEndroits.single.latitude, 50.70);
+    expect(p.premierePhoto, DateTime(2023, 11, 3, 20));
+  });
+
+  test('l\'endroit : le centre des photos d\'un même lieu', () {
+    final p = precompleter([
+      const MetadonneesPhoto(latitude: 50.6470, longitude: 5.5800),
+      const MetadonneesPhoto(latitude: 50.6472, longitude: 5.5804),
       const MetadonneesPhoto(),
     ], maintenant: maintenant);
 
-    expect(p.position?.latitude, closeTo(50.1, 1e-9));
-    expect(p.position?.longitude, closeTo(5.2, 1e-9));
+    expect(p.position?.latitude, closeTo(50.6471, 1e-9));
+    expect(p.position?.longitude, closeTo(5.5802, 1e-9));
     expect(precompleter([], maintenant: maintenant).position, isNull);
   });
 

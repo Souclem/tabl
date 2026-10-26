@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
@@ -88,8 +90,10 @@ const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 /// « 5 » par quartier en zoomant ; un tap sur une bulle zoome juste
 /// assez pour l'ouvrir. De près, chaque lieu est un marqueur doré avec,
 /// dans une petite bulle, le nombre d'amis qui y sont allés (propriété
-/// `amis` du GeoJSON). Le regroupement est celui de Mapbox : il suit la
-/// distance à l'écran, pas les frontières, et vaut partout dans le monde.
+/// `amis` du GeoJSON, sans bulle quand elle est absente). Le regroupement
+/// est celui de Mapbox : il suit la distance à l'écran, pas les
+/// frontières, et vaut partout dans le monde. Un point marqué `repere`
+/// (l'endroit d'une photo) est un simple rond blanc, qu'on ne touche pas.
 ///
 /// Composant pur : reçoit les lieux déjà choisis (au format GeoJSON) et
 /// renvoie le tap sur un lieu ([onTapLieu], avec sa clé) et la zone
@@ -106,6 +110,8 @@ class TablCarteMapbox extends StatefulWidget {
     this.onTapCarte,
     this.controleur,
     this.margeBas = 0,
+    this.avecMaPosition = true,
+    this.dansUneFeuille = false,
   });
 
   final String geojsonLieux;
@@ -134,6 +140,14 @@ class TablCarteMapbox extends StatefulWidget {
   /// doivent rester visibles, sont remontés d'autant.
   final double margeBas;
 
+  /// Le point animé de ma position.
+  final bool avecMaPosition;
+
+  /// Posée dans une feuille qu'on peut faire glisser : la carte garde
+  /// pour elle les gestes qui la touchent (sinon glisser vers le bas
+  /// fermerait la feuille au lieu de déplacer la carte).
+  final bool dansUneFeuille;
+
   @override
   State<TablCarteMapbox> createState() => _TablCarteMapboxState();
 }
@@ -145,6 +159,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   static const _coucheLieux = 'tabl-lieux-points';
   static const _coucheBulles = 'tabl-lieux-bulles';
   static const _coucheAmis = 'tabl-lieux-amis';
+  static const _coucheRepere = 'tabl-repere';
 
   /// Distance à l'écran (pt) sous laquelle des lieux se regroupent.
   static const _rayonGroupes = 46.0;
@@ -161,9 +176,22 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
 
   static const List<Object> _estUnGroupe = ['has', 'point_count'];
   static const List<Object> _estUnLieu = [
-    '!',
-    ['has', 'point_count'],
+    'all',
+    [
+      '!',
+      ['has', 'point_count'],
+    ],
+    [
+      '!',
+      ['has', 'repere'],
+    ],
   ];
+  static const List<Object> _aDesAmis = [
+    'all',
+    _estUnLieu,
+    ['has', 'amis'],
+  ];
+  static const List<Object> _estUnRepere = ['has', 'repere'];
 
   /// Le lieu dont la feuille est ouverte ressort.
   static const List<Object> _echelleExpression = [
@@ -222,7 +250,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     );
     await carte.location.updateSettings(
       LocationComponentSettings(
-        enabled: true,
+        enabled: widget.avecMaPosition,
         pulsingEnabled: true,
         pulsingColor: TablTokens.primaire.toARGB32(),
         showAccuracyRing: false,
@@ -293,6 +321,19 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
+    // L'endroit d'une photo : un rond blanc cerclé d'or, sous les lieux.
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheRepere,
+        sourceId: _source,
+        filter: _estUnRepere,
+        circleColor: TablTokens.texte.toARGB32(),
+        circleRadius: 7.0,
+        circleStrokeColor: TablTokens.primaire.toARGB32(),
+        circleStrokeWidth: 3.0,
+      ),
+    );
+
     // Un lieu seul : marqueur doré, et la petite bulle de ses amis.
     await carte.addLayer(
       CircleLayer(
@@ -309,7 +350,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       CircleLayer(
         id: _coucheBulles,
         sourceId: _source,
-        filter: _estUnLieu,
+        filter: _aDesAmis,
         circleColor: TablTokens.fond.toARGB32(),
         circleRadius: 8.0,
         circleStrokeColor: TablTokens.primaire.toARGB32(),
@@ -321,7 +362,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       SymbolLayer(
         id: _coucheAmis,
         sourceId: _source,
-        filter: _estUnLieu,
+        filter: _aDesAmis,
         textFieldExpression: [
           'case',
           [
@@ -446,6 +487,9 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       onMapCreated: _creee,
       onStyleLoadedListener: _styleChargeListener,
       onCameraChangeListener: (_) => _cameraBouge(),
+      gestureRecognizers: widget.dansUneFeuille
+          ? {Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new)}
+          : null,
     );
   }
 }

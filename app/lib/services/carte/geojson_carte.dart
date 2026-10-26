@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../position/position_service.dart';
+import '../restaurants/lieu_restaurant.dart';
 import 'lieu_carte.dart';
 
 /// Les lieux au format GeoJSON, tel que Mapbox l'attend pour une source.
@@ -24,6 +26,41 @@ String geojsonLieux(Iterable<LieuCarte> lieux, {String? cleChoisie}) {
             if (lieu.cle == cleChoisie) 'choisi': true,
           },
         },
+    ],
+  });
+}
+
+/// Les restaurants parmi lesquels choisir celui d'un souvenir, et les
+/// endroits des photos ([reperes]) : des points à part, qu'on ne touche
+/// pas.
+String geojsonChoixLieux(
+  Iterable<LieuRestaurant> lieux, {
+  List<Coordonnees> reperes = const [],
+  String? cleChoisie,
+}) {
+  Map<String, Object> point(double latitude, double longitude) => {
+    'type': 'Point',
+    'coordinates': [longitude, latitude],
+  };
+  return jsonEncode({
+    'type': 'FeatureCollection',
+    'features': [
+      for (final repere in reperes)
+        {
+          'type': 'Feature',
+          'geometry': point(repere.latitude, repere.longitude),
+          'properties': {'repere': true},
+        },
+      for (final lieu in lieux)
+        if (lieu.latitude != null && lieu.longitude != null)
+          {
+            'type': 'Feature',
+            'geometry': point(lieu.latitude!, lieu.longitude!),
+            'properties': {
+              'cle': lieu.cle,
+              if (lieu.cle == cleChoisie) 'choisi': true,
+            },
+          },
     ],
   });
 }

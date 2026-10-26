@@ -86,6 +86,7 @@ class _FausseRechercheLieu implements RechercheLieuService {
     required double latitude,
     required double longitude,
     double rayonM = 250,
+    int limite = 8,
   }) async {
     pointsDemandes.add((latitude: latitude, longitude: longitude));
     return proches;
@@ -304,6 +305,42 @@ void main() {
       expect(ajoute.date.libelle, '3 novembre 2023');
       expect(ajoute.moment, 'soir');
       expect(ajoute.photos, [_photoA]);
+    });
+
+    testWidgets('deux endroits : le resto de la première photo, l\'autre aussi '
+        'dans la liste', (tester) async {
+      final service = _FauxSouvenirService();
+      final recherche = _FausseRechercheLieu(proches: [_comoEnCasa]);
+      await _ouvrirEditeur(
+        tester,
+        service,
+        photos: [
+          (
+            octets: _photoA,
+            metadonnees: MetadonneesPhoto(
+              prisLe: DateTime(2023, 11, 3, 22),
+              latitude: 50.70,
+              longitude: 5.60,
+            ),
+          ),
+          _photoDuDiner(_photoB),
+        ],
+        recherche: recherche,
+      );
+
+      // La plus ancienne (20 h 41, chez Como en Casa) d'abord.
+      expect(recherche.pointsDemandes.map((p) => p.latitude), [
+        50.64735,
+        50.70,
+      ]);
+      expect(find.text('D\'après vos photos · 20 h 41'), findsOneWidget);
+
+      await tester.tap(find.text('Changer'));
+      await tester.pumpAndSettle();
+      expect(find.text('PRÈS DE VOS PHOTOS'), findsOneWidget);
+      expect(find.text('PRÈS D\'UNE AUTRE PHOTO'), findsOneWidget);
+      expect(find.text('Liste'), findsOneWidget);
+      expect(find.text('Carte'), findsOneWidget);
     });
 
     testWidgets('le restaurant proposé se change : les proches d\'abord', (

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../boutons.dart';
 
 /// « ☾ SOUVENIR », au-dessus du nom d'un souvenir.
 class TablSurtitreSouvenir extends StatelessWidget {
@@ -217,6 +218,63 @@ class TablChampLegende extends StatelessWidget {
         filled: false,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(vertical: 6),
+      ),
+    );
+  }
+}
+
+/// Le restaurant touché sur la carte, en carte posée en bas : son nom,
+/// ce qui le situe, et le bouton pour le choisir.
+class TablCarteChoixLieu extends StatelessWidget {
+  const TablCarteChoixLieu({
+    super.key,
+    required this.nom,
+    required this.detail,
+    required this.libelleBouton,
+    required this.onChoisir,
+  });
+
+  final String nom;
+
+  /// "Végétarien · Liège · à 40 m de la photo".
+  final String detail;
+  final String libelleBouton;
+  final VoidCallback onChoisir;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(TablTokens.espaceM),
+      decoration: BoxDecoration(
+        color: TablTokens.surfaceBasse,
+        borderRadius: BorderRadius.circular(TablTokens.arrondiL),
+        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.12)),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 24,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            nom,
+            style: TablTokens.titreAffichage.copyWith(
+              fontSize: 22,
+              height: 1.15,
+            ),
+          ),
+          if (detail.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(detail, style: TablTokens.legende.copyWith(fontSize: 13)),
+          ],
+          const SizedBox(height: TablTokens.espaceM),
+          TablBouton(libelle: libelleBouton, onPresse: onChoisir),
+        ],
       ),
     );
   }

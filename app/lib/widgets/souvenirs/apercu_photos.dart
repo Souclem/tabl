@@ -184,19 +184,21 @@ class _Quadrillage extends CustomPainter {
   bool shouldRepaint(_Quadrillage ancien) => false;
 }
 
-/// Pilule en verre dépoli posée sur une photo (« ★ Principale »,
-/// « Retirer ») : lisible sur n'importe quelle image.
+/// Pilule en verre dépoli posée sur une photo ou une carte
+/// (« ★ Principale », « Retirer ») : lisible sur n'importe quelle image.
 class TablPiluleVerre extends StatelessWidget {
   const TablPiluleVerre({
     super.key,
     required this.icone,
     required this.libelle,
-    required this.onPresse,
+    this.onPresse,
   });
 
   final IconData icone;
   final String libelle;
-  final VoidCallback onPresse;
+
+  /// `null` : une simple mention, qu'on ne touche pas.
+  final VoidCallback? onPresse;
 
   @override
   Widget build(BuildContext context) {
