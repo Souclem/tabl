@@ -44,6 +44,7 @@ export 'ligne_avis.dart';
 export 'ligne_suggestion_lieu.dart';
 export 'logo.dart';
 export 'messages.dart';
+export 'notifications/ligne_notification.dart';
 export 'option_audience.dart';
 export 'publication.dart';
 export 'publication_depliable.dart';

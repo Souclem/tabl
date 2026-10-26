@@ -83,6 +83,10 @@ abstract interface class SouvenirService {
   /// Sans les repas passés ajoutés après coup ([ajouterSouvenir]).
   Future<List<SouvenirFeed>> feed();
 
+  /// Un seul souvenir, s'il est visible (une notification y mène) ;
+  /// `null` sinon.
+  Future<SouvenirFeed?> souvenir(String souvenirId);
+
   /// Les souvenirs publiés d'un seul auteur, même ordre que [feed] —
   /// pour une page de profil. La RLS reste seule juge : sur le profil de
   /// quelqu'un qu'on ne suit pas, la liste revient simplement vide.

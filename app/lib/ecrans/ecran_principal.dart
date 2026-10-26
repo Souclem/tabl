@@ -23,6 +23,7 @@ class EcranPrincipal extends StatefulWidget {
     this.carteService,
     this.tableService,
     this.instantService,
+    this.notificationService,
     this.rechercheLieuService,
     this.positionService,
   });
@@ -41,6 +42,7 @@ class EcranPrincipal extends StatefulWidget {
   final CarteService? carteService;
   final TableService? tableService;
   final InstantService? instantService;
+  final NotificationService? notificationService;
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
 
@@ -158,6 +160,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                   souvenirService: widget.souvenirService,
                   abonnementService: widget.abonnementService,
                   instantService: widget.instantService,
+                  notificationService: widget.notificationService,
                 ),
                 _ongletsConstruits.contains(TablOnglet.tables)
                     ? EcranTables(

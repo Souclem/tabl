@@ -49,6 +49,8 @@ class TablApp extends StatelessWidget {
     // initialisé. Construit ici, au seul endroit où Supabase est déjà
     // garanti initialisé (après `TablBackend.demarrer` dans `main`).
     final instantService = InstantServiceSupabase(TablBackend.client);
+    // Même raison : la cloche du Feed en a besoin dès son premier build.
+    final notificationService = NotificationServiceSupabase(TablBackend.client);
 
     return MaterialApp(
       title: 'Tabl',
@@ -60,6 +62,7 @@ class TablApp extends StatelessWidget {
         souvenirService: souvenirService,
         etatOnboarding: etatOnboarding,
         instantService: instantService,
+        notificationService: notificationService,
       ),
     );
   }
@@ -77,6 +80,7 @@ class EcranDemarrage extends StatefulWidget {
     required this.souvenirService,
     required this.etatOnboarding,
     this.instantService,
+    this.notificationService,
   });
 
   final AuthService authService;
@@ -88,6 +92,9 @@ class EcranDemarrage extends StatefulWidget {
   /// écran sans lui (aucun n'a besoin des Instants) — `TablApp` en
   /// fournit toujours un vrai dans l'app réelle (voir son commentaire).
   final InstantService? instantService;
+
+  /// Même principe que [instantService].
+  final NotificationService? notificationService;
 
   @override
   State<EcranDemarrage> createState() => _EcranDemarrageState();
@@ -152,6 +159,7 @@ class _EcranDemarrageState extends State<EcranDemarrage> {
             souvenirService: souvenirService,
             utilisateur: utilisateur,
             instantService: widget.instantService,
+            notificationService: widget.notificationService,
           );
         }
         return EcranConnexion(

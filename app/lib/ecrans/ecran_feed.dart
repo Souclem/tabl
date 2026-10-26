@@ -5,6 +5,7 @@ import 'package:app/widgets/widgets.dart';
 import 'actions_publications.dart';
 import 'ecran_abonnes.dart';
 import 'ecran_creer_instant.dart';
+import 'ecran_notifications.dart';
 import 'ecran_viewer_instants.dart';
 
 /// Onglet Feed : les souvenirs des gens qu'on suit (et les siens), du
@@ -19,6 +20,7 @@ class EcranFeed extends StatefulWidget {
     required this.souvenirService,
     required this.abonnementService,
     this.instantService,
+    this.notificationService,
     super.key,
   });
 
@@ -31,6 +33,10 @@ class EcranFeed extends StatefulWidget {
   /// que les tests existants obtiennent par défaut, sans rien changer à
   /// leur comportement.
   final InstantService? instantService;
+
+  /// Pour la cloche. `null` : pas de pastille, et le service est
+  /// construit à l'ouverture des notifications (jamais dans les tests).
+  final NotificationService? notificationService;
 
   @override
   State<EcranFeed> createState() => _EcranFeedState();
@@ -58,6 +64,51 @@ class _EcranFeedState extends State<EcranFeed>
       souvenirs = null;
       _signauxCharges = false;
     });
+    _verifierNotifications();
+  }
+
+  /// Du nouveau dans les notifications : la pastille de la cloche.
+  bool _notificationsNouvelles = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _verifierNotifications();
+  }
+
+  Future<void> _verifierNotifications() async {
+    final service = widget.notificationService;
+    if (service == null) return;
+    try {
+      final (:notifications, :vuesLe) = await service.mesNotifications();
+      if (!mounted) return;
+      setState(
+        () => _notificationsNouvelles = aDesNouvelles(
+          notifications,
+          vuesLe: vuesLe,
+        ),
+      );
+    } catch (e) {
+      debugPrint('EcranFeed: notifications : $e');
+    }
+  }
+
+  Future<void> _ouvrirNotifications() async {
+    setState(() => _notificationsNouvelles = false);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranNotifications(
+          notificationService:
+              widget.notificationService ??
+              NotificationServiceSupabase(TablBackend.client),
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    // Une demande acceptée, un moment ouvert : de quoi revoir le Feed.
+    recharger();
   }
 
   /// Pastille sur l'icône d'ajout d'ami, même source que le badge de
@@ -257,7 +308,8 @@ class _EcranFeedState extends State<EcranFeed>
             _BarreSuperieure(
               futurDemandes: _futurDemandes,
               onAjouterAmis: _allerVersAbonnes,
-              onNotifications: _bientotDisponible,
+              notificationsNouvelles: _notificationsNouvelles,
+              onNotifications: _ouvrirNotifications,
               onPeriode: _bientotDisponible,
             ),
             Expanded(
@@ -328,12 +380,14 @@ class _BarreSuperieure extends StatelessWidget {
     required this.onAjouterAmis,
     required this.onNotifications,
     required this.onPeriode,
+    this.notificationsNouvelles = false,
   });
 
   final Future<int> futurDemandes;
   final VoidCallback onAjouterAmis;
   final VoidCallback onNotifications;
   final VoidCallback onPeriode;
+  final bool notificationsNouvelles;
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +446,7 @@ class _BarreSuperieure extends StatelessWidget {
           const SizedBox(width: TablTokens.espaceS),
           _IconeCirculaire(
             icone: Icons.notifications_none_rounded,
-            pastille: false,
+            pastille: notificationsNouvelles,
             onPresse: onNotifications,
           ),
         ],

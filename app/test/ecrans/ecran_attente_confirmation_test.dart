@@ -118,6 +118,8 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<SouvenirFeed?> souvenir(String souvenirId) => throw UnimplementedError();
+  @override
   Future<Set<String>> empreintesImportees() => throw UnimplementedError();
   @override
   Future<void> supprimer(String souvenirId) => throw UnimplementedError();

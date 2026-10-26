@@ -159,6 +159,8 @@ class AbonnementServiceSupabase implements AbonnementService {
       'suiveur_id': _monId,
       'suivi_id': suiviId,
       'statut': immediat ? 'accepte' : 'en_attente',
+      // Quand le suivi a commencé : la notification « vous suit ».
+      if (immediat) 'accepte_le': DateTime.now().toUtc().toIso8601String(),
     });
     return immediat
         ? StatutAbonnement.abonne
@@ -205,7 +207,11 @@ class AbonnementServiceSupabase implements AbonnementService {
   Future<void> accepterDemande(String suiveurId) async {
     await _client
         .from('abonnements')
-        .update({'statut': 'accepte'})
+        .update({
+          'statut': 'accepte',
+          // « Clara a accepté votre demande », chez celui qui l'a faite.
+          'accepte_le': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('suiveur_id', suiveurId)
         .eq('suivi_id', _monId);
   }
@@ -362,7 +368,10 @@ class AbonnementServiceSupabase implements AbonnementService {
     if (prive) return;
     await _client
         .from('abonnements')
-        .update({'statut': 'accepte'})
+        .update({
+          'statut': 'accepte',
+          'accepte_le': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('suivi_id', _monId)
         .eq('statut', 'en_attente');
   }

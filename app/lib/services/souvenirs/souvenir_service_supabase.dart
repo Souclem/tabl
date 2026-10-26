@@ -304,6 +304,10 @@ class SouvenirServiceSupabase implements SouvenirService {
   Future<List<SouvenirFeed>> feed() => _souvenirsPublies(sansSouvenirs: true);
 
   @override
+  Future<SouvenirFeed?> souvenir(String souvenirId) async =>
+      (await _souvenirsPublies(id: souvenirId)).firstOrNull;
+
+  @override
   Future<List<SouvenirFeed>> souvenirsDe(String auteurId) =>
       _souvenirsPublies(auteurId: auteurId);
 
@@ -325,6 +329,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     String? restaurantId,
     String? avecPresent,
     bool sansSouvenirs = false,
+    String? id,
   }) async {
     final presentsFiltres = avecPresent == null
         ? ''
@@ -341,6 +346,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         )
         .eq('statut', 'publie');
     if (sansSouvenirs) requete = requete.eq('est_souvenir', false);
+    if (id != null) requete = requete.eq('id', id);
     if (restaurantId != null) {
       requete = requete.eq('restaurant_id', restaurantId);
     }
@@ -349,7 +355,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     }
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
-    } else {
+    } else if (id == null) {
       requete = requete.or(await conditionSouvenirsDuReseau(_client, _monId));
     }
     // Les plus récents seulement : au-delà, les requêtes groupées qui

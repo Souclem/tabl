@@ -12,6 +12,8 @@ import 'package:app/ecrans/ecran_commentaires.dart';
 /// comme le ferait le vrai service.
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<SouvenirFeed?> souvenir(String souvenirId) => throw UnimplementedError();
+  @override
   Future<Set<String>> empreintesImportees() => throw UnimplementedError();
   @override
   Future<void> supprimer(String souvenirId) => throw UnimplementedError();
