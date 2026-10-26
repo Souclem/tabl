@@ -91,10 +91,25 @@ void main() {
         'type': 'Point',
         'coordinates': [5.5802, 50.6471],
       });
-      // Le chiffre de la petite bulle : les amis qui y sont allés.
-      expect(point['properties'], {'cle': 'r1', 'amis': 3});
+      // Un point clair, sans plus : personne n'y est retourné.
+      expect(point['properties'], {'cle': 'r1'});
     },
   );
+
+  test('GeoJSON : une étincelle là où le cercle revient', () {
+    const lieu = LieuCarte(
+      restaurantId: 'r1',
+      nom: 'Bibo',
+      ville: 'Liège',
+      latitude: 50.6471,
+      longitude: 5.5802,
+      amis: 2,
+      amisQuiReviennent: 1,
+    );
+    final json = jsonDecode(geojsonLieux([lieu])) as Map<String, dynamic>;
+    final point = (json['features'] as List).single as Map<String, dynamic>;
+    expect(point['properties'], {'cle': 'r1', 'revient': true});
+  });
 
   test('GeoJSON : le lieu dont la feuille est ouverte est marqué', () {
     final json =

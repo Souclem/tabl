@@ -1,15 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'feuille_filtres_explorer.dart';
 import 'feuille_restaurant.dart';
 
-/// Onglet Carte. En haut : le titre, la bascule Carte / Liste et la
-/// rangée de filtres. En bas : la carte des restaurants où mes amis sont
-/// allés (regroupés en bulles chiffrées de loin, un par un de près) ou
-/// leur liste pour la zone visible. Un tap ouvre la feuille du lieu.
+/// L'onglet Explorer, d'après le prototype : « où manger, d'après les
+/// gens en qui j'ai confiance ? ».
+///
+/// La carte prend tout l'écran ; en haut, posé dessus avec un fondu :
+/// la ville qu'on regarde (un tap pour en changer), Carte | Liste, les
+/// trois modes (Ma carte · Envies · Le cercle) et les filtres. Un tap
+/// sur un lieu ouvre son aperçu en bas, qu'on balaie pour passer au
+/// voisin. La liste montre les mêmes lieux — ceux de la zone regardée —
+/// triés au choix, le premier en grand.
+///
+/// S'ouvre sur « Le cercle », puis sur le dernier mode utilisé
+/// (décision du 2026-10-27).
 class EcranCarte extends StatefulWidget {
   const EcranCarte({
     super.key,
@@ -26,26 +36,25 @@ class EcranCarte extends StatefulWidget {
   final CarteService carteService;
 
   /// `null` : la carte démarre sur la Belgique, sans bouton "ma position"
-  /// ni distances dans la liste.
+  /// ni distances.
   final PositionService? positionService;
 
-  /// Pour le nom des Tables du filtre "Table". `null` : filtre masqué.
+  /// Pour le filtre "Une Table" et « Proposer ». `null` : ni l'un ni
+  /// l'autre.
   final TableService? tableService;
 
-  /// Pour les personnes du filtre "Une personne" (celles que je suis).
-  /// `null` : filtre masqué.
+  /// Pour le filtre "Personnes" (celles que je suis). `null` : masqué.
   final AbonnementService? abonnementService;
 
-  /// Pour la page d'un restaurant (avis de mon réseau). `null` : aperçu
-  /// non cliquable.
+  /// Pour la fiche d'un restaurant. `null` : pas de fiche.
   final SouvenirService? souvenirService;
 
   /// Filtres appliqués à l'ouverture ("Voir sur la carte" depuis une
   /// Table ouvre la carte déjà filtrée sur cette Table).
   final FiltresCarte filtresInitiaux;
 
-  /// `false` quand la carte est ouverte par-dessus un autre écran : bouton
-  /// retour, et pas de barre de navigation à éviter en bas.
+  /// `false` quand l'Explorer est ouvert par-dessus un autre écran :
+  /// bouton retour, et pas de barre de navigation à éviter en bas.
   final bool estOnglet;
 
   /// `false` dans les tests : la carte Mapbox est une vue native,
@@ -58,12 +67,24 @@ class EcranCarte extends StatefulWidget {
 }
 
 class _EcranCarteState extends State<EcranCarte> {
+  static const _cleMode = 'explorer_mode';
+
   /// Place occupée en bas par la barre de navigation flottante.
   double get _margeBarre => widget.estOnglet
       ? TablBarreNavigation.hauteurOccupee(context)
       : MediaQuery.paddingOf(context).bottom;
 
   final _controleur = ControleurCarte();
+
+  /// Hauteur de l'en-tête posé sur la carte, mesurée à chaque image.
+  final _cleEnTete = GlobalKey();
+  double _hauteurEnTete = 190;
+
+  ModeExplorer _mode = ModeExplorer.cercle;
+  bool _enListe = false;
+  late FiltresCarte _filtres = widget.filtresInitiaux;
+  TriCercle _tri = TriCercle.recents;
+  final _recherche = TextEditingController();
 
   /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
   ZoneCarte _zone = const ZoneCarte(
@@ -72,67 +93,132 @@ class _EcranCarteState extends State<EcranCarte> {
     nord: 51.6,
     est: 6.5,
   );
+  double _zoom = 6.5;
 
-  bool _enListe = false;
-  late FiltresCarte _filtres = widget.filtresInitiaux;
+  /// Tous les lieux du mode, filtres appliqués par la base : chargés
+  /// d'un coup, pour que les bulles chiffrées comptent juste à tous les
+  /// zooms.
+  List<LieuCarte> _lieux = const [];
+  bool _chargement = false;
+  bool _chargeUneFois = false;
+  bool _enErreur = false;
+  int _demande = 0;
 
-  /// Tous les restaurants où mes amis sont allés, filtres appliqués par
-  /// la base (une ligne résumée par lieu) : chargés d'un coup, pour que
-  /// les bulles chiffrées comptent juste à tous les zooms.
-  List<LieuCarte> _reseau = const [];
   List<ResumeTable> _tables = const [];
   List<ProfilPublic> _personnes = const [];
-  LieuCarte? _selection;
-  bool _chargement = false;
   Coordonnees? _position;
 
-  /// Numéro de la dernière recherche lancée : une réponse plus ancienne,
-  /// arrivée après une plus récente, est ignorée.
-  int _recherche = 0;
+  /// Le lieu dont l'aperçu est ouvert, et ses voisins (du plus proche au
+  /// plus loin) pour passer de l'un à l'autre d'un balayage.
+  LieuCarte? _selection;
+  List<LieuCarte> _voisins = const [];
 
-  @override
-  void dispose() {
-    _feuille.dispose();
-    _fermetureEnAttente?.cancel();
-    super.dispose();
-  }
+  /// Les adresses affichables des photos déjà demandées, par chemin.
+  final Map<String, String> _photos = {};
+  final Set<String> _photosDemandees = {};
 
   @override
   void initState() {
     super.initState();
-    _charger();
+    _restaurerMode();
     _chargerTables();
     _chargerPersonnes();
     _localiser();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _mesurerEnTete());
   }
 
-  /// Recharge les lieux avec les filtres actuels, pour le monde entier :
-  /// déplacer la carte ne demande rien de plus à la base.
+  @override
+  void dispose() {
+    _recherche.dispose();
+    _fermetureEnAttente?.cancel();
+    super.dispose();
+  }
+
+  void _mesurerEnTete() {
+    final boite = _cleEnTete.currentContext?.findRenderObject() as RenderBox?;
+    if (boite == null || !boite.hasSize) return;
+    final h = boite.size.height;
+    if ((h - _hauteurEnTete).abs() > 1 && mounted) {
+      setState(() => _hauteurEnTete = h);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  //  Données
+  // ---------------------------------------------------------------
+
+  Future<void> _restaurerMode() async {
+    // Ouvert depuis une Table : toujours sur « Le cercle ».
+    if (widget.estOnglet) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final valeur = prefs.getString(_cleMode);
+        final mode = ModeExplorer.values
+            .where((m) => m.name == valeur)
+            .firstOrNull;
+        if (mode != null && mounted) setState(() => _mode = mode);
+      } catch (_) {
+        // Pas de préférence lisible : « Le cercle ».
+      }
+    }
+    _charger();
+  }
+
+  Future<void> _choisirMode(ModeExplorer mode) async {
+    if (mode == _mode) return;
+    setState(() {
+      _mode = mode;
+      _selection = null;
+      _lieux = const [];
+    });
+    _charger();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cleMode, mode.name);
+    } catch (_) {}
+  }
+
+  /// Recharge les lieux du mode avec les filtres actuels, pour le monde
+  /// entier : déplacer la carte ne demande rien de plus à la base.
   Future<void> _charger() async {
-    final numero = ++_recherche;
-    final filtres = _filtres;
+    final numero = ++_demande;
     setState(() => _chargement = true);
     try {
       final lieux = await widget.carteService.lieuxReseau(
         ZoneCarte.monde,
-        filtres,
+        _filtres,
+        mode: _mode,
       );
-      if (!mounted || numero != _recherche) return;
-      setState(() => _reseau = lieux);
+      if (!mounted || numero != _demande) return;
+      setState(() {
+        _lieux = lieux;
+        _chargeUneFois = true;
+        _enErreur = false;
+        // Le lieu ouvert, à jour (ou fermé s'il n'est plus là).
+        final s = _selection;
+        if (s != null) {
+          _selection = lieux.where((l) => l.cle == s.cle).firstOrNull;
+        }
+      });
+      _demanderPhotos();
     } catch (e) {
       debugPrint('EcranCarte: chargement : $e');
-      if (mounted && numero == _recherche) {
+      if (mounted && numero == _demande) {
+        setState(() => _enErreur = true);
         afficherMessage(context, messageErreurGenerique);
       }
     } finally {
-      if (mounted && numero == _recherche) {
+      if (mounted && numero == _demande) {
         setState(() => _chargement = false);
       }
     }
   }
 
   void _appliquerFiltres(FiltresCarte filtres) {
-    setState(() => _filtres = filtres);
+    setState(() {
+      _filtres = filtres;
+      _selection = null;
+    });
     _charger();
   }
 
@@ -156,15 +242,50 @@ class _EcranCarteState extends State<EcranCarte> {
     }
   }
 
-  Future<void> _localiser() async {
+  Future<void> _localiser({bool recentrer = true}) async {
     final position = await widget.positionService?.positionActuelle();
     if (!mounted || position == null) return;
     setState(() => _position = position);
-    await _controleur.centrerSur(position.latitude, position.longitude);
+    if (recentrer) {
+      await _controleur.centrerSur(
+        position.latitude,
+        position.longitude,
+        zoom: 13,
+      );
+    }
   }
 
-  /// Appelée par la carte une fois immobile depuis un instant : la liste
-  /// montre les lieux de cette zone.
+  /// Signe les photos de ce qui s'affiche (la liste, l'aperçu) — jamais
+  /// des milliers d'un coup.
+  Future<void> _demanderPhotos() async {
+    final aAfficher = [
+      ?_selection,
+      for (final l in _voisins.take(3)) l,
+      if (_enListe) ..._lieuxListe.take(24),
+    ];
+    final chemins = {
+      for (final l in aAfficher)
+        if (l.cheminPhoto != null && !_photosDemandees.contains(l.cheminPhoto))
+          l.cheminPhoto!,
+    };
+    if (chemins.isEmpty) return;
+    _photosDemandees.addAll(chemins);
+    try {
+      final liens = await widget.carteService.photos(chemins);
+      if (mounted) setState(() => _photos.addAll(liens));
+    } catch (e) {
+      debugPrint('EcranCarte: photos : $e');
+      _photosDemandees.removeAll(chemins);
+    }
+  }
+
+  String? _photo(LieuCarte l) =>
+      l.cheminPhoto == null ? null : _photos[l.cheminPhoto];
+
+  // ---------------------------------------------------------------
+  //  Ce qu'on regarde
+  // ---------------------------------------------------------------
+
   void _zoneVisible(
     double sud,
     double ouest,
@@ -172,40 +293,118 @@ class _EcranCarteState extends State<EcranCarte> {
     double est,
     double zoom,
   ) {
-    _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
+    setState(() {
+      _zone = ZoneCarte(sud: sud, ouest: ouest, nord: nord, est: est);
+      _zoom = zoom;
+    });
   }
 
   double? _distance(LieuCarte lieu) {
-    final position = _position;
-    if (position == null) return null;
+    final p = _position;
+    if (p == null) return null;
     return distanceEnMetres(
-      position.latitude,
-      position.longitude,
+      p.latitude,
+      p.longitude,
       lieu.latitude,
       lieu.longitude,
     );
   }
 
-  /// La liste : les lieux de la zone visible, du plus proche au plus loin
-  /// si la position est connue, sinon les plus pertinents d'abord
-  /// (l'ordre de la base).
-  List<LieuCarte> get _lieuxListe {
-    final zone = _zone;
-    final lieux = [
-      for (final l in _reseau)
-        if (l.latitude >= zone.sud &&
-            l.latitude <= zone.nord &&
-            l.longitude >= zone.ouest &&
-            l.longitude <= zone.est)
-          l,
-    ];
-    if (_position != null) {
-      lieux.sort((a, b) => _distance(a)!.compareTo(_distance(b)!));
-    }
-    return lieux;
+  List<LieuCarte> get _lieuxVisibles => [
+    for (final l in _lieux)
+      if (_zone.contient(l.latitude, l.longitude)) l,
+  ];
+
+  List<VilleCercle> get _villes => villesDuCercle(_lieux);
+
+  /// La ville regardée : la plus proche du centre de la carte, si on est
+  /// assez près pour que ça ait un sens.
+  VilleCercle? get _villeRegardee {
+    if (_zoom < 8) return null;
+    return villeRegardee(
+      _villes,
+      (_zone.sud + _zone.nord) / 2,
+      (_zone.ouest + _zone.est) / 2,
+    );
   }
 
-  /// Un tap sur la carte ferme la feuille, mais un court instant plus
+  String get _titre =>
+      _villeRegardee?.nom ??
+      switch (_mode) {
+        ModeExplorer.cercle => 'Votre cercle',
+        ModeExplorer.envies => 'Vos envies',
+        ModeExplorer.maCarte => 'Votre carte',
+      };
+
+  String _compte(int n) => switch (_mode) {
+    ModeExplorer.cercle => adressesDuCercle(n),
+    ModeExplorer.envies => switch (n) {
+      0 => 'Aucune envie ici',
+      1 => '1 adresse gardée pour plus tard',
+      _ => '$n adresses gardées pour plus tard',
+    },
+    ModeExplorer.maCarte => switch (n) {
+      0 => 'Vous n\'êtes encore allé nulle part ici',
+      1 => '1 adresse où vous êtes allé',
+      _ => '$n adresses où vous êtes allé',
+    },
+  };
+
+  /// La liste : les lieux de la zone regardée — ou, pendant une
+  /// recherche, tous ceux du mode dont le nom correspond —, dans l'ordre
+  /// du tri.
+  List<LieuCarte> get _lieuxListe {
+    final texte = normaliserPourRecherche(_recherche.text.trim());
+    final base = texte.isEmpty
+        ? _lieuxVisibles
+        : [
+            for (final l in _lieux)
+              if (normaliserPourRecherche(l.nom).contains(texte)) l,
+          ];
+    return trierLieux(base, _tri, position: _position);
+  }
+
+  Future<void> _ouvrirOuChercher() async {
+    final choix = await ouvrirOuChercher(
+      context,
+      villes: _villes,
+      villeActuelle: _villeRegardee?.nom,
+      positionConnue: _position != null,
+      compte: _compte,
+    );
+    if (!mounted || choix == null) return;
+    setState(() => _selection = null);
+    if (choix == autourDeMoi) {
+      final p = _position;
+      if (p != null) {
+        await _controleur.centrerSur(p.latitude, p.longitude, zoom: 13.5);
+      }
+      return;
+    }
+    if (choix is VilleCercle) {
+      // Sans carte (liste, tests), la zone se règle d'elle-même.
+      if (!widget.afficherCarte) {
+        setState(() {
+          _zone = choix.zone;
+          _zoom = 12;
+        });
+      }
+      await _controleur.cadrer(
+        sud: choix.zone.sud,
+        ouest: choix.zone.ouest,
+        nord: choix.zone.nord,
+        est: choix.zone.est,
+        haut: _hauteurEnTete,
+        bas: _margeBarre,
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------
+  //  Un lieu
+  // ---------------------------------------------------------------
+
+  /// Un tap sur la carte ferme l'aperçu, mais un court instant plus
   /// tard : si ce tap était en fait sur un lieu, son ouverture l'annule.
   Timer? _fermetureEnAttente;
 
@@ -218,29 +417,48 @@ class _EcranCarteState extends State<EcranCarte> {
 
   void _tapLieu(String cle) {
     _fermetureEnAttente?.cancel();
-    final lieu = _reseau.where((l) => l.cle == cle).firstOrNull;
+    final lieu = _lieux.where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
-    final autreLieu = _selection != null && _selection!.cle != cle;
-    setState(() => _selection = lieu);
-    // Un autre lieu touché, feuille déjà ouverte : on garde la même
-    // feuille (son contrôleur ne peut pas en servir deux à la fois) et
-    // elle repart réduite.
-    if (autreLieu && _feuille.isAttached) {
-      _feuille.jumpTo(tailleFeuilleReduite);
-    }
-    // La feuille réduite couvre à peu près le bas de la carte, sous ~60 %
-    // de sa hauteur : seulement si le lieu se retrouve dessous, on le
-    // remonte juste au-dessus — le plus petit déplacement possible.
-    final zone = _zone;
-    final hauteur = (zone.nord - lieu.latitude) / (zone.nord - zone.sud);
-    if (hauteur > 0.58) {
-      _controleur.amenerA(lieu.latitude, lieu.longitude, hauteur: 0.5);
+    _choisir(lieu, voisinsDepuis: lieu);
+  }
+
+  /// Ouvre l'aperçu de [lieu] ; ses voisins sont rangés depuis
+  /// [voisinsDepuis] (le premier lieu touché), pour que balayer en avant
+  /// puis en arrière ramène au même endroit.
+  void _choisir(LieuCarte lieu, {LieuCarte? voisinsDepuis}) {
+    final depuis = voisinsDepuis;
+    setState(() {
+      _selection = lieu;
+      if (depuis != null) {
+        double d(LieuCarte l) => distanceEnMetres(
+          depuis.latitude,
+          depuis.longitude,
+          l.latitude,
+          l.longitude,
+        );
+        _voisins = [..._lieuxVisibles]..sort((a, b) => d(a).compareTo(d(b)));
+        if (!_voisins.any((l) => l.cle == lieu.cle)) _voisins.insert(0, lieu);
+      }
+    });
+    _demanderPhotos();
+    // L'aperçu couvre le bas de la carte : si le lieu se retrouve
+    // dessous, on le remonte juste au-dessus.
+    final hauteur = (_zone.nord - lieu.latitude) / (_zone.nord - _zone.sud);
+    if (hauteur > 0.5 || hauteur < 0.25) {
+      _controleur.amenerA(lieu.latitude, lieu.longitude, hauteur: 0.4);
     }
   }
 
-  /// Depuis la liste : la page du restaurant en feuille par-dessus ; à
-  /// sa fermeture, la zone est rechargée (une envie a pu changer).
-  Future<void> _ouvrirRestaurant(LieuCarte lieu) async {
+  void _voisin(int sens) {
+    final s = _selection;
+    if (s == null || _voisins.length < 2) return;
+    final i = _voisins.indexWhere((l) => l.cle == s.cle);
+    final j = (i + sens).clamp(0, _voisins.length - 1);
+    if (j == i) return;
+    _choisir(_voisins[j]);
+  }
+
+  Future<void> _ouvrirFiche(LieuCarte lieu) async {
     final souvenirs = widget.souvenirService;
     if (souvenirs == null) return;
     await ouvrirFeuilleRestaurant(
@@ -257,482 +475,690 @@ class _EcranCarteState extends State<EcranCarte> {
     if (mounted) _charger();
   }
 
-  /// Feuille du lieu touché sur la carte : réduite d'abord (l'en-tête),
-  /// agrandie d'un tap ou en la tirant vers le haut ; tirée jusqu'en bas,
-  /// elle se ferme.
-  final _feuille = DraggableScrollableController();
-
-  void _agrandirFeuille() {
-    if (!_feuille.isAttached) return;
-    _feuille.animateTo(
-      tailleFeuilleOuverte,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
+  /// Optimiste : l'étiquette change tout de suite, et revient si la base
+  /// refuse.
+  Future<void> _basculerEnvie(LieuCarte lieu) async {
+    final envie = !lieu.estEnvie;
+    void remplacer(bool valeur) => setState(() {
+      _lieux = [
+        for (final l in _lieux)
+          if (l.cle == lieu.cle) l.copierAvec(estEnvie: valeur) else l,
+      ];
+      final s = _selection;
+      if (s != null && s.cle == lieu.cle) {
+        _selection = s.copierAvec(estEnvie: valeur);
+      }
+    });
+    remplacer(envie);
+    try {
+      final id = await widget.carteService.idRestaurant(lieu);
+      await widget.carteService.basculerEnvie(id, envie: envie);
+      if (mounted) {
+        afficherMessage(
+          context,
+          envie ? 'Ajouté à vos envies.' : 'Retiré de vos envies.',
+        );
+      }
+    } catch (e) {
+      debugPrint('EcranCarte: envie : $e');
+      if (!mounted) return;
+      remplacer(!envie);
+      afficherMessage(context, messageErreurGenerique);
+    }
   }
 
-  Widget _feuilleDuLieu(LieuCarte lieu, SouvenirService souvenirs) {
-    return NotificationListener<DraggableScrollableNotification>(
-      onNotification: (notification) {
-        if (notification.extent <= 0.02) {
-          setState(() => _selection = null);
-        }
-        return false;
-      },
-      child: DraggableScrollableSheet(
-        controller: _feuille,
-        initialChildSize: tailleFeuilleReduite,
-        minChildSize: 0,
-        maxChildSize: tailleFeuilleOuverte,
-        snap: true,
-        snapSizes: const [tailleFeuilleReduite],
-        builder: (_, defilement) => FeuilleRestaurant(
-          key: ValueKey('feuille-${lieu.cle}'),
-          nom: lieu.nom,
-          sousTitre: lieu.description,
-          resume: lieu.duReseau ? lieu.resumeVisites : null,
-          restaurantId: lieu.restaurantId,
-          estEnvie: lieu.estEnvie,
-          souvenirService: souvenirs,
-          abonnementService: widget.abonnementService,
-          entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
-          defilement: defilement,
-          onFermer: () => setState(() => _selection = null),
-          flottante: true,
-          onToucherEntete: _agrandirFeuille,
-          onEnvieChangee: (_) => _charger(),
+  /// « Proposer » : à l'une de mes Tables, qui répondra GO ou non.
+  Future<void> _proposer(LieuCarte lieu) async {
+    final service = widget.tableService;
+    if (service == null || _tables.isEmpty) return;
+    final table = await showModalBottomSheet<ResumeTable>(
+      context: context,
+      backgroundColor: const Color(0xFF111216),
+      showDragHandle: true,
+      builder: (contexte) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(
+            TablTokens.espaceL - 4,
+            0,
+            TablTokens.espaceL - 4,
+            TablTokens.espaceM,
+          ),
+          children: [
+            Text(
+              'Proposer ${lieu.nom}',
+              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'À quelle Table ? Elle répondra GO ou non, puis on trouvera la date.',
+              style: TablTokens.legende,
+            ),
+            const SizedBox(height: TablTokens.espaceM),
+            for (final t in _tables)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Text(
+                  t.emoji ?? '🍽',
+                  style: const TextStyle(fontSize: 22),
+                ),
+                title: Text(t.nom, style: TablTokens.corps),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: TablTokens.texteDoux,
+                ),
+                onTap: () => Navigator.of(contexte).pop(t),
+              ),
+          ],
         ),
       ),
     );
+    if (table == null || !mounted) return;
+    try {
+      final resultat = await service.proposer(
+        tableId: table.id,
+        nomRestaurant: lieu.nom,
+        ville: lieu.ville,
+      );
+      if (!mounted) return;
+      afficherMessage(
+        context,
+        resultat.dejaExistante
+            ? 'Déjà proposé à ${table.nom}.'
+            : 'Proposé à ${table.nom}.',
+      );
+    } catch (e) {
+      debugPrint('EcranCarte: proposer : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+    }
   }
 
-  // ---------------------------------------------------------------
-  //  Choix des filtres à options (une feuille courte, jamais une page)
-  // ---------------------------------------------------------------
-
-  /// Renvoie l'identifiant choisi, `''` pour l'option "tout" (valeur
-  /// `null`), ou `null` si la feuille est fermée sans choix.
-  Future<String?> _choisir({
-    required String titre,
-    required List<({String? valeur, String libelle})> options,
-    required String? actuel,
-  }) {
-    return showModalBottomSheet<String>(
+  /// Les actions d'un lieu de la liste.
+  Future<void> _options(LieuCarte lieu) async {
+    final choix = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: TablTokens.surface,
-      isScrollControlled: true,
-      builder: (contexteFeuille) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(contexteFeuille).height * 0.6,
-          ),
-          child: ListView(
-            shrinkWrap: true,
-            padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
+      backgroundColor: const Color(0xFF111216),
+      showDragHandle: true,
+      builder: (contexte) {
+        Widget action(String valeur, IconData icone, String libelle) =>
+            ListTile(
+              leading: Icon(icone, color: TablTokens.texte),
+              title: Text(libelle, style: TablTokens.corps),
+              onTap: () => Navigator.of(contexte).pop(valeur),
+            );
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL,
+                  TablTokens.espaceL - 4,
                   0,
-                  TablTokens.espaceL,
+                  TablTokens.espaceL - 4,
                   TablTokens.espaceS,
                 ),
-                child: Text(titre, style: TablTokens.sousTitre),
-              ),
-              for (final option in options)
-                ListTile(
-                  title: Text(option.libelle, style: TablTokens.corps),
-                  trailing: option.valeur == actuel
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: TablTokens.primaire,
-                        )
-                      : null,
-                  onTap: () =>
-                      Navigator.of(contexteFeuille).pop(option.valeur ?? ''),
+                child: Row(
+                  children: [
+                    TablPhotoLieu(nom: lieu.nom, url: _photo(lieu), taille: 44),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lieu.nom,
+                            style: TablTokens.titreAffichage.copyWith(
+                              fontSize: 20,
+                            ),
+                          ),
+                          Text(
+                            cuisineEtQuartier(lieu),
+                            style: TablTokens.legende,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              if (widget.souvenirService != null)
+                action('fiche', Icons.article_outlined, 'Voir la fiche'),
+              if (widget.tableService != null && _tables.isNotEmpty)
+                action(
+                  'proposer',
+                  Icons.person_add_alt_1_outlined,
+                  'Proposer à une Table',
+                ),
+              action(
+                'envie',
+                lieu.estEnvie
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                lieu.estEnvie ? 'Retirer de mes envies' : 'Enregistrer',
+              ),
+              if (widget.afficherCarte)
+                action('carte', Icons.map_outlined, 'Voir sur la carte'),
             ],
           ),
+        );
+      },
+    );
+    if (!mounted || choix == null) return;
+    switch (choix) {
+      case 'fiche':
+        _ouvrirFiche(lieu);
+      case 'proposer':
+        _proposer(lieu);
+      case 'envie':
+        _basculerEnvie(lieu);
+      case 'carte':
+        setState(() => _enListe = false);
+        await _controleur.centrerSur(lieu.latitude, lieu.longitude, zoom: 15.5);
+        if (mounted) _choisir(lieu, voisinsDepuis: lieu);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  //  Filtres
+  // ---------------------------------------------------------------
+
+  Future<void> _ouvrirFiltres() async {
+    final choisis = await ouvrirFiltresExplorer(
+      context,
+      filtres: _filtres,
+      personnes: _personnes,
+      tables: _tables,
+    );
+    if (choisis != null && mounted) _appliquerFiltres(choisis);
+  }
+
+  /// Les filtres actifs, chacun avec de quoi le retirer.
+  List<({String libelle, FiltresCarte sans})> get _filtresActifs {
+    final f = _filtres;
+    final pseudo = _personnes
+        .where((p) => p.id == f.personneId)
+        .firstOrNull
+        ?.pseudo;
+    final table = _tables.where((t) => t.id == f.tableId).firstOrNull?.nom;
+    return [
+      if (f.moment != null)
+        (
+          libelle: libelleMomentRepas(f.moment!) ?? f.moment!,
+          sans: f.copierAvec(moment: () => null),
         ),
-      ),
-    );
+      if (f.periode != PeriodeCarte.tout)
+        (
+          libelle: f.periode.libelle,
+          sans: f.copierAvec(periode: PeriodeCarte.tout),
+        ),
+      if (f.personneId != null)
+        (
+          libelle: pseudo ?? 'Une personne',
+          sans: f.copierAvec(personneId: () => null),
+        ),
+      if (f.tableId != null)
+        (
+          libelle: table ?? 'Une Table',
+          sans: f.copierAvec(tableId: () => null),
+        ),
+      for (final famille in f.familles)
+        (
+          libelle: famille,
+          sans: f.copierAvec(familles: {...f.familles}..remove(famille)),
+        ),
+      if (f.jamaisEssaye)
+        (libelle: 'Jamais essayé', sans: f.copierAvec(jamaisEssaye: false)),
+      if (f.coupsDeCoeur)
+        (libelle: 'Coups de cœur', sans: f.copierAvec(coupsDeCoeur: false)),
+      if (f.laOuOnRevient)
+        (libelle: 'Là où on revient', sans: f.copierAvec(laOuOnRevient: false)),
+      if (f.mesEnvies)
+        (libelle: 'Mes envies', sans: f.copierAvec(mesEnvies: false)),
+    ];
   }
 
-  Future<void> _choisirPersonne() async {
-    final choix = await _choisir(
-      titre: 'Une personne',
-      actuel: _filtres.personneId,
-      options: [
-        (valeur: null, libelle: 'Tout mon réseau'),
-        for (final p in _personnes) (valeur: p.id, libelle: p.pseudo),
-      ],
-    );
-    if (choix == null) return;
-    _appliquerFiltres(
-      _filtres.copierAvec(personneId: () => choix.isEmpty ? null : choix),
-    );
-  }
-
-  Future<void> _choisirTable() async {
-    final choix = await _choisir(
-      titre: 'Une Table',
-      actuel: _filtres.tableId,
-      options: [
-        (valeur: null, libelle: 'Toutes'),
-        for (final t in _tables) (valeur: t.id, libelle: t.nom),
-      ],
-    );
-    if (choix == null) return;
-    _appliquerFiltres(
-      _filtres.copierAvec(tableId: () => choix.isEmpty ? null : choix),
-    );
-  }
-
-  Future<void> _choisirMoment() async {
-    final choix = await _choisir(
-      titre: 'Midi ou soir',
-      actuel: _filtres.moment,
-      options: const [
-        (valeur: null, libelle: 'Midi et soir'),
-        (valeur: 'midi', libelle: 'Midi'),
-        (valeur: 'soir', libelle: 'Soir'),
-      ],
-    );
-    if (choix == null) return;
-    _appliquerFiltres(
-      _filtres.copierAvec(moment: () => choix.isEmpty ? null : choix),
-    );
-  }
-
-  Future<void> _choisirCuisine() async {
-    final choisies = await showModalBottomSheet<Set<String>>(
-      context: context,
-      backgroundColor: TablTokens.surface,
-      builder: (_) => _FeuilleCuisine(selection: _filtres.familles),
-    );
-    if (choisies == null) return;
-    _appliquerFiltres(_filtres.copierAvec(familles: choisies));
-  }
-
-  String? _pseudo(String? id) => id == null
-      ? null
-      : _personnes.where((p) => p.id == id).firstOrNull?.pseudo;
+  // ---------------------------------------------------------------
+  //  Affichage
+  // ---------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _mesurerEnTete());
+    final nombre = _enListe && _recherche.text.trim().isNotEmpty
+        ? _lieuxListe.length
+        : _lieuxVisibles.length;
     return Scaffold(
       backgroundColor: TablTokens.fond,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
         children: [
-          SafeArea(bottom: false, child: _enTete()),
-          Expanded(child: _enListe ? _liste() : _carte()),
+          Positioned.fill(child: _carte()),
+          if (_enListe) Positioned.fill(child: _liste()),
+          Positioned(left: 0, right: 0, top: 0, child: _enTete(nombre)),
+          if (!_enListe) ..._surLaCarte(),
         ],
       ),
     );
   }
 
-  Widget _enTete() {
-    final f = _filtres;
-    final pseudo = _pseudo(f.personneId);
-    final table = _tables.where((t) => t.id == f.tableId).firstOrNull;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            TablTokens.espaceL,
-            TablTokens.espaceS,
-            TablTokens.espaceM,
-            TablTokens.espaceS,
+  Widget _enTete(int nombre) {
+    final actifs = _filtresActifs;
+    return DecoratedBox(
+      key: _cleEnTete,
+      decoration: BoxDecoration(
+        gradient: _enListe
+            ? null
+            : LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0, 0.72, 1],
+                colors: [
+                  TablTokens.fond.withValues(alpha: 0.97),
+                  TablTokens.fond.withValues(alpha: 0.82),
+                  TablTokens.fond.withValues(alpha: 0),
+                ],
+              ),
+        color: _enListe ? TablTokens.fond : null,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: _enListe ? TablTokens.espaceS : TablTokens.espaceL,
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!widget.estOnglet) ...[
-                TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
-                const SizedBox(width: TablTokens.espaceM),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  TablTokens.espaceL - 4,
+                  TablTokens.espaceS,
+                  TablTokens.espaceM,
+                  0,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!widget.estOnglet) ...[
+                      TablBoutonRetour(
+                        onPresse: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(width: TablTokens.espaceS),
+                    ],
+                    Expanded(
+                      child: TablTitreExplorer(
+                        titre: _titre,
+                        sousTitre: _enErreur && !_chargeUneFois
+                            ? 'Les adresses n\'ont pas pu être chargées'
+                            : _chargeUneFois
+                            ? _compte(nombre)
+                            : 'Chargement…',
+                        onPresse: _ouvrirOuChercher,
+                      ),
+                    ),
+                    const SizedBox(width: TablTokens.espaceS),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: TablSegmentModeCarte(
+                        options: const ['Carte', 'Liste'],
+                        selectionne: _enListe ? 1 : 0,
+                        onSelection: (i) {
+                          setState(() {
+                            _enListe = i == 1;
+                            _selection = null;
+                          });
+                          if (_enListe) _demanderPhotos();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: TablTokens.espaceM - 2),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceL - 4,
+                ),
+                child: Row(
+                  children: [
+                    TablSegmentModeCarte(
+                      options: [for (final m in ModeExplorer.values) m.libelle],
+                      selectionne: _mode.index,
+                      onSelection: (i) => _choisirMode(ModeExplorer.values[i]),
+                    ),
+                    const Spacer(),
+                    TablBoutonFiltres(
+                      actifs: _filtres.nombreActifs,
+                      onPresse: _ouvrirFiltres,
+                    ),
+                  ],
+                ),
+              ),
+              if (actifs.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 32,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TablTokens.espaceL - 4,
+                    ),
+                    itemCount: actifs.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) => TablPuceRetirable(
+                      libelle: actifs[i].libelle,
+                      onRetirer: () => _appliquerFiltres(actifs[i].sans),
+                    ),
+                  ),
+                ),
               ],
-              Expanded(
-                child: Text(
-                  'Carte',
-                  style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-                ),
-              ),
-              TablSegmentModeCarte(
-                options: const ['Carte', 'Liste'],
-                selectionne: _enListe ? 1 : 0,
-                onSelection: (i) => setState(() => _enListe = i == 1),
-              ),
-            ],
-          ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
-          child: Row(
-            children: [
-              for (final puce in [
-                if (f.nombreActifs > 0)
-                  TablPuceFiltre(
-                    libelle: 'Effacer (${f.nombreActifs})',
-                    actif: false,
-                    onPresse: () => _appliquerFiltres(FiltresCarte.aucun),
-                  ),
-                TablPuceFiltre(
-                  libelle: pseudo ?? 'Une personne',
-                  actif: pseudo != null,
-                  avecChoix: true,
-                  onPresse: _choisirPersonne,
-                ),
-                if (_tables.isNotEmpty)
-                  TablPuceFiltre(
-                    libelle: table?.nom ?? 'Une Table',
-                    actif: table != null,
-                    avecChoix: true,
-                    onPresse: _choisirTable,
-                  ),
-                TablPuceFiltre(
-                  libelle: f.familles.isEmpty
-                      ? 'Cuisine'
-                      : f.familles.length == 1
-                      ? f.familles.first
-                      : 'Cuisine (${f.familles.length})',
-                  actif: f.familles.isNotEmpty,
-                  avecChoix: true,
-                  onPresse: _choisirCuisine,
-                ),
-                TablPuceFiltre(
-                  libelle: 'Mes envies',
-                  actif: f.mesEnvies,
-                  onPresse: () =>
-                      _appliquerFiltres(f.copierAvec(mesEnvies: !f.mesEnvies)),
-                ),
-                TablPuceFiltre(
-                  libelle: 'Jamais essayé',
-                  actif: f.jamaisEssaye,
-                  onPresse: () => _appliquerFiltres(
-                    f.copierAvec(jamaisEssaye: !f.jamaisEssaye),
-                  ),
-                ),
-                TablPuceFiltre(
-                  libelle: 'Coups de cœur 😍',
-                  actif: f.coupsDeCoeur,
-                  onPresse: () => _appliquerFiltres(
-                    f.copierAvec(coupsDeCoeur: !f.coupsDeCoeur),
-                  ),
-                ),
-                TablPuceFiltre(
-                  libelle: 'Là où on revient',
-                  actif: f.laOuOnRevient,
-                  onPresse: () => _appliquerFiltres(
-                    f.copierAvec(laOuOnRevient: !f.laOuOnRevient),
-                  ),
-                ),
-                TablPuceFiltre(
-                  libelle: switch (f.moment) {
-                    'midi' => 'Midi',
-                    'soir' => 'Soir',
-                    _ => 'Midi / soir',
-                  },
-                  actif: f.moment != null,
-                  avecChoix: true,
-                  onPresse: _choisirMoment,
-                ),
-              ])
+              if (_enListe) ...[
+                const SizedBox(height: TablTokens.espaceM),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: puce,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL - 4,
+                  ),
+                  child: TablChampTexte(
+                    libelle: '',
+                    controleur: _recherche,
+                    indication: 'Chercher dans ces adresses',
+                    iconePrefixe: Icons.search_rounded,
+                    onChanged: (_) {
+                      setState(() {});
+                      _demanderPhotos();
+                    },
+                  ),
                 ),
+                const SizedBox(height: TablTokens.espaceS),
+                TablOngletsDefilants(
+                  libelles: [for (final t in TriCercle.values) t.libelle],
+                  index: _tri.index,
+                  onChoisir: (i) {
+                    setState(() => _tri = TriCercle.values[i]);
+                    _demanderPhotos();
+                  },
+                ),
+              ],
+              SizedBox(
+                height: 2,
+                child: _chargement
+                    ? const LinearProgressIndicator(
+                        color: TablTokens.primaire,
+                        backgroundColor: Colors.transparent,
+                      )
+                    : null,
+              ),
             ],
           ),
         ),
-        const SizedBox(height: TablTokens.espaceS),
-        // Discret : la zone ou les filtres changent, la carte se recharge.
-        SizedBox(
-          height: 2,
-          child: _chargement
-              ? const LinearProgressIndicator(
-                  color: TablTokens.primaire,
-                  backgroundColor: Colors.transparent,
-                )
-              : null,
-        ),
-      ],
+      ),
     );
   }
 
   Widget _carte() {
+    if (!widget.afficherCarte) {
+      return const ColoredBox(color: TablTokens.surface);
+    }
+    return TablCarteMapbox(
+      // Tous les lieux : la carte les regroupe elle-même selon le zoom.
+      geojsonLieux: geojsonLieux(_lieux, cleChoisie: _selection?.cle),
+      // Belgique, avant de connaître la position.
+      latitudeInitiale: 50.5,
+      longitudeInitiale: 4.6,
+      zoomInitial: 6.5,
+      margeBas: _margeBarre,
+      controleur: _controleur,
+      onTapLieu: _tapLieu,
+      onZoneVisible: _zoneVisible,
+      onTapCarte: _tapCarte,
+    );
+  }
+
+  List<Widget> _surLaCarte() {
     final selection = _selection;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: widget.afficherCarte
-              ? TablCarteMapbox(
-                  // Tous les lieux : la carte les regroupe elle-même
-                  // selon le zoom.
-                  geojsonLieux: geojsonLieux(
-                    _reseau,
-                    cleChoisie: _selection?.cle,
-                  ),
-                  // Belgique, avant de connaître la position.
-                  latitudeInitiale: 50.5,
-                  longitudeInitiale: 4.6,
-                  zoomInitial: 6.5,
-                  margeBas: _margeBarre,
-                  controleur: _controleur,
-                  onTapLieu: _tapLieu,
-                  onZoneVisible: _zoneVisible,
-                  onTapCarte: _tapCarte,
-                )
-              : const ColoredBox(color: TablTokens.surface),
+    return [
+      if (selection == null && widget.positionService != null)
+        Positioned(
+          right: TablTokens.espaceM,
+          bottom: _margeBarre + TablTokens.espaceM,
+          child: TablBoutonVerre(
+            icone: Icons.near_me_rounded,
+            libelle: 'Me recentrer',
+            onPresse: () {
+              final p = _position;
+              if (p == null) {
+                _localiser();
+              } else {
+                _controleur.centrerSur(p.latitude, p.longitude, zoom: 13.5);
+              }
+            },
+          ),
         ),
-        // Toujours là : recentre sur moi, ou redemande ma position si
-        // elle n'est pas encore connue (autorisation refusée puis
-        // accordée, signal GPS revenu...).
-        if (widget.positionService != null)
-          Positioned(
-            right: TablTokens.espaceM,
-            top: TablTokens.espaceM,
-            child: _BoutonRond(
-              icone: Icons.my_location_rounded,
-              libelle: 'Me recentrer',
-              onPresse: () {
-                final position = _position;
-                if (position == null) {
-                  _localiser();
-                } else {
-                  _controleur.centrerSur(position.latitude, position.longitude);
-                }
-              },
+      if (selection == null &&
+          _chargeUneFois &&
+          _lieuxVisibles.isEmpty &&
+          _lieux.isNotEmpty)
+        Positioned(
+          left: TablTokens.espaceL,
+          right: TablTokens.espaceL,
+          bottom: _margeBarre + 76,
+          child: _MessageCarte(
+            texte: _compte(0),
+            action: 'Voir mes villes',
+            onAction: _ouvrirOuChercher,
+          ),
+        ),
+      if (selection != null)
+        Positioned(
+          left: TablTokens.espaceS + 4,
+          right: TablTokens.espaceS + 4,
+          bottom: _margeBarre + TablTokens.espaceS,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (enfant, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween(
+                  begin: const Offset(0, 0.06),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: enfant,
+              ),
             ),
+            child: _apercu(selection),
           ),
-        if (selection != null && widget.souvenirService != null)
-          Positioned(
-            // Une carte flottante : un peu d'air sur les côtés et
-            // au-dessus de la barre de navigation.
-            left: TablTokens.espaceS,
-            right: TablTokens.espaceS,
-            top: 0,
-            bottom: _margeBarre + TablTokens.espaceS,
-            child: _feuilleDuLieu(selection, widget.souvenirService!),
-          ),
+        ),
+    ];
+  }
+
+  Widget _apercu(LieuCarte lieu) {
+    final distance = _distance(lieu);
+    final maintenant = DateTime.now();
+    final detail = [
+      cuisineEtQuartier(lieu),
+      if (distance != null) distanceLisible(distance),
+    ].where((m) => m.isNotEmpty).join(' · ');
+    final moi = lieu.mesVisites;
+    final derniere = lieu.maDerniereVisite;
+    return TablApercuLieu(
+      key: ValueKey('apercu-${lieu.cle}'),
+      nom: lieu.nom,
+      detail: detail,
+      photoUrl: _photo(lieu),
+      visages: [
+        for (final v in lieu.visages)
+          BullePersonne(pseudo: v.pseudo, photoUrl: v.photoUrl),
       ],
+      quiLaConnait: lieu.amis > 0
+          ? quiLaConnait(lieu)
+          : lieu.estEnvie
+          ? 'Dans vos envies'
+          : 'Vous y êtes allé',
+      signal: signalLieu(lieu, maintenant),
+      ressentis: lieu.ressentis,
+      dejaAlle: moi == 0
+          ? null
+          : [
+              moi == 1
+                  ? 'Vous y êtes allé une fois'
+                  : 'Vous y êtes allé $moi fois',
+              if (derniere != null) 'la dernière ${ilYA(derniere, maintenant)}',
+            ].join(', '),
+      enregistre: lieu.estEnvie,
+      onFermer: () => setState(() => _selection = null),
+      onVoirFiche: () => _ouvrirFiche(lieu),
+      onEnregistrer: () => _basculerEnvie(lieu),
+      onProposer: widget.tableService != null && _tables.isNotEmpty
+          ? () => _proposer(lieu)
+          : null,
+      onSuivant: () => _voisin(1),
+      onPrecedent: () => _voisin(-1),
     );
   }
 
   Widget _liste() {
     final lieux = _lieuxListe;
+    final maintenant = DateTime.now();
+    final texte = _recherche.text.trim();
+    final haut = _hauteurEnTete;
     if (lieux.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(TablTokens.espaceXl),
-        child: Text(
-          _filtres.nombreActifs > 0
-              ? 'Aucun lieu de votre réseau ne correspond à ces filtres.'
-              : 'Aucun restaurant où vos amis sont allés ici pour '
-                    'l\'instant.',
-          textAlign: TextAlign.center,
-          style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+      return ColoredBox(
+        color: TablTokens.fond,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            TablTokens.espaceXl,
+            haut + TablTokens.espaceXl,
+            TablTokens.espaceXl,
+            0,
+          ),
+          child: Column(
+            children: [
+              Text(
+                !_chargeUneFois
+                    ? 'Chargement…'
+                    : texte.isNotEmpty
+                    ? 'Aucune adresse ne correspond à « $texte ».'
+                    : _lieux.isEmpty
+                    ? switch (_mode) {
+                        ModeExplorer.cercle =>
+                          _filtres.nombreActifs > 0
+                              ? 'Aucune adresse de vos proches ne correspond à ces filtres.'
+                              : 'Vos proches n\'ont encore partagé aucune adresse.',
+                        ModeExplorer.envies =>
+                          'Aucune envie pour l\'instant. Enregistrez une adresse pour la retrouver ici.',
+                        ModeExplorer.maCarte =>
+                          'Vos souvenirs apparaîtront ici, à leur place sur la carte.',
+                      }
+                    : _compte(0),
+                textAlign: TextAlign.center,
+                style: TablTokens.titreAffichage.copyWith(
+                  fontSize: 20,
+                  height: 1.3,
+                ),
+              ),
+              if (_chargeUneFois && texte.isEmpty && _lieux.isNotEmpty) ...[
+                const SizedBox(height: TablTokens.espaceM),
+                TablBoutonTexte(
+                  libelle: 'Voir mes villes',
+                  onPresse: _ouvrirOuChercher,
+                ),
+              ],
+            ],
+          ),
         ),
       );
     }
-    return ListView.separated(
-      padding: EdgeInsets.only(bottom: _margeBarre),
-      itemCount: lieux.length,
-      separatorBuilder: (_, _) => const Divider(
-        height: 1,
-        indent: TablTokens.espaceL,
-        endIndent: TablTokens.espaceL,
-        color: TablTokens.bordure,
-      ),
-      itemBuilder: (_, index) {
-        final lieu = lieux[index];
-        final distance = _distance(lieu);
-        return TablLigneLieu(
-          nom: lieu.nom,
-          description: lieu.description,
-          resume: lieu.resumeVisites,
-          duReseau: lieu.visites > 0,
-          estEnvie: lieu.estEnvie,
-          distance: distance == null ? null : distanceLisible(distance),
-          onPresse: () => _ouvrirRestaurant(lieu),
-        );
-      },
-    );
-  }
-}
-
-/// Choix des familles de cuisine : plusieurs à la fois.
-class _FeuilleCuisine extends StatefulWidget {
-  const _FeuilleCuisine({required this.selection});
-
-  final Set<String> selection;
-
-  @override
-  State<_FeuilleCuisine> createState() => _FeuilleCuisineState();
-}
-
-class _FeuilleCuisineState extends State<_FeuilleCuisine> {
-  late final Set<String> _selection = {...widget.selection};
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(TablTokens.espaceL),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Cuisine', style: TablTokens.sousTitre),
-            const SizedBox(height: TablTokens.espaceM),
-            Wrap(
-              spacing: TablTokens.espaceS,
-              runSpacing: TablTokens.espaceS,
-              children: [
-                for (final famille in famillesCuisine.keys)
-                  TablPuceSelection(
-                    libelle: famille,
-                    selectionnee: _selection.contains(famille),
-                    onBascule: () => setState(() {
-                      if (!_selection.remove(famille)) _selection.add(famille);
-                    }),
-                  ),
-              ],
-            ),
-            const SizedBox(height: TablTokens.espaceL),
-            TablBouton(
-              libelle: 'Appliquer',
-              onPresse: () => Navigator.of(context).pop(_selection),
-            ),
-          ],
+    final vedette = lieux.first;
+    final suite = lieux.skip(1).toList();
+    String? raison(LieuCarte l) =>
+        ligneSelonTri(
+          l,
+          _tri,
+          maintenant: maintenant,
+          distanceM: _distance(l),
+        ) ??
+        signalLieu(l, maintenant);
+    String qui(LieuCarte l) => l.amis > 0
+        ? quiLaConnait(l)
+        : l.estEnvie
+        ? 'Dans vos envies'
+        : 'Vous y êtes allé';
+    return ColoredBox(
+      color: TablTokens.fond,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          TablTokens.espaceL - 4,
+          haut + TablTokens.espaceS,
+          TablTokens.espaceL - 4,
+          _margeBarre + TablTokens.espaceL,
         ),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        children: [
+          TablCarteVedette(
+            key: ValueKey('vedette-${vedette.cle}'),
+            nom: vedette.nom,
+            photoUrl: _photo(vedette),
+            quiLaConnait: qui(vedette),
+            raison: raison(vedette),
+            enregistre: vedette.estEnvie,
+            onPresse: () => _ouvrirFiche(vedette),
+            onEnregistrer: () => _basculerEnvie(vedette),
+            onOptions: () => _options(vedette),
+          ),
+          if (suite.isNotEmpty) ...[
+            const SizedBox(height: TablTokens.espaceL),
+            Text(
+              'La suite',
+              style: TablTokens.titreAffichage.copyWith(fontSize: 22),
+            ),
+            const SizedBox(height: TablTokens.espaceXs),
+            for (final l in suite)
+              TablLigneCercle(
+                key: ValueKey('ligne-${l.cle}'),
+                nom: l.nom,
+                photoUrl: _photo(l),
+                raison: [qui(l), ?raison(l)].join(' · '),
+                detail: cuisineEtQuartier(l),
+                onPresse: () => _ouvrirFiche(l),
+                onOptions: () => _options(l),
+              ),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _BoutonRond extends StatelessWidget {
-  const _BoutonRond({
-    required this.icone,
-    required this.libelle,
-    required this.onPresse,
+/// Un message posé sur la carte, avec de quoi aller ailleurs.
+class _MessageCarte extends StatelessWidget {
+  const _MessageCarte({
+    required this.texte,
+    required this.action,
+    required this.onAction,
   });
 
-  final IconData icone;
-  final String libelle;
-  final VoidCallback onPresse;
+  final String texte;
+  final String action;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: TablTokens.surface,
-      shape: const CircleBorder(side: BorderSide(color: TablTokens.bordure)),
-      clipBehavior: Clip.antiAlias,
-      child: IconButton(
-        onPressed: onPresse,
-        tooltip: libelle,
-        icon: Icon(icone, size: 20),
-        color: TablTokens.primaire,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xF20F1014),
+        borderRadius: BorderRadius.circular(TablTokens.arrondiL),
+        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            texte,
+            textAlign: TextAlign.center,
+            style: TablTokens.titreAffichage.copyWith(fontSize: 18),
+          ),
+          TablBoutonTexte(libelle: action, onPresse: onAction),
+        ],
       ),
     );
   }

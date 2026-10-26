@@ -131,8 +131,12 @@ class _FauxCarteService implements CarteService {
   Future<List<LieuCarte>> lieuxReseau(
     ZoneCarte zone,
     FiltresCarte filtres, {
+    ModeExplorer mode = ModeExplorer.cercle,
     int limite = nombreMaxLieuxCarte,
   }) async => [];
+
+  @override
+  Future<Map<String, String>> photos(Iterable<String> chemins) async => {};
 
   @override
   Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;

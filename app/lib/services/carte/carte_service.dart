@@ -8,14 +8,19 @@ const nombreMaxLieuxCarte = 5000;
 
 /// Les données de la carte.
 abstract interface class CarteService {
-  /// Les restaurants où au moins un de mes amis est allé, dans [zone],
-  /// [filtres] appliqués, une ligne résumée par lieu, les plus
-  /// pertinents d'abord.
+  /// Les lieux de [mode] dans [zone] — par défaut, les restaurants où
+  /// au moins un de mes proches est allé —, [filtres] appliqués, une
+  /// ligne résumée par lieu, les plus pertinents d'abord.
   Future<List<LieuCarte>> lieuxReseau(
     ZoneCarte zone,
     FiltresCarte filtres, {
+    ModeExplorer mode = ModeExplorer.cercle,
     int limite = nombreMaxLieuxCarte,
   });
+
+  /// Les adresses affichables des photos des lieux ([LieuCarte.cheminPhoto]),
+  /// par chemin — à demander seulement pour ce qui s'affiche.
+  Future<Map<String, String>> photos(Iterable<String> chemins);
 
   /// L'identifiant `restaurants` d'un lieu, en l'y faisant entrer s'il
   /// n'est encore que dans l'annuaire (mettre en envie un lieu jamais

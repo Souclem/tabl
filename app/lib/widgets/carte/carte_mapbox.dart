@@ -53,6 +53,45 @@ class ControleurCarte {
     );
   }
 
+  /// Cadre la carte sur une zone (une ville), avec un peu d'air autour
+  /// et de la place pour ce qui flotte en haut ([haut]) et en bas
+  /// ([bas]). Jamais plus près que [zoomMax] : une ville d'une seule
+  /// adresse ne se voit pas à l'échelle d'une rue.
+  Future<void> cadrer({
+    required double sud,
+    required double ouest,
+    required double nord,
+    required double est,
+    double haut = 0,
+    double bas = 0,
+    double zoomMax = 14,
+  }) async {
+    final carte = _carte;
+    final bornes = CoordinateBounds(
+      southwest: Point(coordinates: Position(ouest, sud)),
+      northeast: Point(coordinates: Position(est, nord)),
+      infiniteBounds: false,
+    );
+    if (carte == null) {
+      _enAttente = CameraOptions(
+        center: Point(
+          coordinates: Position((ouest + est) / 2, (sud + nord) / 2),
+        ),
+        zoom: 12,
+      );
+      return;
+    }
+    final camera = await carte.cameraForCoordinateBounds(
+      bornes,
+      MbxEdgeInsets(top: haut + 40, left: 40, bottom: bas + 40, right: 40),
+      0,
+      0,
+      zoomMax,
+      null,
+    );
+    await carte.flyTo(camera, MapAnimationOptions(duration: 900));
+  }
+
   Future<void> centrerSur(
     double latitude,
     double longitude, {
@@ -85,15 +124,16 @@ const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 /// commerces de Mapbox (seuls nos lieux ressortent), ma position et une
 /// boussole.
 ///
-/// Les lieux proches à l'écran se regroupent en une bulle dorée qui dit
+/// Les lieux proches à l'écran se regroupent en une bulle sombre qui dit
 /// combien ils sont : « 42 » sur une ville vue de loin, puis « 3 », « 2 »,
 /// « 5 » par quartier en zoomant ; un tap sur une bulle zoome juste
-/// assez pour l'ouvrir. De près, chaque lieu est un marqueur doré avec,
-/// dans une petite bulle, le nombre d'amis qui y sont allés (propriété
-/// `amis` du GeoJSON, sans bulle quand elle est absente). Le regroupement
-/// est celui de Mapbox : il suit la distance à l'écran, pas les
-/// frontières, et vaut partout dans le monde. Un point marqué `repere`
-/// (l'endroit d'une photo) est un simple rond blanc, qu'on ne touche pas.
+/// assez pour l'ouvrir. De près, chaque lieu est un point clair ; une
+/// petite étincelle dorée le signale quand mon cercle y revient
+/// (propriété `revient` du GeoJSON), et le lieu choisi grossit, cerclé
+/// d'or (`choisi`). Le regroupement est celui de Mapbox : il suit la
+/// distance à l'écran, pas les frontières, et vaut partout dans le
+/// monde. Un point marqué `repere` (l'endroit d'une photo) est un rond
+/// blanc cerclé d'or, qu'on ne touche pas.
 ///
 /// Composant pur : reçoit les lieux déjà choisis (au format GeoJSON) et
 /// renvoie le tap sur un lieu ([onTapLieu], avec sa clé) et la zone
@@ -157,22 +197,23 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   static const _coucheGroupes = 'tabl-groupes';
   static const _coucheNombres = 'tabl-groupes-nombres';
   static const _coucheLieux = 'tabl-lieux-points';
-  static const _coucheBulles = 'tabl-lieux-bulles';
-  static const _coucheAmis = 'tabl-lieux-amis';
+  static const _coucheToucher = 'tabl-lieux-toucher';
+  static const _coucheHalo = 'tabl-lieux-halo';
+  static const _coucheEtincelles = 'tabl-lieux-etincelles';
   static const _coucheRepere = 'tabl-repere';
 
   /// Distance à l'écran (pt) sous laquelle des lieux se regroupent.
   static const _rayonGroupes = 46.0;
 
   /// Au-delà de ce zoom (quelques rues), plus aucun regroupement : chaque
-  /// restaurant a son marqueur.
+  /// restaurant a son point.
   static const _zoomMaxGroupes = 14.0;
 
   /// Les polices du style de Tabl (les seules que Mapbox lui sert).
   static const _police = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
 
-  /// La petite bulle des amis : en haut à droite du marqueur.
-  static const _decalageBulle = [9.0, -9.0];
+  /// L'étincelle du cercle qui revient : en haut à droite du point.
+  static const _decalageEtincelle = [6.5, -6.5];
 
   static const List<Object> _estUnGroupe = ['has', 'point_count'];
   static const List<Object> _estUnLieu = [
@@ -186,22 +227,21 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ['has', 'repere'],
     ],
   ];
-  static const List<Object> _aDesAmis = [
+  static const List<Object> _estChoisi = [
     'all',
     _estUnLieu,
-    ['has', 'amis'],
+    ['has', 'choisi'],
+  ];
+  static const List<Object> _revient = [
+    'all',
+    _estUnLieu,
+    ['has', 'revient'],
   ];
   static const List<Object> _estUnRepere = ['has', 'repere'];
 
-  /// Le lieu dont la feuille est ouverte ressort.
-  static const List<Object> _echelleExpression = [
-    'case',
-    [
-      'to-boolean',
-      ['get', 'choisi'],
-    ],
-    1.35,
-    1.0,
+  static const List<Object> _choisiExpression = [
+    'to-boolean',
+    ['get', 'choisi'],
   ];
 
   MapboxMap? _carte;
@@ -237,17 +277,12 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     _carte = carte;
 
     await carte.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
-    // Boussole toujours visible, sous le bouton "ma position" : un tap
-    // remet le nord en haut.
-    await carte.compass.updateSettings(
-      CompassSettings(
-        enabled: true,
-        position: OrnamentPosition.TOP_RIGHT,
-        marginTop: 70,
-        marginRight: 18,
-        fadeWhenFacingNorth: false,
-      ),
+    // Toujours le nord en haut, à plat : on se repère d'un coup d'œil,
+    // et la boussole devient inutile.
+    await carte.gestures.updateSettings(
+      GesturesSettings(rotateEnabled: false, pitchEnabled: false),
     );
+    await carte.compass.updateSettings(CompassSettings(enabled: false));
     await carte.location.updateSettings(
       LocationComponentSettings(
         enabled: widget.avecMaPosition,
@@ -259,8 +294,14 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     await carte.logo.updateSettings(
       LogoSettings(marginBottom: widget.margeBas + 8),
     );
+    // Le « i » de Mapbox à côté de son logo, en bas à gauche : le coin
+    // droit reste aux boutons de l'écran.
     await carte.attribution.updateSettings(
-      AttributionSettings(marginBottom: widget.margeBas + 8),
+      AttributionSettings(
+        position: OrnamentPosition.BOTTOM_LEFT,
+        marginLeft: 96,
+        marginBottom: widget.margeBas + 8,
+      ),
     );
   }
 
@@ -276,27 +317,27 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
-    // Les groupes : une bulle dorée, plus grande quand ils sont nombreux,
-    // et leur nombre au centre.
+    // Les groupes : une bulle sombre, plus grande quand ils sont
+    // nombreux, et leur nombre au centre.
     await carte.addLayer(
       CircleLayer(
         id: _coucheGroupes,
         sourceId: _source,
         filter: _estUnGroupe,
-        circleColor: TablTokens.primaire.toARGB32(),
+        circleColor: const Color(0xF21A1C21).toARGB32(),
         circleRadiusExpression: [
           'step',
           ['get', 'point_count'],
-          15.0,
+          14.0,
           10,
-          19.0,
+          17.0,
           50,
-          24.0,
+          21.0,
           200,
-          30.0,
+          26.0,
         ],
-        circleStrokeColor: TablTokens.fond.toARGB32(),
-        circleStrokeWidth: 2.5,
+        circleStrokeColor: const Color(0x52F5F0E8).toARGB32(),
+        circleStrokeWidth: 1.2,
       ),
     );
     await carte.addLayer(
@@ -309,13 +350,13 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         textSizeExpression: [
           'step',
           ['get', 'point_count'],
-          13.0,
+          12.5,
           50,
-          15.0,
+          14.0,
           200,
-          17.0,
+          16.0,
         ],
-        textColor: TablTokens.texteSurPrimaire.toARGB32(),
+        textColor: TablTokens.texte.toARGB32(),
         textAllowOverlap: true,
         textIgnorePlacement: true,
       ),
@@ -334,68 +375,73 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
-    // Un lieu seul : marqueur doré, et la petite bulle de ses amis.
+    // Le lieu choisi : un halo doré derrière son point.
+    await carte.addLayer(
+      CircleLayer(
+        id: _coucheHalo,
+        sourceId: _source,
+        filter: _estChoisi,
+        circleColor: TablTokens.primaire.withValues(alpha: 0.28).toARGB32(),
+        circleRadius: 17.0,
+        circleBlur: 0.6,
+      ),
+    );
+
+    // Un lieu seul : un point clair, plus gros et cerclé d'or s'il est
+    // choisi.
     await carte.addLayer(
       CircleLayer(
         id: _coucheLieux,
         sourceId: _source,
         filter: _estUnLieu,
-        circleColor: TablTokens.primaire.toARGB32(),
-        circleRadiusExpression: ['*', 8.0, _echelleExpression],
-        circleStrokeColor: TablTokens.fond.toARGB32(),
-        circleStrokeWidth: 2.0,
+        circleColor: TablTokens.texte.toARGB32(),
+        circleRadiusExpression: ['case', _choisiExpression, 7.5, 5.0],
+        circleStrokeColorExpression: [
+          'case',
+          _choisiExpression,
+          TablTokens.primaire.toARGB32(),
+          const Color(0xE6101114).toARGB32(),
+        ],
+        circleStrokeWidthExpression: ['case', _choisiExpression, 3.0, 1.6],
       ),
     );
+
+    // Mon cercle y revient : une étincelle dorée au coin du point.
     await carte.addLayer(
       CircleLayer(
-        id: _coucheBulles,
+        id: _coucheEtincelles,
         sourceId: _source,
-        filter: _aDesAmis,
-        circleColor: TablTokens.fond.toARGB32(),
-        circleRadius: 8.0,
-        circleStrokeColor: TablTokens.primaire.toARGB32(),
-        circleStrokeWidth: 1.5,
-        circleTranslate: _decalageBulle,
+        filter: _revient,
+        circleColor: TablTokens.primaire.toARGB32(),
+        circleRadius: 2.4,
+        circleTranslate: _decalageEtincelle,
+        circleStrokeColor: const Color(0x99D9AC67).toARGB32(),
+        circleStrokeWidth: 1.6,
+        circleBlur: 0.15,
       ),
     );
+
+    // Un point est petit : on le touche dans un rond plus large,
+    // invisible.
     await carte.addLayer(
-      SymbolLayer(
-        id: _coucheAmis,
+      CircleLayer(
+        id: _coucheToucher,
         sourceId: _source,
-        filter: _aDesAmis,
-        textFieldExpression: [
-          'case',
-          [
-            '>',
-            ['get', 'amis'],
-            99,
-          ],
-          '99+',
-          [
-            'to-string',
-            ['get', 'amis'],
-          ],
-        ],
-        textFont: _police,
-        textSize: 10.0,
-        textColor: TablTokens.texte.toARGB32(),
-        textTranslate: _decalageBulle,
-        textAllowOverlap: true,
-        textIgnorePlacement: true,
+        filter: _estUnLieu,
+        circleColor: const Color(0x03FFFFFF).toARGB32(),
+        circleRadius: 18.0,
       ),
     );
 
     carte.addInteraction(
       TapInteraction.onMap((_) => widget.onTapCarte?.call()),
     );
-    for (final couche in [_coucheLieux, _coucheBulles, _coucheAmis]) {
-      carte.addInteraction(
-        TapInteraction(FeaturesetDescriptor(layerId: couche), (lieu, _) {
-          final cle = lieu.properties['cle'];
-          if (cle is String) widget.onTapLieu(cle);
-        }),
-      );
-    }
+    carte.addInteraction(
+      TapInteraction(FeaturesetDescriptor(layerId: _coucheToucher), (lieu, _) {
+        final cle = lieu.properties['cle'];
+        if (cle is String) widget.onTapLieu(cle);
+      }),
+    );
     for (final couche in [_coucheGroupes, _coucheNombres]) {
       carte.addInteraction(
         TapInteraction(

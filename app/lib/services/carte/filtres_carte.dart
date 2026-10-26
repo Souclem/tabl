@@ -80,6 +80,38 @@ const Map<String, Set<String>> famillesCuisine = {
   },
 };
 
+/// Les trois façons de regarder l'Explorer.
+enum ModeExplorer {
+  maCarte('Ma carte', 'moi'),
+  envies('Envies', 'envies'),
+  cercle('Le cercle', 'cercle');
+
+  const ModeExplorer(this.libelle, this.valeur);
+
+  final String libelle;
+
+  /// Valeur du paramètre `p_mode` de `lieux_carte`.
+  final String valeur;
+}
+
+/// Jusqu'où remonter dans les visites.
+enum PeriodeCarte {
+  troisMois('3 derniers mois'),
+  unAn('1 an'),
+  tout('Tout');
+
+  const PeriodeCarte(this.libelle);
+
+  final String libelle;
+
+  /// La première date retenue ; `null` : depuis toujours.
+  DateTime? depuis(DateTime maintenant) => switch (this) {
+    troisMois => DateTime(maintenant.year, maintenant.month - 3, maintenant.day),
+    unAn => DateTime(maintenant.year - 1, maintenant.month, maintenant.day),
+    tout => null,
+  };
+}
+
 /// Les filtres de la carte, tous combinés (ET), appliqués par la base.
 class FiltresCarte {
   const FiltresCarte({
@@ -91,6 +123,7 @@ class FiltresCarte {
     this.coupsDeCoeur = false,
     this.laOuOnRevient = false,
     this.moment,
+    this.periode = PeriodeCarte.tout,
   });
 
   static const aucun = FiltresCarte();
@@ -119,6 +152,8 @@ class FiltresCarte {
   /// `'midi'` ou `'soir'`.
   final String? moment;
 
+  final PeriodeCarte periode;
+
   int get nombreActifs => [
     personneId != null,
     tableId != null,
@@ -128,6 +163,7 @@ class FiltresCarte {
     coupsDeCoeur,
     laOuOnRevient,
     moment != null,
+    periode != PeriodeCarte.tout,
   ].where((actif) => actif).length;
 
   /// Les catégories Foursquare des familles choisies (pour la base),
@@ -145,6 +181,7 @@ class FiltresCarte {
     bool? coupsDeCoeur,
     bool? laOuOnRevient,
     String? Function()? moment,
+    PeriodeCarte? periode,
   }) {
     return FiltresCarte(
       personneId: personneId != null ? personneId() : this.personneId,
@@ -155,6 +192,7 @@ class FiltresCarte {
       coupsDeCoeur: coupsDeCoeur ?? this.coupsDeCoeur,
       laOuOnRevient: laOuOnRevient ?? this.laOuOnRevient,
       moment: moment != null ? moment() : this.moment,
+      periode: periode ?? this.periode,
     );
   }
 }

@@ -20,9 +20,9 @@ String geojsonLieux(Iterable<LieuCarte> lieux, {String? cleChoisie}) {
           },
           'properties': {
             'cle': lieu.cle,
-            // Le chiffre de la petite bulle : les amis qui y sont allés.
-            'amis': lieu.amis,
-            // Le lieu dont la feuille est ouverte : marqueur agrandi.
+            // Mon cercle y revient : une étincelle dorée.
+            if (lieu.leCercleRevient) 'revient': true,
+            // Le lieu dont l'aperçu est ouvert : point agrandi.
             if (lieu.cle == cleChoisie) 'choisi': true,
           },
         },

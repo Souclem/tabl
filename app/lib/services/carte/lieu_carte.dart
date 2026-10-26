@@ -1,8 +1,13 @@
 import '../restaurants/categories_lieu.dart';
 
-/// Un lieu de la carte, déjà résumé par la base : un restaurant où au
-/// moins un de mes amis est allé. Les chiffres tiennent déjà compte des
-/// filtres de la recherche qui l'a renvoyé.
+/// Un proche mis en avant sur un lieu : sa tête et son pseudo.
+typedef VisageCarte = ({String pseudo, String? photoUrl});
+
+/// Un lieu de l'Explorer, déjà résumé par la base. En mode « Le
+/// cercle », un restaurant où au moins un de mes proches est allé ; en
+/// « Envies », une adresse gardée ; en « Ma carte », un lieu où je suis
+/// allé. Les chiffres tiennent déjà compte des filtres de la recherche
+/// qui l'a renvoyé.
 class LieuCarte {
   const LieuCarte({
     required this.nom,
@@ -11,6 +16,7 @@ class LieuCarte {
     required this.longitude,
     this.restaurantId,
     this.fsqPlaceId,
+    this.quartier,
     this.adresse,
     this.categories = const [],
     this.amis = 0,
@@ -19,6 +25,14 @@ class LieuCarte {
     this.visiteParMoi = false,
     this.estEnvie = false,
     this.amiPseudo,
+    this.amisQuiReviennent = 0,
+    this.derniereVisite,
+    this.ressentis = const [],
+    this.cheminPhoto,
+    this.visages = const [],
+    this.mesVisites = 0,
+    this.maPremiereVisite,
+    this.maDerniereVisite,
   });
 
   final String nom;
@@ -29,10 +43,11 @@ class LieuCarte {
   /// `null` pour un lieu qui n'est encore que dans l'annuaire.
   final String? restaurantId;
   final String? fsqPlaceId;
+  final String? quartier;
   final String? adresse;
   final List<String> categories;
 
-  /// Amis différents qui y sont allés (moi exclu).
+  /// Proches différents qui y sont allés (moi exclu).
   final int amis;
 
   /// Visites de mon réseau, les miennes comprises.
@@ -45,8 +60,28 @@ class LieuCarte {
   /// Dans mes envies.
   final bool estEnvie;
 
-  /// L'ami mis en avant (celui qui y est allé le plus souvent).
+  /// Le proche mis en avant (celui qui y est allé le plus souvent).
   final String? amiPseudo;
+
+  /// Proches qui y sont allés au moins deux fois.
+  final int amisQuiReviennent;
+
+  /// La dernière visite d'un proche.
+  final DateTime? derniereVisite;
+
+  /// Les ressentis de mes proches (emoji), du plus récent au plus ancien.
+  final List<String> ressentis;
+
+  /// La photo la plus récente qu'on a le droit de voir : chemin dans le
+  /// bucket `souvenirs`, à signer avant de l'afficher.
+  final String? cheminPhoto;
+
+  /// Jusqu'à trois proches, les plus fidèles d'abord.
+  final List<VisageCarte> visages;
+
+  final int mesVisites;
+  final DateTime? maPremiereVisite;
+  final DateTime? maDerniereVisite;
 
   /// Identifiant stable sur la carte, quelle que soit l'origine du lieu.
   String get cle => restaurantId ?? 'fsq:$fsqPlaceId';
@@ -55,10 +90,13 @@ class LieuCarte {
   /// points de l'annuaire.
   bool get duReseau => visites > 0 || estEnvie;
 
+  /// Mon cercle y revient : au moins un proche y est allé deux fois.
+  bool get leCercleRevient => amisQuiReviennent > 0;
+
   /// L'ami mis en avant, et le nombre d'autres amis qui y sont allés.
   /// `null` si aucun ami n'y est allé.
   ({String pseudo, int autres})? get amiEnAvant {
-    final pseudo = amiPseudo;
+    final pseudo = amiPseudo ?? visages.firstOrNull?.pseudo;
     if (pseudo == null || amis == 0) return null;
     return (pseudo: pseudo, autres: amis - 1);
   }
@@ -98,6 +136,7 @@ class LieuCarte {
       longitude: longitude,
       restaurantId: restaurantId ?? this.restaurantId,
       fsqPlaceId: fsqPlaceId,
+      quartier: quartier,
       adresse: adresse,
       categories: categories,
       amis: amis,
@@ -106,6 +145,14 @@ class LieuCarte {
       visiteParMoi: visiteParMoi,
       estEnvie: estEnvie ?? this.estEnvie,
       amiPseudo: amiPseudo,
+      amisQuiReviennent: amisQuiReviennent,
+      derniereVisite: derniereVisite,
+      ressentis: ressentis,
+      cheminPhoto: cheminPhoto,
+      visages: visages,
+      mesVisites: mesVisites,
+      maPremiereVisite: maPremiereVisite,
+      maDerniereVisite: maDerniereVisite,
     );
   }
 }
@@ -126,4 +173,10 @@ class ZoneCarte {
   final double ouest;
   final double nord;
   final double est;
+
+  bool contient(double latitude, double longitude) =>
+      latitude >= sud &&
+      latitude <= nord &&
+      longitude >= ouest &&
+      longitude <= est;
 }

@@ -14,6 +14,7 @@ export 'boutons.dart';
 export 'boutons_auth_tierce.dart';
 export 'bulles_personnes.dart';
 export 'carte/carte_mapbox.dart';
+export 'carte/explorer.dart';
 export 'carte/ligne_lieu.dart';
 export 'carte/puce_filtre.dart';
 export 'carte/segment_mode_carte.dart';

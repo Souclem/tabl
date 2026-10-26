@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../restaurants/envies_restaurants.dart';
+import '../social/photo_profil.dart';
+import '../stockage/liens_signes.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/registre_restaurants.dart';
 import 'carte_service.dart';
@@ -16,8 +18,10 @@ class CarteServiceSupabase implements CarteService {
   Future<List<LieuCarte>> lieuxReseau(
     ZoneCarte zone,
     FiltresCarte filtres, {
+    ModeExplorer mode = ModeExplorer.cercle,
     int limite = nombreMaxLieuxCarte,
   }) async {
+    final depuis = filtres.periode.depuis(DateTime.now());
     final lignes = await _client.rpc<List<dynamic>>(
       'lieux_carte',
       params: {
@@ -34,8 +38,14 @@ class CarteServiceSupabase implements CarteService {
         'p_la_ou_on_revient': filtres.laOuOnRevient,
         'p_moment': filtres.moment,
         'p_limite': limite,
+        'p_depuis': depuis == null ? null : _date(depuis),
+        'p_mode': mode.valeur,
       },
     );
+    DateTime? date(Object? valeur) =>
+        valeur == null ? null : DateTime.parse(valeur as String);
+    List<String> textes(Object? valeur) =>
+        (valeur as List?)?.cast<String>() ?? const [];
     return [
       for (final l in lignes.cast<Map<String, dynamic>>())
         LieuCarte(
@@ -43,6 +53,7 @@ class CarteServiceSupabase implements CarteService {
           fsqPlaceId: l['fsq_place_id'] as String?,
           nom: l['nom'] as String,
           ville: l['ville'] as String? ?? '',
+          quartier: l['quartier'] as String?,
           adresse: l['adresse'] as String?,
           latitude: (l['latitude'] as num).toDouble(),
           longitude: (l['longitude'] as num).toDouble(),
@@ -53,9 +64,36 @@ class CarteServiceSupabase implements CarteService {
           visiteParMoi: l['visite_par_moi'] as bool,
           estEnvie: l['est_envie'] as bool,
           amiPseudo: l['ami_pseudo'] as String?,
+          amisQuiReviennent: l['amis_qui_reviennent'] as int? ?? 0,
+          derniereVisite: date(l['derniere_visite']),
+          ressentis: textes(l['ressentis']),
+          cheminPhoto: l['photo'] as String?,
+          visages: [
+            for (final (i, pseudo) in textes(l['visages_pseudos']).indexed)
+              (
+                pseudo: pseudo,
+                photoUrl: urlPhotoProfil(
+                  _client,
+                  textes(l['visages_photos']).elementAtOrNull(i),
+                  miniature: true,
+                ),
+              ),
+          ],
+          mesVisites: l['mes_visites'] as int? ?? 0,
+          maPremiereVisite: date(l['ma_premiere_visite']),
+          maDerniereVisite: date(l['ma_derniere_visite']),
         ),
     ];
   }
+
+  @override
+  Future<Map<String, String>> photos(Iterable<String> chemins) =>
+      liensSignes(_client, 'souvenirs', chemins.toSet());
+
+  static String _date(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   @override
   Future<String> idRestaurant(LieuCarte lieu) async {
