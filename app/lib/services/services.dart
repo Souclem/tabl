@@ -8,6 +8,7 @@ export 'auth/auth_service.dart';
 export 'auth/auth_service_supabase.dart';
 export 'auth/utilisateur.dart';
 export 'auth/validation.dart';
+export 'avis/avis.dart';
 export 'carte/carte_service.dart';
 export 'carte/carte_service_supabase.dart';
 export 'carte/constellation.dart';

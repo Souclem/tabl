@@ -1,3 +1,4 @@
+import '../avis/avis.dart';
 import '../souvenirs/presentation_souvenir.dart';
 
 /// Ce qui m'arrive, dans l'ordre où la base le dit.
@@ -15,7 +16,13 @@ enum TypeNotification {
   reaction('reaction'),
 
   /// Commentaire sur l'un de mes souvenirs.
-  commentaire('commentaire');
+  commentaire('commentaire'),
+
+  /// On me demande mon avis sur un restaurant (pas encore répondu).
+  demandeAvis('demande_avis'),
+
+  /// On a répondu à ma demande d'avis.
+  avisRecu('avis_recu');
 
   const TypeNotification(this.valeur);
 
@@ -37,20 +44,30 @@ class NotificationTabl {
     required this.creeLe,
     this.souvenirId,
     this.souvenirPhotoUrl,
+    this.restaurantId,
     this.restaurantNom,
     this.texte,
+    this.reponse,
+    this.demandeId,
   });
 
   final TypeNotification type;
   final ActeurNotification acteur;
   final DateTime creeLe;
   final String? souvenirId;
+  final String? restaurantId;
+
+  /// Une réponse à ma demande d'avis.
+  final ReponseAvis? reponse;
+
+  /// La demande d'avis concernée.
+  final String? demandeId;
 
   /// Déjà signée, prête à afficher.
   final String? souvenirPhotoUrl;
   final String? restaurantNom;
 
-  /// Le commentaire.
+  /// Le commentaire, la question posée, ou le mot de la réponse.
   final String? texte;
 }
 
@@ -65,8 +82,11 @@ class LigneNotification {
     required this.nouvelle,
     this.souvenirId,
     this.souvenirPhotoUrl,
+    this.restaurantId,
     this.restaurantNom,
     this.texte,
+    this.reponse,
+    this.demandeId,
   });
 
   final TypeNotification type;
@@ -79,14 +99,17 @@ class LigneNotification {
   final bool nouvelle;
   final String? souvenirId;
   final String? souvenirPhotoUrl;
+  final String? restaurantId;
   final String? restaurantNom;
   final String? texte;
+  final ReponseAvis? reponse;
+  final String? demandeId;
 
   ActeurNotification get acteur => acteurs.first;
 }
 
-/// Les notifications rangées pour l'écran : les demandes de suivi à
-/// part, en tête (elles attendent une réponse) ; puis le reste, les j'aime
+/// Les notifications rangées pour l'écran : les demandes (de suivi,
+/// d'avis) à part, en tête (elles attendent une réponse) ; puis le reste, les j'aime
 /// d'un même souvenir rassemblés, du plus récent au plus ancien. Une
 /// ligne est « nouvelle » si elle est arrivée après [vuesLe].
 ({List<LigneNotification> demandes, List<LigneNotification> autres})
@@ -99,19 +122,25 @@ rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
     nouvelle: nouvelle(n.creeLe),
     souvenirId: n.souvenirId,
     souvenirPhotoUrl: n.souvenirPhotoUrl,
+    restaurantId: n.restaurantId,
     restaurantNom: n.restaurantNom,
     texte: n.texte,
+    reponse: n.reponse,
+    demandeId: n.demandeId,
   );
 
   final tri = [...notifications]..sort((a, b) => b.creeLe.compareTo(a.creeLe));
+  bool attend(NotificationTabl n) =>
+      n.type == TypeNotification.demandeSuivi ||
+      n.type == TypeNotification.demandeAvis;
   final demandes = [
     for (final n in tri)
-      if (n.type == TypeNotification.demandeSuivi) seule(n),
+      if (attend(n)) seule(n),
   ];
   final autres = <LigneNotification>[];
   final jaimeParSouvenir = <String, int>{};
   for (final n in tri) {
-    if (n.type == TypeNotification.demandeSuivi) continue;
+    if (attend(n)) continue;
     final souvenir = n.souvenirId;
     if (n.type == TypeNotification.reaction && souvenir != null) {
       final i = jaimeParSouvenir[souvenir];
@@ -176,6 +205,16 @@ List<({String texte, bool gras})> phraseNotification(LigneNotification l) {
       final texte = l.texte?.trim();
       normal(' a commenté votre moment$ou');
       normal(texte == null || texte.isEmpty ? '.' : ' : « $texte »');
+    case TypeNotification.demandeAvis:
+      final texte = l.texte?.trim();
+      normal(' vous demande votre avis$ou');
+      normal(texte == null || texte.isEmpty ? '.' : ' : « $texte »');
+    case TypeNotification.avisRecu:
+      final reponse = l.reponse;
+      final mot = l.texte?.trim();
+      normal(' a répondu$ou : ');
+      gras(reponse == null ? 'Réponse' : '${reponse.emoji} ${reponse.libelle}');
+      if (mot != null && mot.isNotEmpty) normal(' — « $mot »');
   }
   return morceaux;
 }

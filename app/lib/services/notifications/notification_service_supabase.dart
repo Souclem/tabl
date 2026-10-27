@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../avis/avis.dart';
 import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
 import 'notification.dart';
@@ -49,8 +50,11 @@ class NotificationServiceSupabase implements NotificationService {
               creeLe: DateTime.parse(l['cree_le'] as String).toLocal(),
               souvenirId: l['souvenir_id'] as String?,
               souvenirPhotoUrl: photos[l['souvenir_photo']],
+              restaurantId: l['restaurant_id'] as String?,
               restaurantNom: l['restaurant_nom'] as String?,
               texte: l['texte'] as String?,
+              reponse: ReponseAvis.depuisValeur(l['reponse'] as String?),
+              demandeId: l['demande_id'] as String?,
             ),
       ],
       vuesLe: vuesLe == null ? null : DateTime.parse(vuesLe).toLocal(),
