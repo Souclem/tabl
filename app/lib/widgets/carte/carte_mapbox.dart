@@ -118,6 +118,13 @@ class ControleurCarte {
 /// Le style de carte propre à Tabl (« nuit dorée »), publié dans Mapbox
 /// Studio. Sa source est versionnée dans `design/style_carte_tabl.json` :
 /// une modification faite dans Studio doit y être recopiée.
+/// Une couleur dans une expression Mapbox : le style attend une chaîne
+/// (« rgba(…) »), pas l'entier ARGB des propriétés simples.
+String _rgba(Color c) {
+  int canal(double v) => (v * 255).round();
+  return 'rgba(${canal(c.r)}, ${canal(c.g)}, ${canal(c.b)}, ${c.a.toStringAsFixed(3)})';
+}
+
 const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 
 /// La carte Mapbox de Tabl : globe 3D au dézoom, notre style sans les
@@ -424,8 +431,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         circleStrokeColorExpression: [
           'case',
           _choisiExpression,
-          TablTokens.primaire.toARGB32(),
-          const Color(0xE6101114).toARGB32(),
+          _rgba(TablTokens.primaire),
+          _rgba(const Color(0xE6101114)),
         ],
         circleStrokeWidthExpression: ['case', _choisiExpression, 3.0, 1.6],
       ),
@@ -604,8 +611,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         circleColorExpression: [
           'case',
           choisie,
-          TablTokens.primaire.withValues(alpha: 0.55).toARGB32(),
-          TablTokens.primaire.withValues(alpha: 0.26).toARGB32(),
+          _rgba(TablTokens.primaire.withValues(alpha: 0.55)),
+          _rgba(TablTokens.primaire.withValues(alpha: 0.26)),
         ],
         circleRadiusExpression: [
           'interpolate',
@@ -638,8 +645,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
         circleStrokeColorExpression: [
           'case',
           choisie,
-          TablTokens.primaire.toARGB32(),
-          const Color(0x00000000).toARGB32(),
+          _rgba(TablTokens.primaire),
+          _rgba(const Color(0x00000000)),
         ],
         circleStrokeWidth: 2.0,
       ),
