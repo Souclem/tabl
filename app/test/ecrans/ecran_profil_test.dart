@@ -4,6 +4,7 @@ import 'package:network_image_mock/network_image_mock.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'package:app/ecrans/ecran_accueil.dart';
 import 'package:app/ecrans/ecran_aide.dart';
 import 'package:app/ecrans/ecran_profil.dart';
 
@@ -146,6 +147,17 @@ class _FauxRetourService implements RetourService {
 }
 
 class _FauxAuthService implements AuthService {
+  _FauxAuthService({this.suppressionEchoue = false});
+
+  final bool suppressionEchoue;
+  int suppressions = 0;
+
+  @override
+  Future<void> supprimerCompte() async {
+    suppressions++;
+    if (suppressionEchoue) throw Exception('réseau');
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
@@ -180,6 +192,7 @@ Future<_FauxSouvenirService> _ouvrirProfil(
   List<SouvenirFeed> souvenirs, {
   _FauxAbonnementService? abonnementService,
   RetourService? retourService,
+  _FauxAuthService? authService,
 }) async {
   tester.view.physicalSize = const Size(1000, 2400);
   tester.view.devicePixelRatio = 1.0;
@@ -191,7 +204,7 @@ Future<_FauxSouvenirService> _ouvrirProfil(
       MaterialApp(
         theme: TablTheme.sombre(),
         home: EcranProfil(
-          authService: _FauxAuthService(),
+          authService: authService ?? _FauxAuthService(),
           abonnementService: abonnementService ?? _FauxAbonnementService(),
           souvenirService: service,
           utilisateur: _moi,
@@ -480,6 +493,52 @@ void main() {
       find.textContaining('Tous les utilisateurs de Tabl peuvent voir'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Réglages → « Supprimer mon compte », après confirmation '
+      'seulement, puis retour à l\'accueil', (tester) async {
+    final auth = _FauxAuthService();
+    await _ouvrirProfil(tester, [], authService: auth);
+
+    await tester.tap(find.byTooltip('Réglages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer mon compte'));
+    await tester.pumpAndSettle();
+    expect(find.text('Supprimer votre compte ?'), findsOneWidget);
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+    expect(auth.suppressions, 0);
+
+    await tester.tap(find.byTooltip('Réglages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer mon compte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+
+    expect(auth.suppressions, 1);
+    expect(find.byType(EcranProfil), findsNothing);
+    expect(find.byType(EcranAccueil), findsOneWidget);
+    expect(find.text('Votre compte a été supprimé.'), findsOneWidget);
+  });
+
+  testWidgets('« Supprimer mon compte » qui échoue : on reste, et on le dit', (
+    tester,
+  ) async {
+    final auth = _FauxAuthService(suppressionEchoue: true);
+    await _ouvrirProfil(tester, [], authService: auth);
+
+    await tester.tap(find.byTooltip('Réglages'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer mon compte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Supprimer'));
+    await tester.pumpAndSettle();
+
+    expect(auth.suppressions, 1);
+    expect(find.text('Supprimer votre compte ?'), findsNothing);
+    expect(find.byType(EcranProfil), findsOneWidget);
+    expect(find.text(messageErreurGenerique), findsOneWidget);
   });
 
   testWidgets('aucune publication : une invitation à retrouver ses souvenirs', (

@@ -41,6 +41,9 @@ class _FauxAuthService implements AuthService {
 
   @override
   Future<void> deconnexion() => throw UnimplementedError();
+
+  @override
+  Future<void> supprimerCompte() => throw UnimplementedError();
 }
 
 class _FauxAbonnementService implements AbonnementService {

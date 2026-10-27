@@ -106,4 +106,11 @@ abstract interface class AuthService {
 
   /// Met fin à la session en cours.
   Future<void> deconnexion();
+
+  /// Supprime définitivement le compte connecté et tout ce qui est à lui
+  /// (souvenirs, photos, abonnés, abonnements…), puis ferme la session.
+  /// Lance une exception si la suppression n'a pas abouti : le compte
+  /// existe alors toujours, et un nouvel essai reprend où elle s'était
+  /// arrêtée.
+  Future<void> supprimerCompte();
 }

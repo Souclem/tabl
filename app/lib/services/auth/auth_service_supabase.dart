@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -202,6 +203,20 @@ class AuthServiceSupabase implements AuthService {
     // Tant qu'on est encore connecté : la ligne de l'appareil est à moi.
     await oublierCetAppareil(_client);
     await _client.auth.signOut();
+  }
+
+  @override
+  Future<void> supprimerCompte() async {
+    // Seule la fonction Edge a le droit de supprimer un compte ; elle
+    // lève une `FunctionException` si elle n'a pas abouti.
+    await _client.functions.invoke('supprimer-compte');
+    try {
+      await _client.auth.signOut();
+    } catch (e) {
+      // Le compte n'existe plus : le serveur peut refuser de fermer une
+      // session déjà caduque. La session locale, elle, est effacée.
+      debugPrint('AuthService: déconnexion après suppression : $e');
+    }
   }
 
   /// Chaîne aléatoire servant de nonce brut pour Sign in with Apple (sa

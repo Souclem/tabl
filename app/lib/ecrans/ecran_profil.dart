@@ -14,7 +14,8 @@ import 'feuille_audience.dart';
 /// Onglet Profil : en haut, qui on est (photo, prénom, moments, abonnés,
 /// abonnements) ; dessous, son journal en grille par mois et son bilan
 /// de l'année (voir [ContenuProfil]). Les réglages (profil privé,
-/// déconnexion) sont derrière le bouton en haut à droite.
+/// déconnexion, suppression du compte) sont derrière le bouton en haut à
+/// droite.
 class EcranProfil extends StatefulWidget {
   const EcranProfil({
     super.key,
@@ -294,7 +295,12 @@ class _EcranProfilState extends State<EcranProfil>
                 },
               ),
               Padding(
-                padding: const EdgeInsets.all(TablTokens.espaceL),
+                padding: const EdgeInsets.fromLTRB(
+                  TablTokens.espaceL,
+                  TablTokens.espaceL,
+                  TablTokens.espaceL,
+                  0,
+                ),
                 child: TablBouton(
                   libelle: 'Se déconnecter',
                   enCours: _enCours,
@@ -304,6 +310,17 @@ class _EcranProfilState extends State<EcranProfil>
                   },
                 ),
               ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(contexteFeuille).pop();
+                  _supprimerCompte();
+                },
+                child: Text(
+                  'Supprimer mon compte',
+                  style: TablTokens.legende.copyWith(color: TablTokens.erreur),
+                ),
+              ),
+              const SizedBox(height: TablTokens.espaceS),
             ],
           ),
         ),
@@ -481,19 +498,44 @@ class _EcranProfilState extends State<EcranProfil>
     try {
       await widget.authService.deconnexion();
       if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        EcranAccueil.route(
-          widget.authService,
-          widget.abonnementService,
-          widget.souvenirService,
-        ),
-        (route) => false,
-      );
+      _revenirALAccueil();
     } catch (_) {
       if (!mounted) return;
       afficherMessage(context, messageErreurGenerique);
       setState(() => _enCours = false);
     }
+  }
+
+  /// Après confirmation : c'est définitif. La fenêtre reste ouverte le
+  /// temps de la suppression, puis on revient à l'accueil.
+  Future<void> _supprimerCompte() async {
+    final supprime = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ConfirmationSuppressionCompte(
+        supprimer: widget.authService.supprimerCompte,
+      ),
+    );
+    if (supprime == null || !mounted) return;
+    if (!supprime) {
+      afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    // Le message suit sur l'accueil : il appartient à l'app, pas à cet
+    // écran.
+    afficherMessage(context, 'Votre compte a été supprimé.');
+    _revenirALAccueil();
+  }
+
+  void _revenirALAccueil() {
+    Navigator.of(context).pushAndRemoveUntil(
+      EcranAccueil.route(
+        widget.authService,
+        widget.abonnementService,
+        widget.souvenirService,
+      ),
+      (route) => false,
+    );
   }
 
   @override
@@ -688,6 +730,75 @@ class _InterrupteurProfilPrive extends StatelessWidget {
           style: TablTokens.legende,
         ),
       ),
+    );
+  }
+}
+
+/// « Supprimer votre compte ? » : se ferme sur `true` une fois le compte
+/// supprimé, `false` si la suppression a échoué, `null` si on annule.
+class _ConfirmationSuppressionCompte extends StatefulWidget {
+  const _ConfirmationSuppressionCompte({required this.supprimer});
+
+  final Future<void> Function() supprimer;
+
+  @override
+  State<_ConfirmationSuppressionCompte> createState() =>
+      _ConfirmationSuppressionCompteState();
+}
+
+class _ConfirmationSuppressionCompteState
+    extends State<_ConfirmationSuppressionCompte> {
+  bool _enCours = false;
+
+  Future<void> _supprimer() async {
+    setState(() => _enCours = true);
+    var supprime = true;
+    try {
+      await widget.supprimer();
+    } catch (e) {
+      debugPrint('EcranProfil: suppression du compte : $e');
+      supprime = false;
+    }
+    if (mounted) Navigator.of(context).pop(supprime);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: TablTokens.surface,
+      title: const Text('Supprimer votre compte ?'),
+      content: const Text(
+        'Vos souvenirs, vos moments et leurs photos, vos abonnés, vos '
+        'abonnements, vos commentaires et vos réactions disparaîtront '
+        'avec lui. C\'est définitif.',
+      ),
+      actions: _enCours
+          ? const [
+              Padding(
+                padding: EdgeInsets.all(TablTokens.espaceS),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: TablTokens.erreur,
+                  ),
+                ),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              TextButton(
+                onPressed: _supprimer,
+                child: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: TablTokens.erreur),
+                ),
+              ),
+            ],
     );
   }
 }
