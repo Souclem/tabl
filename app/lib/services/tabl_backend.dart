@@ -13,7 +13,14 @@ class TablBackend {
     required String clePubliable,
   }) async {
     await Supabase.initialize(url: url, publishableKey: clePubliable);
+    _demarre = true;
   }
+
+  static bool _demarre = false;
+
+  /// `true` une fois [demarrer] appelé — jamais pendant les tests, où
+  /// Supabase n'est pas initialisé.
+  static bool get estDemarre => _demarre;
 
   /// Le client Supabase, une fois [demarrer] appelé.
   static SupabaseClient get client => Supabase.instance.client;

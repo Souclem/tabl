@@ -15,7 +15,8 @@ import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   @override
-  Future<SouvenirFeed?> souvenir(String souvenirId) => throw UnimplementedError();
+  Future<SouvenirFeed?> souvenir(String souvenirId) =>
+      throw UnimplementedError();
   @override
   Future<Set<String>> empreintesImportees() => throw UnimplementedError();
   @override
@@ -27,7 +28,8 @@ class _FauxSouvenirService implements SouvenirService {
   Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
       throw UnimplementedError();
   @override
-  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
+      [];
 
   final List<(String, bool)> appelsEnvie = [];
 
@@ -109,6 +111,21 @@ class _FauxSouvenirService implements SouvenirService {
 
 /// Faux [AbonnementService] : aucune méthode n'est appelée tant qu'on ne
 /// tape pas sur "Trouver des personnes".
+class _FauxNotificationService implements NotificationService {
+  final List<NotificationTabl> notifications = [];
+  int appels = 0;
+
+  @override
+  Future<({List<NotificationTabl> notifications, DateTime? vuesLe})>
+  mesNotifications() async {
+    appels++;
+    return (notifications: [...notifications], vuesLe: null);
+  }
+
+  @override
+  Future<void> marquerVues(DateTime moment) async {}
+}
+
 class _FauxAbonnementService implements AbonnementService {
   @override
   Future<CompteursProfil> compteurs(String profilId) =>
@@ -246,9 +263,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: EcranFeed(
-          souvenirService: _FauxSouvenirService(
-            souvenirs: [_souvenirDeTest()],
-          ),
+          souvenirService: _FauxSouvenirService(souvenirs: [_souvenirDeTest()]),
           abonnementService: _FauxAbonnementService(),
         ),
       ),
@@ -714,5 +729,47 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('À table maintenant · 2'), findsOneWidget);
+  });
+
+  testWidgets('la cloche se revérifie quand on revient dans l\'app', (
+    tester,
+  ) async {
+    final notifications = _FauxNotificationService();
+    final pastilles = find.byWidgetPredicate(
+      (w) =>
+          w is Container &&
+          w.decoration is BoxDecoration &&
+          (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+          (w.decoration! as BoxDecoration).color == TablTokens.primaire,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(),
+          abonnementService: _FauxAbonnementService(),
+          notificationService: notifications,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(pastilles, findsNothing);
+
+    // Une demande de suivi arrive pendant que l'app est en arrière-plan.
+    notifications.notifications.add(
+      NotificationTabl(
+        type: TypeNotification.demandeSuivi,
+        acteur: (id: 'm', pseudo: 'martin', photoUrl: null),
+        creeLe: DateTime.now(),
+      ),
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(pastilles, findsOneWidget);
+
+    // Et chaque minute tant qu'elle reste ouverte.
+    final avant = notifications.appels;
+    await tester.pump(const Duration(minutes: 1));
+    expect(notifications.appels, avant + 1);
   });
 }

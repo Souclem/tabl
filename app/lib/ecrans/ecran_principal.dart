@@ -113,6 +113,20 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
     TablOnglet.profil,
   };
 
+  // Le Feed en a besoin dès son premier build. Venu de `main`, ils sont
+  // passés ; après une connexion ([route]), on les construit ici — si
+  // Supabase est démarré, donc jamais dans les tests sans backend.
+  late final InstantService? _instantService =
+      widget.instantService ??
+      (TablBackend.estDemarre
+          ? InstantServiceSupabase(TablBackend.client)
+          : null);
+  late final NotificationService? _notificationService =
+      widget.notificationService ??
+      (TablBackend.estDemarre
+          ? NotificationServiceSupabase(TablBackend.client)
+          : null);
+
   late final CarteService _carteService =
       widget.carteService ?? CarteServiceSupabase(TablBackend.client);
   // Paresseux comme les autres : seulement à l'ouverture d'Explorer.
@@ -164,8 +178,8 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                 EcranFeed(
                   souvenirService: widget.souvenirService,
                   abonnementService: widget.abonnementService,
-                  instantService: widget.instantService,
-                  notificationService: widget.notificationService,
+                  instantService: _instantService,
+                  notificationService: _notificationService,
                 ),
                 _ongletsConstruits.contains(TablOnglet.tables)
                     ? EcranTables(

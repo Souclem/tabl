@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -43,7 +45,7 @@ class EcranFeed extends StatefulWidget {
 }
 
 class _EcranFeedState extends State<EcranFeed>
-    with ActionsPublications<EcranFeed> {
+    with ActionsPublications<EcranFeed>, WidgetsBindingObserver {
   // Calculé une seule fois : cet écran vit dans l'IndexedStack de
   // EcranPrincipal, un changement d'onglet ne doit pas relancer la
   // requête (même raisonnement que le badge de EcranProfil). Mutable
@@ -70,10 +72,42 @@ class _EcranFeedState extends State<EcranFeed>
   /// Du nouveau dans les notifications : la pastille de la cloche.
   bool _notificationsNouvelles = false;
 
+  /// La cloche se revérifie chaque minute tant que l'app est ouverte,
+  /// et dès qu'on y revient.
+  Timer? _veilleNotifications;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _verifierNotifications();
+    _veiller();
+  }
+
+  @override
+  void dispose() {
+    _veilleNotifications?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState etat) {
+    if (etat == AppLifecycleState.resumed) {
+      _verifierNotifications();
+      _veiller();
+    } else if (etat == AppLifecycleState.paused) {
+      _veilleNotifications?.cancel();
+    }
+  }
+
+  void _veiller() {
+    _veilleNotifications?.cancel();
+    if (widget.notificationService == null) return;
+    _veilleNotifications = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _verifierNotifications(),
+    );
   }
 
   Future<void> _verifierNotifications() async {
