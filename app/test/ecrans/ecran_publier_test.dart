@@ -3,35 +3,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'package:app/ecrans/ecran_publier.dart';
 
-/// Faux [ImagePickerPlatform] : évite tout appel plateforme réel (aucune
-/// caméra/photothèque dans les tests). Renvoie toujours les mêmes octets
-/// tant qu'un fichier est "disponible", ou `null` pour simuler une
-/// sélection annulée par l'utilisateur.
-class _FauxImagePickerPlatform extends ImagePickerPlatform {
-  _FauxImagePickerPlatform({this.octets});
-
-  final Uint8List? octets;
-
-  @override
-  Future<XFile?> getImageFromSource({
-    required ImageSource source,
-    ImagePickerOptions options = const ImagePickerOptions(),
-  }) async {
-    final o = octets;
-    if (o == null) return null;
-    return XFile.fromData(o, name: 'photo.jpg', mimeType: 'image/jpeg');
-  }
-}
-
 class _FauxSouvenirService implements SouvenirService {
   @override
-  Future<SouvenirFeed?> souvenir(String souvenirId) => throw UnimplementedError();
+  Future<SouvenirFeed?> souvenir(String souvenirId) =>
+      throw UnimplementedError();
   @override
   Future<Set<String>> empreintesImportees() => throw UnimplementedError();
   @override
@@ -43,7 +23,8 @@ class _FauxSouvenirService implements SouvenirService {
   Future<List<SouvenirFeed>> mesMomentsAvec(String profilId) =>
       throw UnimplementedError();
   @override
-  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async => [];
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
+      [];
 
   @override
   Future<void> basculerEnvie(
@@ -80,7 +61,7 @@ class _FauxSouvenirService implements SouvenirService {
   @override
   Future<List<String>> publier({
     required LieuRestaurant lieu,
-    required Uint8List photo,
+    required List<Uint8List> photos,
     required Emotion emotion,
     String? legende,
     List<String> amisTaguesIds = const [],
@@ -88,13 +69,14 @@ class _FauxSouvenirService implements SouvenirService {
     String? boissonTexte,
     Uint8List? boissonPhoto,
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
+    List<String> empreintes = const [],
   }) async {
     if (erreur) throw Exception('erreur réseau');
     appelsPublier.add({
       'nomRestaurant': lieu.nom,
       'ville': lieu.ville,
       'lieu': lieu,
-      'photo': photo,
+      'photos': photos,
       'emotion': emotion,
       'legende': legende,
       'amisTaguesIds': amisTaguesIds,
@@ -302,12 +284,14 @@ final _octetsPhoto = base64Decode(
   '42YAAAAASUVORK5CYII=',
 );
 
-/// Faux annuaire : renvoie [lieux] dont le nom contient le texte tapé.
+/// Faux annuaire : [proches] autour de n'importe quel endroit, et [lieux]
+/// dont le nom contient le texte tapé.
 class _FausseRechercheLieu implements RechercheLieuService {
-  _FausseRechercheLieu(this.lieux);
+  _FausseRechercheLieu({this.lieux = const [], this.proches = const []});
 
   final List<LieuRestaurant> lieux;
-  final List<({String texte, double? latitude})> appels = [];
+  final List<LieuRestaurant> proches;
+  final List<({double latitude, double longitude})> autourDe = [];
 
   @override
   Future<List<LieuRestaurant>> rechercher(
@@ -315,7 +299,6 @@ class _FausseRechercheLieu implements RechercheLieuService {
     double? latitude,
     double? longitude,
   }) async {
-    appels.add((texte: texte, latitude: latitude));
     final t = texte.toLowerCase();
     return lieux.where((l) => l.nom.toLowerCase().contains(t)).toList();
   }
@@ -326,7 +309,10 @@ class _FausseRechercheLieu implements RechercheLieuService {
     required double longitude,
     double rayonM = 250,
     int limite = 8,
-  }) async => const [];
+  }) async {
+    autourDe.add((latitude: latitude, longitude: longitude));
+    return proches;
+  }
 
   @override
   Future<List<LieuRestaurant>> mesLieuxPersonnels() async => const [];
@@ -338,42 +324,74 @@ class _FaussePosition implements PositionService {
       (latitude: 50.6326, longitude: 5.5797);
 }
 
+const _comptoir = LieuRestaurant(
+  fsqPlaceId: 'fsq-comptoir',
+  nom: 'Le Comptoir',
+  ville: 'Liège',
+  latitude: 50.6327,
+  longitude: 5.5799,
+  distanceM: 42,
+);
+
 const _comoEnCasa = LieuRestaurant(
   fsqPlaceId: 'fsq-como',
   nom: 'Como en Casa',
   ville: 'Liège',
-  adresse: 'Rue Hors-Château 76',
   latitude: 50.6471,
   longitude: 5.5802,
   categories: ['Vegan and Vegetarian Restaurant'],
-  distanceM: 1620,
+);
+
+const _sarah = ProfilPublic(
+  id: 'ami-1',
+  pseudo: 'sarah',
+  statut: StatutAbonnement.abonne,
+);
+
+const _marbella = ResumeTable(
+  id: 'table-1',
+  nom: 'Marbella',
+  nombreMembres: 3,
+  etatTexte: 'Rien de nouveau',
+  actionRequise: false,
 );
 
 /// Pousse EcranPublier sur une pile de navigation réelle (pour que
 /// `Navigator.pop()` ait un écran en dessous, comme en vrai — poussé
-/// depuis EcranPrincipal).
-Future<void> _ouvrirEcranPublier(
+/// depuis EcranPrincipal). Par défaut : on est au Comptoir, l'appareil
+/// photo et la photothèque donnent chacun une photo.
+Future<void> _ouvrir(
   WidgetTester tester,
-  SouvenirService service, {
+  _FauxSouvenirService service, {
   AbonnementService? abonnementService,
   TableService? tableService,
   RechercheLieuService? rechercheLieuService,
   PositionService? positionService,
+  bool sansAnnuaire = false,
 }) async {
+  tester.view.physicalSize = const Size(1000, 2200);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
         body: Builder(
           builder: (context) => ElevatedButton(
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              MaterialPageRoute<bool>(
                 builder: (_) => EcranPublier(
                   souvenirService: service,
                   abonnementService:
                       abonnementService ?? _FauxAbonnementService(),
                   tableService: tableService,
-                  rechercheLieuService: rechercheLieuService,
-                  positionService: positionService,
+                  rechercheLieuService: sansAnnuaire
+                      ? null
+                      : rechercheLieuService ??
+                            _FausseRechercheLieu(proches: const [_comptoir]),
+                  positionService: positionService ?? _FaussePosition(),
+                  prendrePhoto: () async => _octetsPhoto,
+                  choisirPhotos: (restant) async => [_octetsPhoto],
                 ),
               ),
             ),
@@ -387,31 +405,18 @@ Future<void> _ouvrirEcranPublier(
   await tester.pumpAndSettle();
 }
 
-/// Remplit l'étape Lieu et avance jusqu'à Capturer.
-Future<void> _remplirLieu(WidgetTester tester) async {
-  await tester.enterText(find.byType(TextField).first, 'Le Comptoir');
-  await tester.enterText(find.byType(TextField).last, 'Paris');
-  await tester.tap(find.text('Continuer'));
+/// Une photo prise, et « 🙂 » : tout ce qu'il faut pour publier.
+Future<void> _photoEtRessenti(WidgetTester tester) async {
+  await tester.tap(find.text('Prendre une photo'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('🙂'));
   await tester.pumpAndSettle();
 }
 
-/// Depuis Capturer : appuie sur le déclencheur, choisit la photothèque
-/// dans la feuille proposée.
-Future<void> _capturerPhoto(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('bouton-declencheur')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Choisir depuis la photothèque'));
-  await tester.pumpAndSettle();
-}
-
-/// Depuis Lieu : avance jusqu'à l'étape Finaliser (Lieu → Capturer →
-/// photo → Brouillon → "Finaliser maintenant").
-Future<void> _avancerJusquauFinaliser(WidgetTester tester) async {
-  await _remplirLieu(tester);
-  await _capturerPhoto(tester);
-  await tester.tap(find.text('Continuer'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Finaliser maintenant'));
+Future<void> _garder(WidgetTester tester) async {
+  await tester.tap(find.text('Garder ce moment.'));
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 2));
   await tester.pumpAndSettle();
 }
 
@@ -441,439 +446,359 @@ Future<void> _choisirAudience(
   await tester.pumpAndSettle();
 }
 
+/// Ouvre une ligne d'option ([libelle]), y touche [choix], et valide.
+Future<void> _option(
+  WidgetTester tester,
+  String libelle,
+  List<String> choix,
+) async {
+  await tester.ensureVisible(find.text(libelle));
+  await tester.tap(find.text(libelle));
+  await tester.pumpAndSettle();
+  for (final c in choix) {
+    await tester.tap(
+      find.descendant(of: find.byType(BottomSheet), matching: find.text(c)),
+    );
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.text('Valider'));
+  await tester.pumpAndSettle();
+}
+
+Map<String, Object?> _publie(_FauxSouvenirService service) =>
+    service.appelsPublier.single;
+
 AudienceSouvenir _audiencePubliee(_FauxSouvenirService service) =>
-    service.appelsPublier.single['audience']! as AudienceSouvenir;
+    _publie(service)['audience']! as AudienceSouvenir;
 
-const _sarah = ProfilPublic(
-  id: 'ami-1',
-  pseudo: 'sarah',
-  statut: StatutAbonnement.abonne,
-);
-
-const _marbella = ResumeTable(
-  id: 'table-1',
-  nom: 'Marbella',
-  nombreMembres: 3,
-  etatTexte: 'Rien de nouveau',
-  actionRequise: false,
+FilledButton _bouton(WidgetTester tester) => tester.widget<FilledButton>(
+  find.widgetWithText(FilledButton, 'Garder ce moment.'),
 );
 
 void main() {
-  setUp(() {
-    ImagePickerPlatform.instance = _FauxImagePickerPlatform(
-      octets: _octetsPhoto,
-    );
-  });
+  testWidgets('à l\'ouverture : la photo d\'abord, le restaurant où l\'on '
+      'est déjà proposé', (tester) async {
+    await _ouvrir(tester, _FauxSouvenirService());
 
-  testWidgets('étape Lieu : champs vides → erreurs, ne passe pas à Capturer', (
-    tester,
-  ) async {
-    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-
-    expect(find.text('Où êtes-vous ?'), findsOneWidget);
-    await tester.tap(find.text('Continuer'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Entre le nom du restaurant.'), findsOneWidget);
-    expect(find.text('Entre la ville.'), findsOneWidget);
-    expect(find.text('Où êtes-vous ?'), findsOneWidget);
-  });
-
-  testWidgets('Lieu rempli → Capturer, "Continuer" désactivé sans photo', (
-    tester,
-  ) async {
-    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-    await _remplirLieu(tester);
-
+    expect(find.text('Prendre une photo'), findsOneWidget);
+    expect(find.text('Photothèque'), findsOneWidget);
     expect(find.text('Le Comptoir'), findsOneWidget);
-    expect(find.text('Continuer'), findsNothing);
+    expect(find.text('Liège · à 40 m de vous'), findsOneWidget);
+    expect(find.text('Une photo d\'abord.'), findsOneWidget);
+    expect(_bouton(tester).onPressed, isNull);
   });
 
-  testWidgets('capturer une photo affiche "Continuer" vers Brouillon', (
-    tester,
-  ) async {
-    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-    await _remplirLieu(tester);
-    await _capturerPhoto(tester);
+  testWidgets('une photo, un ressenti : le moment est gardé, l\'écran se '
+      'referme', (tester) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(tester, service);
+
+    await tester.tap(find.text('Prendre une photo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Comment c\'était ?'), findsWidgets);
+    expect(_bouton(tester).onPressed, isNull);
+
+    await tester.tap(find.text('🤩'));
+    await tester.pumpAndSettle();
+    expect(_bouton(tester).onPressed, isNotNull);
+
+    await tester.tap(find.text('Garder ce moment.'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Moment gardé.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
-    expect(find.text('Continuer'), findsOneWidget);
-    await tester.tap(find.text('Continuer'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Moment enregistré.'), findsOneWidget);
+    final appel = _publie(service);
+    expect((appel['lieu']! as LieuRestaurant).fsqPlaceId, 'fsq-comptoir');
+    expect(appel['photos'], hasLength(1));
+    expect(appel['emotion'], Emotion.inoubliable);
+    expect(find.byType(EcranPublier), findsNothing);
   });
 
-  testWidgets('"Plus tard" enregistre un brouillon et revient en arrière', (
+  testWidgets('glisser après la dernière photo pour en ajouter une', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirEcranPublier(tester, service);
-    await _remplirLieu(tester);
-    await _capturerPhoto(tester);
-    await tester.tap(find.text('Continuer'));
+    await _ouvrir(tester, service);
+    await _photoEtRessenti(tester);
+
+    await tester.drag(find.byType(PageView).first, const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Une autre photo ?'), findsOneWidget);
+
+    await tester.tap(find.text('Photothèque'));
+    await tester.pumpAndSettle();
+    // La nouvelle photo est affichée, deux vignettes dessous.
+    expect(find.text('Une autre photo ?'), findsNothing);
+    expect(find.bySemanticsLabel('Photo 2'), findsOneWidget);
+
+    await _garder(tester);
+    expect(_publie(service)['photos'], hasLength(2));
+  });
+
+  testWidgets('« Changer » : un autre restaurant, cherché dans l\'annuaire', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(
+      tester,
+      service,
+      rechercheLieuService: _FausseRechercheLieu(
+        lieux: const [_comoEnCasa],
+        proches: const [_comptoir],
+      ),
+    );
+    await _photoEtRessenti(tester);
+
+    await tester.tap(find.text('Changer'));
+    await tester.pumpAndSettle();
+    expect(find.text('PRÈS DE VOUS'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(TextField),
+      ),
+      'como',
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Como en Casa').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Plus tard'));
-    await tester.pumpAndSettle();
-
-    expect(service.appelsBrouillon, hasLength(1));
-    expect(service.appelsBrouillon.single['nomRestaurant'], 'Le Comptoir');
-    expect(service.appelsBrouillon.single['ville'], 'Paris');
-    expect(find.byType(EcranPublier), findsNothing);
+    expect(find.text('Como en Casa'), findsOneWidget);
+    await _garder(tester);
     expect(
-      find.text('Enregistré. Reprenez-le depuis votre profil.'),
+      (_publie(service)['lieu']! as LieuRestaurant).fsqPlaceId,
+      'fsq-como',
+    );
+  });
+
+  testWidgets('saisi à la main : il prend la position du téléphone', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(tester, service, sansAnnuaire: true);
+    expect(find.text('Où êtes-vous ?'), findsWidgets);
+
+    await _photoEtRessenti(tester);
+    await tester.tap(find.text('Choisir'));
+    await tester.pumpAndSettle();
+    final champs = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.byType(TextField),
+    );
+    await tester.enterText(champs.first, 'Chez K');
+    await tester.enterText(champs.last, 'Liège');
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _garder(tester);
+    final lieu = _publie(service)['lieu']! as LieuRestaurant;
+    expect(lieu.estManuel, isTrue);
+    expect(lieu.nom, 'Chez K');
+    expect(lieu.latitude, 50.6326);
+  });
+
+  testWidgets('« Avec qui ? » : la personne taguée est transmise', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(
+      tester,
+      service,
+      abonnementService: _FauxAbonnementService(amis: const [_sarah]),
+    );
+    await _photoEtRessenti(tester);
+
+    await _option(tester, 'Avec qui ?', ['sarah']);
+    expect(find.text('Avec sarah'), findsOneWidget);
+    // Profil privé et sarah n'est pas une abonnée : « Tout le monde » ne
+    // l'inclut pas.
+    expect(find.text('sarah ne verra pas ce moment.'), findsOneWidget);
+
+    await _garder(tester);
+    expect(_publie(service)['amisTaguesIds'], ['ami-1']);
+  });
+
+  testWidgets('« Ce qui ressort » et la boisson sont transmis', (tester) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(tester, service);
+    await _photoEtRessenti(tester);
+
+    await _option(tester, 'Ce qui ressort', [
+      'Assiette · Exceptionnelle',
+      'Service · Attentionné',
+    ]);
+    expect(
+      find.text('Assiette · Exceptionnelle, Service · Attentionné'),
       findsOneWidget,
     );
-  });
 
-  testWidgets(
-    '"Finaliser maintenant" amène sur Finaliser, bouton grisé sans émotion',
-    (tester) async {
-      await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-      await _avancerJusquauFinaliser(tester);
-
-      expect(find.text('Comment c\'était ?'), findsOneWidget);
-      final bouton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Garder ce moment.'),
-      );
-      expect(bouton.onPressed, isNull);
-    },
-  );
-
-  testWidgets('choisir une émotion active "Garder ce moment."', (tester) async {
-    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-    await _avancerJusquauFinaliser(tester);
-
-    await tester.tap(find.text('😍'));
+    await tester.ensureVisible(find.text('Une boisson ?'));
+    await tester.tap(find.text('Une boisson ?'));
     await tester.pumpAndSettle();
-
-    final bouton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Garder ce moment.'),
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byType(TextField),
+      ),
+      'Un Margaux 2018',
     );
-    expect(bouton.onPressed, isNotNull);
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    expect(find.text('Un Margaux 2018'), findsOneWidget);
+
+    await _garder(tester);
+    expect(_publie(service)['impressions'], [
+      'Assiette · Exceptionnelle',
+      'Service · Attentionné',
+    ]);
+    expect(_publie(service)['boissonTexte'], 'Un Margaux 2018');
   });
-
-  testWidgets(
-    'parcours complet : publie avec émotion, puis anime et confirme',
-    (tester) async {
-      final service = _FauxSouvenirService();
-      await _ouvrirEcranPublier(tester, service);
-      await _avancerJusquauFinaliser(tester);
-
-      await tester.tap(find.text('🤩'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Garder ce moment.'));
-      await tester.tap(find.text('Garder ce moment.'));
-      await tester.pumpAndSettle();
-
-      expect(service.appelsPublier, hasLength(1));
-      final appel = service.appelsPublier.single;
-      expect(appel['nomRestaurant'], 'Le Comptoir');
-      expect(appel['ville'], 'Paris');
-      expect(appel['emotion'], Emotion.inoubliable);
-      // "Tout le monde" par défaut.
-      expect(
-        (appel['audience']! as AudienceSouvenir).mode,
-        ModeAudience.toutLeMonde,
-      );
-
-      // L'animation de publication (~1,5 s) enchaîne automatiquement.
-      expect(find.text('Moment ajouté.'), findsNothing);
-      await tester.pump(const Duration(milliseconds: 1600));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Moment ajouté.'), findsOneWidget);
-      await tester.tap(find.text('Retourner au feed'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(EcranPublier), findsNothing);
-    },
-  );
 
   testWidgets('"Seulement…" une personne : transmis à la publication', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirEcranPublier(
+    await _ouvrir(
       tester,
       service,
       abonnementService: _FauxAbonnementService(amis: const [_sarah]),
     );
-    await _avancerJusquauFinaliser(tester);
-
-    await tester.tap(find.text('🙂'));
-    await tester.pumpAndSettle();
+    await _photoEtRessenti(tester);
     expect(find.text('Tout le monde'), findsOneWidget);
 
     await _choisirAudience(tester, 'Seulement…', choix: ['sarah']);
     expect(find.text('Seulement sarah'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Garder ce moment.'));
-    await tester.tap(find.text('Garder ce moment.'));
-    await tester.pumpAndSettle();
-
+    await _garder(tester);
     final audience = _audiencePubliee(service);
     expect(audience.mode, ModeAudience.seulement);
     expect(audience.personneIds, {'ami-1'});
-  });
-
-  testWidgets('"Seulement…" sans rien cocher : impossible d\'enregistrer', (
-    tester,
-  ) async {
-    await _ouvrirEcranPublier(tester, _FauxSouvenirService());
-    await _avancerJusquauFinaliser(tester);
-
-    await tester.ensureVisible(find.text('Qui peut voir'));
-    await tester.tap(find.text('Qui peut voir'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Seulement…'));
-    await tester.pumpAndSettle();
-
-    final bouton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Enregistrer'),
-    );
-    expect(bouton.onPressed, isNull);
   });
 
   testWidgets('"Tout le monde sauf…" : la personne exclue est transmise', (
     tester,
   ) async {
     final service = _FauxSouvenirService();
-    await _ouvrirEcranPublier(
+    await _ouvrir(
       tester,
       service,
       abonnementService: _FauxAbonnementService(amis: const [_sarah]),
     );
-    await _avancerJusquauFinaliser(tester);
+    await _photoEtRessenti(tester);
 
-    await tester.tap(find.text('🙂'));
     await _choisirAudience(tester, 'Tout le monde sauf…', choix: ['sarah']);
     expect(find.text('Tout le monde sauf 1 personne'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Garder ce moment.'));
-    await tester.tap(find.text('Garder ce moment.'));
-    await tester.pumpAndSettle();
-
+    await _garder(tester);
     final audience = _audiencePubliee(service);
     expect(audience.mode, ModeAudience.sauf);
     expect(audience.personneIds, {'ami-1'});
   });
 
-  testWidgets('ami tagué hors audience : avertissement sous "Qui peut voir"', (
+  testWidgets('"Seulement…" une Table : transmise à la publication', (
     tester,
   ) async {
-    // Profil privé et sarah ne fait pas partie des abonnés : "Tout le
-    // monde" ne l'inclut pas.
-    await _ouvrirEcranPublier(
-      tester,
-      _FauxSouvenirService(),
-      abonnementService: _FauxAbonnementService(amis: const [_sarah]),
-    );
-    await _avancerJusquauFinaliser(tester);
-
-    await tester.tap(find.text('sarah'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('sarah ne verra pas ce moment.'), findsOneWidget);
-  });
-
-  testWidgets(
-    'sélectionner des impressions ("Ce qui ressort") les inclut à la publication',
-    (tester) async {
-      final service = _FauxSouvenirService();
-      await _ouvrirEcranPublier(tester, service);
-      await _avancerJusquauFinaliser(tester);
-
-      await tester.tap(find.text('🙂'));
-      await tester.ensureVisible(find.text('Assiette · Exceptionnelle'));
-      await tester.tap(find.text('Assiette · Exceptionnelle'));
-      await tester.tap(find.text('Service · Attentionné'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Garder ce moment.'));
-      await tester.tap(find.text('Garder ce moment.'));
-      await tester.pumpAndSettle();
-
-      expect(service.appelsPublier.single['impressions'], [
-        'Assiette · Exceptionnelle',
-        'Service · Attentionné',
-      ]);
-    },
-  );
-
-  testWidgets('taguer un ami l\'inclut dans la publication', (tester) async {
     final service = _FauxSouvenirService();
-    final abonnementService = _FauxAbonnementService(amis: const [_sarah]);
-    await _ouvrirEcranPublier(
+    await _ouvrir(
       tester,
       service,
-      abonnementService: abonnementService,
+      tableService: _FauxTableService(tables: const [_marbella]),
     );
-    await _avancerJusquauFinaliser(tester);
-    await tester.pumpAndSettle();
+    await _photoEtRessenti(tester);
 
-    await tester.tap(find.text('🙂'));
-    await tester.tap(find.text('sarah'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Garder ce moment.'));
-    await tester.tap(find.text('Garder ce moment.'));
-    await tester.pumpAndSettle();
+    await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
+    expect(find.text('Seulement Marbella'), findsOneWidget);
 
-    expect(service.appelsPublier.single['amisTaguesIds'], ['ami-1']);
+    await _garder(tester);
+    expect(_audiencePubliee(service).tableIds, {'table-1'});
   });
 
-  testWidgets('erreur du service à la publication → message générique', (
+  testWidgets('Table en échec : publié quand même, et on le dit', (
     tester,
   ) async {
-    final service = _FauxSouvenirService(erreur: true);
-    await _ouvrirEcranPublier(tester, service);
-    await _avancerJusquauFinaliser(tester);
+    final service = _FauxSouvenirService(tablesEnEchec: const ['table-1']);
+    await _ouvrir(
+      tester,
+      service,
+      tableService: _FauxTableService(tables: const [_marbella]),
+    );
+    await _photoEtRessenti(tester);
+    await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
 
-    await tester.tap(find.text('🙂'));
+    await tester.tap(find.text('Garder ce moment.'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      find.text('Publié, mais impossible de le partager avec 1 Table.'),
+      findsOneWidget,
+    );
+    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Garder ce moment.'));
+    expect(service.appelsPublier, hasLength(1));
+    expect(find.byType(EcranPublier), findsNothing);
+  });
+
+  testWidgets('erreur du service à la publication → message, on reste', (
+    tester,
+  ) async {
+    await _ouvrir(tester, _FauxSouvenirService(erreur: true));
+    await _photoEtRessenti(tester);
+
     await tester.tap(find.text('Garder ce moment.'));
     await tester.pumpAndSettle();
 
     expect(find.text(messageErreurGenerique), findsOneWidget);
-    // Toujours sur l'écran de finalisation : pas d'avancée en cas
-    // d'échec.
-    expect(find.text('Comment c\'était ?'), findsOneWidget);
+    expect(find.text('Moment gardé.'), findsNothing);
+    expect(find.byType(EcranPublier), findsOneWidget);
   });
 
-  testWidgets(
-    '"Seulement…" une Table : transmise à la publication (megaprompt Bloc 5)',
-    (tester) async {
-      final service = _FauxSouvenirService();
-      await _ouvrirEcranPublier(
-        tester,
-        service,
-        tableService: _FauxTableService(tables: const [_marbella]),
-      );
-      await _avancerJusquauFinaliser(tester);
+  testWidgets('fermer avec une photo : « Plus tard » garde un brouillon', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(tester, service);
+    await tester.tap(find.text('Prendre une photo'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('🙂'));
-      await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
-      // Règle 13 : le résumé nomme la Table, jamais "audience"/"grant".
-      expect(find.text('Seulement Marbella'), findsOneWidget);
+    await tester.tap(find.byTooltip('Fermer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Abandonner ce moment ?'), findsOneWidget);
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EcranPublier), findsOneWidget);
 
-      await tester.ensureVisible(find.text('Garder ce moment.'));
-      await tester.tap(find.text('Garder ce moment.'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Fermer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plus tard'));
+    await tester.pumpAndSettle();
 
-      expect(_audiencePubliee(service).tableIds, {'table-1'});
-    },
-  );
+    expect(service.appelsBrouillon.single['nomRestaurant'], 'Le Comptoir');
+    expect(find.byType(EcranPublier), findsNothing);
+  });
 
-  testWidgets(
-    'échec d\'association à une Table : la publication réussit malgré tout '
-    '(règle 51)',
-    (tester) async {
-      final service = _FauxSouvenirService(tablesEnEchec: const ['table-1']);
-      await _ouvrirEcranPublier(
-        tester,
-        service,
-        tableService: _FauxTableService(tables: const [_marbella]),
-      );
-      await _avancerJusquauFinaliser(tester);
+  testWidgets('fermer avec une photo : « Abandonner » ne garde rien', (
+    tester,
+  ) async {
+    final service = _FauxSouvenirService();
+    await _ouvrir(tester, service);
+    await tester.tap(find.text('Prendre une photo'));
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.text('🙂'));
-      await _choisirAudience(tester, 'Seulement…', choix: ['Marbella']);
-      await tester.ensureVisible(find.text('Garder ce moment.'));
-      await tester.tap(find.text('Garder ce moment.'));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Fermer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abandonner'));
+    await tester.pumpAndSettle();
 
-      expect(
-        find.text('Publié, mais impossible de l\'ajouter à cette Table.'),
-        findsOneWidget,
-      );
-      // La publication a bien avancé jusqu'à l'animation malgré l'échec
-      // d'association — jamais de ghost post, mais pas non plus un blocage
-      // de la publication elle-même pour un problème d'association.
-      expect(find.text('Comment c\'était ?'), findsNothing);
-    },
-  );
-
-  group('recherche du restaurant dans l\'annuaire', () {
-    testWidgets('taper affiche les suggestions, un tap passe à la photo', (
-      tester,
-    ) async {
-      final recherche = _FausseRechercheLieu([_comoEnCasa]);
-      final service = _FauxSouvenirService();
-      await _ouvrirEcranPublier(
-        tester,
-        service,
-        rechercheLieuService: recherche,
-        positionService: _FaussePosition(),
-      );
-
-      await tester.enterText(find.byType(TextField), 'como');
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Como en Casa'), findsOneWidget);
-      expect(
-        find.text('Végétarien · Rue Hors-Château 76, Liège · 1,6 km'),
-        findsOneWidget,
-      );
-      // La position du téléphone sert au tri par proximité.
-      expect(recherche.appels.last.latitude, 50.6326);
-
-      await tester.tap(find.text('Como en Casa'));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('bouton-declencheur')), findsOneWidget);
-
-      await _capturerPhoto(tester);
-      await tester.tap(find.text('Continuer'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Finaliser maintenant'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('🙂'));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Garder ce moment.'));
-      await tester.tap(find.text('Garder ce moment.'));
-      await tester.pumpAndSettle();
-
-      final lieu = service.appelsPublier.single['lieu']! as LieuRestaurant;
-      expect(lieu.fsqPlaceId, 'fsq-como');
-    });
-
-    testWidgets(
-      '"Je ne trouve pas mon restaurant" : saisie à la main, avec la position',
-      (tester) async {
-        final service = _FauxSouvenirService();
-        await _ouvrirEcranPublier(
-          tester,
-          service,
-          rechercheLieuService: _FausseRechercheLieu(const []),
-          positionService: _FaussePosition(),
-        );
-
-        await tester.enterText(find.byType(TextField), 'Chez K');
-        await tester.pump(const Duration(milliseconds: 300));
-        await tester.pumpAndSettle();
-        expect(find.text('Aucun restaurant trouvé.'), findsOneWidget);
-
-        await tester.tap(find.text('Je ne trouve pas mon restaurant'));
-        await tester.pumpAndSettle();
-
-        // Le nom déjà tapé est repris.
-        expect(find.text('Chez K'), findsOneWidget);
-        await tester.enterText(find.byType(TextField).last, 'Liège');
-        await tester.tap(find.text('Continuer'));
-        await tester.pumpAndSettle();
-
-        await _capturerPhoto(tester);
-        await tester.tap(find.text('Continuer'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Plus tard'));
-        await tester.pumpAndSettle();
-
-        final lieu = service.appelsBrouillon.single['lieu']! as LieuRestaurant;
-        expect(lieu.estManuel, isTrue);
-        expect(lieu.nom, 'Chez K');
-        expect(lieu.latitude, 50.6326);
-      },
-    );
+    expect(service.appelsBrouillon, isEmpty);
+    expect(service.appelsPublier, isEmpty);
+    expect(find.byType(EcranPublier), findsNothing);
   });
 }

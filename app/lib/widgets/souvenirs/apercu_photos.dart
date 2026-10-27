@@ -6,23 +6,35 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../indicateur_page.dart';
 
-/// Les photos d'un souvenir en train d'être ajouté, en grand et bord à
-/// bord, comme il apparaîtra une fois sur le profil : on les fait
-/// défiler du doigt, le bas se fond dans la page.
+/// Une façon d'ajouter des photos : « Prendre une photo »,
+/// « Photothèque »…
+typedef ActionAjoutPhoto = ({
+  IconData icone,
+  String libelle,
+  VoidCallback onPresse,
+});
+
+/// Les photos d'un souvenir ou d'un moment en train d'être créé, en
+/// grand et bord à bord, comme il apparaîtra une fois publié : on les
+/// fait défiler du doigt, le bas se fond dans la page.
 ///
 /// [page] est celle affichée : la changer (vignette touchée) y amène ;
-/// un défilement la renvoie par [onPage].
+/// un défilement la renvoie par [onPage]. Avec [pageAjout], une page de
+/// plus attend après la dernière photo : on glisse pour en ajouter une
+/// (son numéro est alors `photos.length`).
 class TablApercuPhotos extends StatefulWidget {
   const TablApercuPhotos({
     super.key,
     required this.photos,
     required this.page,
     required this.onPage,
+    this.pageAjout,
   });
 
   final List<Uint8List> photos;
   final int page;
   final ValueChanged<int> onPage;
+  final Widget? pageAjout;
 
   @override
   State<TablApercuPhotos> createState() => _TablApercuPhotosState();
@@ -58,10 +70,11 @@ class _TablApercuPhotosState extends State<TablApercuPhotos> {
       children: [
         PageView.builder(
           controller: _controleur,
-          itemCount: photos.length,
+          itemCount: photos.length + (widget.pageAjout == null ? 0 : 1),
           onPageChanged: widget.onPage,
-          itemBuilder: (_, i) =>
-              Image.memory(photos[i], fit: BoxFit.cover, gaplessPlayback: true),
+          itemBuilder: (_, i) => i < photos.length
+              ? Image.memory(photos[i], fit: BoxFit.cover, gaplessPlayback: true)
+              : widget.pageAjout!,
         ),
         // Le haut s'assombrit pour les boutons, le bas se fond dans la
         // page pour le nom du restaurant.
@@ -101,18 +114,17 @@ class _TablApercuPhotosState extends State<TablApercuPhotos> {
   }
 }
 
-/// À la place des photos, pour un souvenir sans photo : une carte sombre
-/// et sobre — jamais une image inventée —, et de quoi en ajouter.
+/// À la place d'une photo : une carte sombre et sobre — jamais une image
+/// inventée —, et de quoi en ajouter. Sert avant la première photo, et
+/// comme page d'ajout après la dernière ([TablApercuPhotos.pageAjout]).
 class TablApercuSansPhoto extends StatelessWidget {
-  const TablApercuSansPhoto({
-    super.key,
-    required this.libelle,
-    required this.onAjouter,
-  });
+  const TablApercuSansPhoto({super.key, required this.actions, this.titre});
 
-  /// "Ajouter des photos".
-  final String libelle;
-  final VoidCallback onAjouter;
+  /// La première donne son icône au rond du milieu.
+  final List<ActionAjoutPhoto> actions;
+
+  /// Au-dessus des boutons : « Une autre photo ? ».
+  final String? titre;
 
   @override
   Widget build(BuildContext context) {
@@ -145,16 +157,32 @@ class TablApercuSansPhoto extends StatelessWidget {
                     color: TablTokens.texte.withValues(alpha: 0.12),
                   ),
                 ),
-                child: const Icon(
-                  Icons.add_photo_alternate_outlined,
+                child: Icon(
+                  actions.firstOrNull?.icone ??
+                      Icons.add_photo_alternate_outlined,
                   color: TablTokens.texte,
                 ),
               ),
+              if (titre != null) ...[
+                const SizedBox(height: TablTokens.espaceM),
+                Text(
+                  titre!,
+                  style: TablTokens.titreAffichage.copyWith(fontSize: 20),
+                ),
+              ],
               const SizedBox(height: TablTokens.espaceM),
-              TablPiluleVerre(
-                icone: Icons.photo_library_outlined,
-                libelle: libelle,
-                onPresse: onAjouter,
+              Wrap(
+                spacing: TablTokens.espaceS,
+                runSpacing: TablTokens.espaceS,
+                alignment: WrapAlignment.center,
+                children: [
+                  for (final action in actions)
+                    TablPiluleVerre(
+                      icone: action.icone,
+                      libelle: action.libelle,
+                      onPresse: action.onPresse,
+                    ),
+                ],
               ),
             ],
           ),

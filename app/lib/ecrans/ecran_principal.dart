@@ -79,6 +79,9 @@ class EcranPrincipal extends StatefulWidget {
 class _EcranPrincipalState extends State<EcranPrincipal> {
   TablOnglet _onglet = TablOnglet.feed;
 
+  /// Change à chaque moment publié : le Feed repart de zéro et le montre.
+  int _versionFeed = 0;
+
   /// La barre se tasse pendant qu'on descend dans une liste, et reprend
   /// sa taille dès qu'on s'arrête un instant.
   bool _barreCompacte = false;
@@ -193,9 +196,9 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
     });
   }
 
-  void _publier() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
+  Future<void> _publier() async {
+    final publie = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (_) => EcranPublier(
           souvenirService: widget.souvenirService,
           abonnementService: widget.abonnementService,
@@ -205,6 +208,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
         ),
       ),
     );
+    if (publie != true || !mounted) return;
+    setState(() {
+      _versionFeed++;
+      _onglet = TablOnglet.feed;
+    });
   }
 
   @override
@@ -222,6 +230,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
               index: _onglet.index,
               children: [
                 EcranFeed(
+                  key: ValueKey(_versionFeed),
                   souvenirService: widget.souvenirService,
                   abonnementService: widget.abonnementService,
                   instantService: _instantService,

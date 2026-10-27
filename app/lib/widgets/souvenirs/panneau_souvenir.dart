@@ -3,18 +3,24 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 import '../boutons.dart';
 
-/// « ☾ SOUVENIR », au-dessus du nom d'un souvenir.
+/// « ☾ SOUVENIR », au-dessus du nom d'un souvenir — ou d'un moment, avec
+/// son [icone].
 class TablSurtitreSouvenir extends StatelessWidget {
-  const TablSurtitreSouvenir({super.key, required this.texte});
+  const TablSurtitreSouvenir({
+    super.key,
+    required this.texte,
+    this.icone = Icons.nightlight_round,
+  });
 
-  /// "Souvenir", "Souvenir · d'après vos photos".
+  /// "Souvenir", "Souvenir · d'après vos photos", "Moment · ce soir".
   final String texte;
+  final IconData icone;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.nightlight_round, size: 13, color: TablTokens.texte),
+        Icon(icone, size: 13, color: TablTokens.texte),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
@@ -107,22 +113,30 @@ class TablTitreLieuSouvenir extends StatelessWidget {
   }
 }
 
-/// Le « quand » d'un souvenir sur une ligne (« 3 novembre 2023 ·
-/// Dîner »), avec d'où il vient (« D'après vos photos · 20 h 41 »).
-class TablLigneQuandSouvenir extends StatelessWidget {
-  const TablLigneQuandSouvenir({
+/// Une option d'un souvenir ou d'un moment sur une ligne, son icône dans
+/// un rond : le « quand » (« 3 novembre 2023 · Dîner », avec d'où il
+/// vient : « D'après vos photos · 20 h 41 »), « Avec qui ? », la
+/// boisson… Toute la ligne ouvre de quoi la changer.
+class TablLigneOption extends StatelessWidget {
+  const TablLigneOption({
     super.key,
+    required this.icone,
     required this.texte,
     required this.onPresse,
     this.detail,
     this.vide = false,
+    this.fin,
   });
 
+  final IconData icone;
   final String texte;
   final String? detail;
 
   /// Rien de choisi : [texte] est une invitation (« Quand était-ce ? »).
   final bool vide;
+
+  /// Avant le chevron : les têtes choisies, la photo de la boisson…
+  final Widget? fin;
   final VoidCallback onPresse;
 
   @override
@@ -144,11 +158,7 @@ class TablLigneQuandSouvenir extends StatelessWidget {
                   color: TablTokens.surfaceBasse,
                   border: Border.all(color: TablTokens.bordure),
                 ),
-                child: const Icon(
-                  Icons.event_outlined,
-                  size: 19,
-                  color: TablTokens.texte,
-                ),
+                child: Icon(icone, size: 19, color: TablTokens.texte),
               ),
               const SizedBox(width: TablTokens.espaceM - 4),
               Expanded(
@@ -157,6 +167,8 @@ class TablLigneQuandSouvenir extends StatelessWidget {
                   children: [
                     Text(
                       texte,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TablTokens.corps.copyWith(
                         color: vide ? TablTokens.texteDoux : TablTokens.texte,
                         fontWeight: FontWeight.w500,
@@ -170,6 +182,10 @@ class TablLigneQuandSouvenir extends StatelessWidget {
                   ],
                 ),
               ),
+              if (fin != null) ...[
+                const SizedBox(width: TablTokens.espaceS),
+                fin!,
+              ],
               const Icon(
                 Icons.chevron_right_rounded,
                 color: TablTokens.texteDoux,

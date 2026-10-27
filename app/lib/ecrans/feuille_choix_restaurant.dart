@@ -6,10 +6,11 @@ import 'package:app/widgets/widgets.dart';
 
 import 'recherche_lieu_en_direct.dart';
 
-/// « Quel restaurant ? » pour un souvenir : ceux près des [endroits] des
-/// photos d'abord (un par liste de [prochesParEndroit]), en liste ou sur
-/// la carte, ses lieux personnels (« Mes lieux »), la recherche au fil
-/// de la frappe — triée autour des photos, sinon du téléphone
+/// « Quel restaurant ? » pour un souvenir ou un moment : ceux près des
+/// [endroits] d'abord — ceux des photos, ou là où l'on est, selon
+/// [repere] — (un par liste de [prochesParEndroit]), en liste ou sur la
+/// carte, ses lieux personnels (« Mes lieux »), la recherche au fil de
+/// la frappe — triée autour des endroits, sinon du téléphone
 /// ([positionService]) —, la saisie à la main en dernier recours, ou un
 /// nouveau lieu personnel. `null` : fermée sans choisir.
 Future<LieuRestaurant?> choisirRestaurant(
@@ -18,6 +19,7 @@ Future<LieuRestaurant?> choisirRestaurant(
   required PositionService? positionService,
   List<Coordonnees> endroits = const [],
   List<List<LieuRestaurant>> prochesParEndroit = const [],
+  RepereDistance repere = RepereDistance.photo,
   LieuRestaurant? choisi,
 }) {
   return showModalBottomSheet<LieuRestaurant>(
@@ -32,13 +34,14 @@ Future<LieuRestaurant?> choisirRestaurant(
           : positionService,
       endroits: endroits,
       prochesParEndroit: prochesParEndroit,
+      repere: repere,
       choisi: choisi,
     ),
   );
 }
 
-/// Une position qui ne bouge pas : celle des photos, pour trier la
-/// recherche autour d'elles plutôt qu'autour du téléphone.
+/// Une position qui ne bouge pas : celle des photos (ou du téléphone au
+/// moment d'ouvrir), pour trier la recherche autour d'elle.
 class _PositionFixe implements PositionService {
   const _PositionFixe(this.position);
 
@@ -57,16 +60,18 @@ class _FeuilleRestaurant extends StatefulWidget {
     required this.positionService,
     required this.endroits,
     required this.prochesParEndroit,
+    required this.repere,
     required this.choisi,
   });
 
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
 
-  /// Les endroits des photos, le principal d'abord ; vide sans photo
-  /// localisée.
+  /// Les endroits des photos (ou là où l'on est), le principal
+  /// d'abord ; vide sans position.
   final List<Coordonnees> endroits;
   final List<List<LieuRestaurant>> prochesParEndroit;
+  final RepereDistance repere;
 
   /// Celui déjà choisi, qui ressort sur la carte.
   final LieuRestaurant? choisi;
@@ -160,13 +165,15 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   static List<LieuRestaurant> _sansDoublon(Iterable<LieuRestaurant> lieux) =>
       {for (final l in lieux) l.cle: l}.values.toList();
 
-  /// Sa distance à la photo la plus proche, quand il y a des photos.
-  LieuRestaurant _depuisPhotos(LieuRestaurant lieu) => widget.endroits.isEmpty
+  /// Sa distance à l'endroit le plus proche, quand il y en a.
+  LieuRestaurant _aDistance(LieuRestaurant lieu) => widget.endroits.isEmpty
       ? lieu
-      : aDistanceDesPhotos(lieu, widget.endroits);
+      : aDistanceDesEndroits(lieu, widget.endroits);
 
-  String _detail(LieuRestaurant lieu) =>
-      detailLieuSouvenir(lieu, depuisLaPhoto: widget.endroits.isNotEmpty);
+  String _detail(LieuRestaurant lieu) => detailLieuSouvenir(
+    lieu,
+    repere: widget.endroits.isEmpty ? null : widget.repere,
+  );
 
   void _passerALaMain() => setState(() {
     _aLaMain = true;
@@ -217,7 +224,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
       setState(() {
         _lieuxCarte = _sansDoublon([
           ..._lieuxCarte,
-          for (final l in autour) _depuisPhotos(l),
+          for (final l in autour) _aDistance(l),
         ]);
       });
     } catch (e) {
@@ -408,7 +415,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
           for (final lieu in mesLieux) ligne(lieu),
         ],
         if (aCherche) ...[
-          for (final lieu in suggestions) ligne(_depuisPhotos(lieu)),
+          for (final lieu in suggestions) ligne(_aDistance(lieu)),
           if (!rechercheEnCours && suggestions.isEmpty && mesLieux.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
@@ -420,9 +427,11 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
         ] else
           for (var i = 0; i < widget.prochesParEndroit.length; i++)
             if (widget.prochesParEndroit[i].isNotEmpty) ...[
-              section(
-                i == 0 ? 'PRÈS DE VOS PHOTOS' : 'PRÈS D\'UNE AUTRE PHOTO',
-              ),
+              section(switch ((widget.repere, i)) {
+                (RepereDistance.vous, _) => 'PRÈS DE VOUS',
+                (_, 0) => 'PRÈS DE VOS PHOTOS',
+                _ => 'PRÈS D\'UNE AUTRE PHOTO',
+              }),
               for (final lieu in widget.prochesParEndroit[i]) ligne(lieu),
             ],
         if (!aCherche && mesLieux.isNotEmpty) ...[
@@ -480,7 +489,9 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
             child: Center(
               child: TablPiluleVerre(
                 icone: Icons.circle_outlined,
-                libelle: widget.endroits.length > 1
+                libelle: widget.repere == RepereDistance.vous
+                    ? 'Rond blanc : là où vous êtes'
+                    : widget.endroits.length > 1
                     ? 'Ronds blancs : les endroits de vos photos'
                     : 'Rond blanc : l\'endroit de vos photos',
               ),

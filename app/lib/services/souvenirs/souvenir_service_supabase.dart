@@ -13,6 +13,7 @@ import 'emotion.dart';
 import 'filtre_reseau.dart';
 import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
+import 'precompletion_souvenir.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
 
@@ -48,7 +49,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           'auteur_id': _monId,
           'restaurant_id': restaurantId,
           'photo_url': cheminPhoto,
-          'moment': maintenant.hour < 17 ? 'midi' : 'soir',
+          'moment': momentDuJour(maintenant),
           'date_visite': _formaterDate(maintenant),
           'statut': 'brouillon',
         })
@@ -61,7 +62,7 @@ class SouvenirServiceSupabase implements SouvenirService {
   @override
   Future<List<String>> publier({
     required LieuRestaurant lieu,
-    required Uint8List photo,
+    required List<Uint8List> photos,
     required Emotion emotion,
     String? legende,
     List<String> amisTaguesIds = const [],
@@ -69,58 +70,70 @@ class SouvenirServiceSupabase implements SouvenirService {
     String? boissonTexte,
     Uint8List? boissonPhoto,
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
+    List<String> empreintes = const [],
   }) async {
-    final cible = audience.normalisee();
-    final cheminPhoto = await _deposerPhoto(photo);
-    final cheminBoisson = boissonPhoto == null
-        ? null
-        : await _deposerPhoto(boissonPhoto, suffixe: 'boisson');
-    final restaurantId = await _restaurants.idPour(lieu);
     final maintenant = DateTime.now();
-
-    final cree = await _client
-        .from('souvenirs')
-        .insert({
-          'auteur_id': _monId,
-          'restaurant_id': restaurantId,
-          'photo_url': cheminPhoto,
-          'legende': legende,
-          'emotion': emotion.emoji,
-          'impressions': impressions,
-          // Rien demandé à l'utilisateur pour le moment/la date : on
-          // capture l'instant, on ne le fait pas remplir un formulaire
-          // pour redire ce que l'horloge sait déjà.
-          'moment': maintenant.hour < 17 ? 'midi' : 'soir',
-          'date_visite': _formaterDate(maintenant),
-          'statut': 'publie',
-          'visibilite': cible.mode.valeur,
-          'boisson_texte': boissonTexte,
-          'boisson_photo_url': cheminBoisson,
-        })
-        .select('id')
-        .single();
-
-    final souvenirId = cree['id'] as String;
-    if (amisTaguesIds.isNotEmpty) {
-      await _client.from('souvenirs_amis_tagues').insert([
-        for (final profilId in amisTaguesIds)
-          {'souvenir_id': souvenirId, 'profil_id': profilId},
-      ]);
-    }
-
-    await _ecrirePersonnesAudience(souvenirId, cible.personneIds);
-    return _associerTables(souvenirId, cible.tableIds.toList());
+    return _creer(
+      lieu: lieu,
+      photos: photos,
+      audience: audience,
+      empreintes: empreintes,
+      amisTaguesIds: amisTaguesIds,
+      colonnes: {
+        'legende': legende,
+        'emotion': emotion.emoji,
+        'impressions': impressions,
+        // Rien demandé à l'utilisateur pour le moment/la date : on
+        // capture l'instant, on ne le fait pas remplir un formulaire
+        // pour redire ce que l'horloge sait déjà.
+        'moment': momentDuJour(maintenant),
+        'date_visite': _formaterDate(maintenant),
+        'boisson_texte': boissonTexte,
+        'boisson_photo_url': boissonPhoto == null
+            ? null
+            : await _deposerPhoto(boissonPhoto, suffixe: 'boisson'),
+      },
+    );
   }
 
   @override
-  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) async {
-    final cible = souvenir.audience.normalisee();
+  Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) {
+    return _creer(
+      lieu: souvenir.lieu,
+      photos: souvenir.photos,
+      audience: souvenir.audience,
+      empreintes: souvenir.empreintes,
+      colonnes: {
+        'legende': souvenir.legende,
+        'emotion': souvenir.emotion?.emoji,
+        'moment': souvenir.moment,
+        'date_visite': _formaterDate(souvenir.date.date),
+        'jour_connu': souvenir.date.jour != null,
+        'est_souvenir': true,
+      },
+    );
+  }
+
+  /// Crée un moment ou un souvenir, publié : ses photos déposées toutes
+  /// ensemble (la première est la principale, les autres dans
+  /// `souvenirs_photos`), la ligne `souvenirs` avec ses [colonnes] propres,
+  /// puis les empreintes, les amis tagués et l'audience. Retourne les
+  /// Tables dont l'association a échoué.
+  Future<List<String>> _creer({
+    required LieuRestaurant lieu,
+    required List<Uint8List> photos,
+    required AudienceSouvenir audience,
+    required Map<String, Object?> colonnes,
+    List<String> empreintes = const [],
+    List<String> amisTaguesIds = const [],
+  }) async {
+    final cible = audience.normalisee();
     // Toutes ensemble : dix photos l'une après l'autre feraient attendre.
     final chemins = await Future.wait([
-      for (var i = 0; i < souvenir.photos.length; i++)
-        _deposerPhoto(souvenir.photos[i], suffixe: '$i'),
+      for (var i = 0; i < photos.length; i++)
+        _deposerPhoto(photos[i], suffixe: '$i'),
     ]);
-    final restaurantId = await _restaurants.idPour(souvenir.lieu);
+    final restaurantId = await _restaurants.idPour(lieu);
 
     final cree = await _client
         .from('souvenirs')
@@ -128,20 +141,15 @@ class SouvenirServiceSupabase implements SouvenirService {
           'auteur_id': _monId,
           'restaurant_id': restaurantId,
           'photo_url': chemins.firstOrNull,
-          'legende': souvenir.legende,
-          'emotion': souvenir.emotion?.emoji,
-          'moment': souvenir.moment,
-          'date_visite': _formaterDate(souvenir.date.date),
-          'jour_connu': souvenir.date.jour != null,
-          'est_souvenir': true,
           'statut': 'publie',
           'visibilite': cible.mode.valeur,
+          ...colonnes,
         })
         .select('id')
         .single();
 
     final souvenirId = cree['id'] as String;
-    final empreintes = souvenir.empreintes.toSet();
+    final empreintesUniques = empreintes.toSet();
     await (
       chemins.length > 1
           ? _client.from('souvenirs_photos').insert([
@@ -153,10 +161,16 @@ class SouvenirServiceSupabase implements SouvenirService {
                 },
             ])
           : Future<void>.value(),
-      empreintes.isNotEmpty
+      empreintesUniques.isNotEmpty
           ? _client.from('souvenirs_empreintes').insert([
-              for (final e in empreintes)
+              for (final e in empreintesUniques)
                 {'souvenir_id': souvenirId, 'empreinte': e},
+            ])
+          : Future<void>.value(),
+      amisTaguesIds.isNotEmpty
+          ? _client.from('souvenirs_amis_tagues').insert([
+              for (final profilId in amisTaguesIds)
+                {'souvenir_id': souvenirId, 'profil_id': profilId},
             ])
           : Future<void>.value(),
     ).wait;

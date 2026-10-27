@@ -2,38 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'creation_moment.dart';
 import 'feuille_audience.dart';
-import 'feuille_choix_restaurant.dart';
-
-/// Choisit au plus `restant` photos dans la photothèque.
-typedef ChoisirPhotos = Future<List<Uint8List>> Function(int restant);
-
-/// Le sélecteur de photos du téléphone. Les photos sont réduites, mais
-/// gardent leur date et leur position (c'est d'elles que part le
-/// souvenir).
-Future<List<Uint8List>> photosDuTelephone(int restant) async {
-  if (restant <= 0) return const [];
-  final selecteur = ImagePicker();
-  // Le sélecteur multiple refuse une limite de 1.
-  final fichiers = restant == 1
-      ? [
-          ?await selecteur.pickImage(
-            source: ImageSource.gallery,
-            imageQuality: 80,
-            maxWidth: 1600,
-          ),
-        ]
-      : await selecteur.pickMultiImage(
-          imageQuality: 80,
-          maxWidth: 1600,
-          limit: restant,
-        );
-  return [for (final f in fichiers.take(restant)) await f.readAsBytes()];
-}
 
 /// Ajouter un souvenir : un repas passé, tel qu'il apparaîtra sur le
 /// profil. Les photos en grand d'abord — il en faut au moins une ;
@@ -76,23 +49,18 @@ class EcranAjouterSouvenir extends StatefulWidget {
   State<EcranAjouterSouvenir> createState() => _EcranAjouterSouvenirState();
 }
 
-class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
-  late final List<PhotoChoisie> _photos = List.of(widget.photos);
-  int _page = 0;
+class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
+    with
+        EditionPhotos<EcranAjouterSouvenir>,
+        PropositionLieu<EcranAjouterSouvenir> {
+  @override
+  List<PhotoChoisie> get photosInitiales => widget.photos;
 
-  /// Les endroits où les photos ont été prises, le principal d'abord :
-  /// c'est autour d'eux qu'on cherche le restaurant.
-  List<Coordonnees> _endroitsPhotos = const [];
+  @override
+  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
 
-  /// Les restaurants autour de chacun des [_endroitsPhotos], du plus
-  /// proche au plus loin.
-  List<List<LieuRestaurant>> _prochesParEndroit = const [];
-  bool _rechercheProches = false;
-
-  LieuRestaurant? _lieu;
-
-  /// La distance de [_lieu] est celle qui le sépare des photos.
-  bool _lieuDepuisPhotos = false;
+  @override
+  PositionService? get positionService => widget.positionService;
 
   DateSouvenir? _date;
   String? _moment;
@@ -115,8 +83,8 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
     super.initState();
     final propose = widget.lieuPropose;
     if (propose != null) {
-      _lieu = propose;
-      _lieuDepuisPhotos = propose.distanceM != null;
+      lieu = propose;
+      lieuChoisi = true;
     }
     _completerDepuisPhotos();
   }
@@ -127,11 +95,14 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
     super.dispose();
   }
 
+  @override
+  void photosAjoutees() => _completerDepuisPhotos();
+
   /// Ce que les photos disent, pour ce qui n'est pas encore choisi :
   /// jamais par-dessus un choix de l'utilisateur.
   void _completerDepuisPhotos() {
     final suggestion = precompleter([
-      for (final p in _photos) p.metadonnees,
+      for (final p in photos) p.metadonnees,
     ], maintenant: DateTime.now());
     if (_date == null && suggestion.date != null) {
       _date = suggestion.date;
@@ -139,96 +110,23 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
       _heurePhotos = suggestion.premierePhoto;
     }
     final position = suggestion.position;
-    if (position != null && _endroitsPhotos.isEmpty) {
+    if (position != null && endroits.isEmpty) {
       // Au plus deux autres endroits : au-delà, ce sont sans doute
       // d'autres repas (l'import de plusieurs souvenirs s'en chargera).
-      _endroitsPhotos = [position, ...suggestion.autresEndroits.take(2)];
-      _chercherLieuxProches(_endroitsPhotos);
-    }
-  }
-
-  Future<void> _chercherLieuxProches(List<Coordonnees> endroits) async {
-    final service = widget.rechercheLieuService;
-    if (service == null) return;
-    // Appelé depuis initState : l'état ne change qu'après la première
-    // image.
-    await Future<void>.delayed(Duration.zero);
-    if (!mounted) return;
-    setState(() => _rechercheProches = true);
-    try {
-      final proches = await Future.wait([
-        for (var i = 0; i < endroits.length; i++)
-          service.lieuxProches(
-            latitude: endroits[i].latitude,
-            longitude: endroits[i].longitude,
-            limite: i == 0 ? 8 : 4,
-          ),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _prochesParEndroit = proches;
-        // Le plus proche de l'endroit principal, proposé : on peut en
-        // changer d'un tap.
-        final propose = proches.first.firstOrNull;
-        if (_lieu == null && propose != null) {
-          _lieu = propose;
-          _lieuDepuisPhotos = true;
-        }
-      });
-    } catch (e) {
-      debugPrint('EcranAjouterSouvenir: lieux proches : $e');
-    } finally {
-      if (mounted) setState(() => _rechercheProches = false);
+      chercherAutour([
+        position,
+        ...suggestion.autresEndroits.take(2),
+      ], repere: RepereDistance.photo);
     }
   }
 
   Future<void> _ajouterPhotos() async {
-    final restant = nombreMaxPhotosSouvenir - _photos.length;
-    if (restant <= 0) return;
     try {
-      final nouvelles = await lirePhotos(await widget.choisirPhotos(restant));
-      if (!mounted || nouvelles.isEmpty) return;
-      setState(() {
-        _photos.addAll(nouvelles.take(restant));
-        _completerDepuisPhotos();
-      });
+      await ajouterPhotos(await widget.choisirPhotos(placesRestantes));
     } catch (e) {
       debugPrint('EcranAjouterSouvenir: photos : $e');
       if (mounted) afficherMessage(context, messageErreurGenerique);
     }
-  }
-
-  void _rendrePrincipale() {
-    if (_page == 0) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _photos.insert(0, _photos.removeAt(_page));
-      _page = 0;
-    });
-  }
-
-  void _retirerPhoto() {
-    setState(() {
-      _photos.removeAt(_page);
-      _page = math.min(_page, math.max(_photos.length - 1, 0));
-    });
-  }
-
-  Future<void> _choisirLieu() async {
-    final endroits = _endroitsPhotos;
-    final choisi = await choisirRestaurant(
-      context,
-      rechercheLieuService: widget.rechercheLieuService,
-      positionService: widget.positionService,
-      endroits: endroits,
-      prochesParEndroit: _prochesParEndroit,
-      choisi: _lieu,
-    );
-    if (choisi == null || !mounted) return;
-    setState(() {
-      _lieu = choisi;
-      _lieuDepuisPhotos = endroits.isNotEmpty && !choisi.estManuel;
-    });
   }
 
   Future<void> _choisirQuand() async {
@@ -267,7 +165,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
   }
 
   Future<void> _ajouter() async {
-    final lieu = _lieu;
+    final lieu = this.lieu;
     final date = _date;
     if (lieu == null || date == null) return;
     final legende = _legende.text.trim();
@@ -282,12 +180,12 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
       final souvenir = NouveauSouvenir(
         lieu: lieu,
         date: date,
-        photos: [for (final p in _photos) p.octets],
+        photos: [for (final p in photos) p.octets],
         emotion: _emotion,
         legende: legende.isEmpty ? null : legende,
         moment: _moment,
         audience: _audience,
-        empreintes: [for (final p in _photos) ?p.metadonnees.empreinte],
+        empreintes: [for (final p in photos) ?p.metadonnees.empreinte],
       );
       final tablesEnEchec = await widget.souvenirService.ajouterSouvenir(
         souvenir,
@@ -313,13 +211,9 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
 
   @override
   Widget build(BuildContext context) {
-    final taille = MediaQuery.sizeOf(context);
-    final hauteurPhoto = math.min(taille.width * 1.12, taille.height * 0.56);
-    final lieu = _lieu;
+    final lieu = this.lieu;
     final date = _date;
     final heurePhotos = _heurePhotos;
-    final peutAjouterPhotos = _photos.length < nombreMaxPhotosSouvenir;
-    final octets = [for (final p in _photos) p.octets];
 
     return Scaffold(
       backgroundColor: TablTokens.fond,
@@ -330,55 +224,16 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                SizedBox(
-                  height: hauteurPhoto,
-                  child: _photos.isEmpty
-                      ? TablApercuSansPhoto(
-                          libelle: 'Ajouter des photos',
-                          onAjouter: _ajouterPhotos,
-                        )
-                      : Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            TablApercuPhotos(
-                              photos: octets,
-                              page: _page,
-                              onPage: (page) => setState(() => _page = page),
-                            ),
-                            Positioned(
-                              right: TablTokens.espaceM,
-                              bottom: TablTokens.espaceL + 22,
-                              child: Row(
-                                children: [
-                                  if (_page > 0) ...[
-                                    TablPiluleVerre(
-                                      icone: Icons.star_rounded,
-                                      libelle: 'Principale',
-                                      onPresse: _rendrePrincipale,
-                                    ),
-                                    const SizedBox(width: TablTokens.espaceS),
-                                  ],
-                                  TablPiluleVerre(
-                                    icone: Icons.delete_outline_rounded,
-                                    libelle: 'Retirer',
-                                    onPresse: _retirerPhoto,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                zonePhotos(
+                  context,
+                  actions: [
+                    (
+                      icone: Icons.photo_library_outlined,
+                      libelle: 'Ajouter des photos',
+                      onPresse: _ajouterPhotos,
+                    ),
+                  ],
                 ),
-                if (_photos.length > 1 ||
-                    (_photos.isNotEmpty && peutAjouterPhotos)) ...[
-                  const SizedBox(height: TablTokens.espaceXs),
-                  TablBandeVignettes(
-                    photos: octets,
-                    page: _page,
-                    onChoisir: (i) => setState(() => _page = i),
-                    onAjouter: peutAjouterPhotos ? _ajouterPhotos : null,
-                  ),
-                ],
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                     TablTokens.espaceL - 4,
@@ -390,27 +245,21 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       TablSurtitreSouvenir(
-                        texte: _lieuDepuisPhotos || heurePhotos != null
+                        texte: endroits.isNotEmpty || heurePhotos != null
                             ? 'Souvenir · d\'après vos photos'
                             : 'Souvenir',
                       ),
                       const SizedBox(height: 10),
                       TablTitreLieuSouvenir(
                         nom: lieu?.nom,
-                        detail: lieu != null
-                            ? detailLieuSouvenir(
-                                lieu,
-                                depuisLaPhoto: _lieuDepuisPhotos,
-                              )
-                            : _rechercheProches
-                            ? 'Recherche du restaurant…'
-                            : null,
+                        detail: detailLieu,
                         indication: 'Quel restaurant ?',
                         action: lieu == null ? 'Choisir' : 'Changer',
-                        onPresse: _choisirLieu,
+                        onPresse: changerLieu,
                       ),
                       const SizedBox(height: TablTokens.espaceM),
-                      TablLigneQuandSouvenir(
+                      TablLigneOption(
+                        icone: Icons.event_outlined,
                         texte: date == null
                             ? 'Quand était-ce ?'
                             : [
@@ -516,7 +365,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
                       onPresse: () => Navigator.of(context).pop(),
                     ),
                     const Spacer(),
-                    if (_photos.isNotEmpty && peutAjouterPhotos)
+                    if (photos.isNotEmpty && placesRestantes > 0)
                       TablBoutonVerre(
                         icone: Icons.add_photo_alternate_outlined,
                         libelle: 'Ajouter des photos',
@@ -555,7 +404,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir> {
                   child: TablBouton(
                     libelle: 'Ajouter à mon profil',
                     enCours: _enCours,
-                    onPresse: _photos.isNotEmpty && lieu != null && date != null
+                    onPresse: photos.isNotEmpty && lieu != null && date != null
                         ? _ajouter
                         : null,
                   ),

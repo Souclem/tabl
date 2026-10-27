@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'creation_moment.dart';
 import 'ecran_ajouter_souvenir.dart';
 import 'feuille_choix_restaurant.dart';
 
@@ -559,7 +560,9 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
                   detailLieu: r.lieu != null
                       ? detailLieuSouvenir(
                           r.lieu!,
-                          depuisLaPhoto: r.endroits.isNotEmpty,
+                          repere: r.endroits.isEmpty
+                              ? null
+                              : RepereDistance.photo,
                         )
                       : r.rechercheEnCours
                       ? 'Recherche du restaurant…'

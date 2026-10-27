@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'avatar.dart';
 import 'bouton_reaction.dart';
+import 'indicateur_page.dart';
 import 'instants/bouton_ajouter_instant.dart';
 import 'instants/signal_instants_post.dart';
 
@@ -51,6 +52,7 @@ class TablPublication extends StatelessWidget {
     required this.auteurPseudo,
     required this.dateLisible,
     required this.photoUrl,
+    this.autresPhotosUrls = const [],
     this.auteurPhotoUrl,
     required this.restaurantNom,
     required this.ville,
@@ -84,6 +86,10 @@ class TablPublication extends StatelessWidget {
   final String? auteurPhotoUrl;
   final String dateLisible;
   final String? photoUrl;
+
+  /// Les autres photos du moment, après la principale : on les fait
+  /// défiler du doigt.
+  final List<String> autresPhotosUrls;
   final String restaurantNom;
   final String ville;
   final String? emojiEmotion;
@@ -148,7 +154,7 @@ class TablPublication extends StatelessWidget {
             onTapAuteur: onTapAuteur,
           ),
           _Photo(
-            photoUrl: photoUrl,
+            photoUrls: [?photoUrl, ...autresPhotosUrls],
             restaurantNom: restaurantNom,
             ville: ville,
             emojiEmotion: emojiEmotion,
@@ -326,23 +332,42 @@ class _EnTete extends StatelessWidget {
   }
 }
 
-class _Photo extends StatelessWidget {
+class _Photo extends StatefulWidget {
   const _Photo({
-    required this.photoUrl,
+    required this.photoUrls,
     required this.restaurantNom,
     required this.ville,
     required this.emojiEmotion,
     required this.onOuvrirLieu,
   });
 
-  final String? photoUrl;
+  /// La principale d'abord ; vide : pas de photo.
+  final List<String> photoUrls;
   final String restaurantNom;
   final String ville;
   final String? emojiEmotion;
   final VoidCallback onOuvrirLieu;
 
   @override
+  State<_Photo> createState() => _PhotoState();
+}
+
+class _PhotoState extends State<_Photo> {
+  int _page = 0;
+
+  Widget _image(String url) => Image.network(
+    url,
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stack) => const SizedBox(),
+  );
+
+  @override
   Widget build(BuildContext context) {
+    final photoUrls = widget.photoUrls;
+    final restaurantNom = widget.restaurantNom;
+    final ville = widget.ville;
+    final emojiEmotion = widget.emojiEmotion;
+    final onOuvrirLieu = widget.onOuvrirLieu;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: TablPublication.margePhoto,
@@ -359,12 +384,13 @@ class _Photo extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   Container(color: TablTokens.surface),
-                  if (photoUrl != null)
-                    Image.network(
-                      photoUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => const SizedBox(),
-                    ),
+                  if (photoUrls.length > 1)
+                    PageView(
+                      onPageChanged: (page) => setState(() => _page = page),
+                      children: [for (final url in photoUrls) _image(url)],
+                    )
+                  else if (photoUrls.isNotEmpty)
+                    _image(photoUrls.first),
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -382,6 +408,20 @@ class _Photo extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (photoUrls.length > 1)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 12,
+                      child: IgnorePointer(
+                        child: Center(
+                          child: TablIndicateurPage(
+                            total: photoUrls.length,
+                            index: _page,
+                          ),
+                        ),
+                      ),
+                    ),
                   Positioned(
                     left: 16,
                     right: 16,
@@ -448,7 +488,7 @@ class _Photo extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  emojiEmotion!,
+                  emojiEmotion,
                   style: const TextStyle(fontSize: 19),
                 ),
               ),

@@ -212,6 +212,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
         jourConnu: souvenir.jourConnu,
       ),
       photoUrl: souvenir.photoUrl,
+      autresPhotosUrls: souvenir.autresPhotosUrls,
       restaurantNom: souvenir.restaurantNom,
       ville: souvenir.ville,
       emojiEmotion: souvenir.emotion?.emoji,

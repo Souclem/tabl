@@ -105,15 +105,19 @@ void main() {
     );
 
     expect(
-      detailLieuSouvenir(lieu, depuisLaPhoto: true),
+      detailLieuSouvenir(lieu, repere: RepereDistance.photo),
       endsWith('Liège · à 40 m de la photo'),
     );
-    expect(detailLieuSouvenir(lieu, depuisLaPhoto: false), endsWith('Liège'));
+    expect(
+      detailLieuSouvenir(lieu, repere: RepereDistance.vous),
+      endsWith('Liège · à 40 m de vous'),
+    );
+    expect(detailLieuSouvenir(lieu), endsWith('Liège'));
     expect(heureLisible(DateTime(2023, 1, 1, 20, 5)), '20 h 05');
     expect(
       detailLieuSouvenir(
         const LieuRestaurant.personnel(nom: 'Chez mes parents'),
-        depuisLaPhoto: true,
+        repere: RepereDistance.photo,
       ),
       'Lieu personnel · jamais public',
     );

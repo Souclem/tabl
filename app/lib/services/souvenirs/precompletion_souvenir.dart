@@ -116,9 +116,9 @@ List<({Coordonnees position, List<MetadonneesPhoto> photos})> endroitsDesPhotos(
   return endroits;
 }
 
-/// [lieu] avec sa distance au plus proche des [endroits] des photos ;
-/// inchangé s'il n'y en a pas.
-LieuRestaurant aDistanceDesPhotos(
+/// [lieu] avec sa distance au plus proche des [endroits] (ceux des
+/// photos, ou le téléphone) ; inchangé s'il n'y en a pas.
+LieuRestaurant aDistanceDesEndroits(
   LieuRestaurant lieu,
   List<Coordonnees> endroits,
 ) {
@@ -142,21 +142,37 @@ String? momentDApresHeure(DateTime heure) {
   return null;
 }
 
+/// Le moment d'un repas pris maintenant : avant 17 h, c'est midi. Toujours
+/// l'un ou l'autre — contrairement à [momentDApresHeure], l'heure d'un
+/// moment publié sur place ne laisse pas de doute.
+String momentDuJour(DateTime maintenant) =>
+    maintenant.hour < 17 ? 'midi' : 'soir';
+
 /// "20 h 41".
 String heureLisible(DateTime heure) =>
     '${heure.hour} h ${heure.minute.toString().padLeft(2, '0')}';
 
-/// Sous le nom du restaurant d'un souvenir : "Végétarien · Liège · à
-/// 40 m de la photo". [depuisLaPhoto] : la distance du lieu est celle
-/// qui le sépare de l'endroit des photos (sinon, du téléphone : elle ne
-/// dit rien du souvenir, on la tait).
-String detailLieuSouvenir(LieuRestaurant lieu, {required bool depuisLaPhoto}) {
+/// D'où se mesure la distance d'un lieu proposé : l'endroit des photos
+/// (un souvenir), ou là où l'on est (un moment publié sur place).
+enum RepereDistance {
+  photo('de la photo'),
+  vous('de vous');
+
+  const RepereDistance(this.libelle);
+
+  final String libelle;
+}
+
+/// Sous le nom du restaurant d'un souvenir ou d'un moment : "Végétarien
+/// · Liège · à 40 m de la photo". Sans [repere], la distance du lieu ne
+/// dit rien du repas (mesurée depuis ailleurs) : on la tait.
+String detailLieuSouvenir(LieuRestaurant lieu, {RepereDistance? repere}) {
   if (lieu.personnel) return 'Lieu personnel · jamais public';
   final distance = lieu.distanceM;
   return [
     if (lieu.categories.isNotEmpty) libelleCategorie(lieu.categories.first),
     if (lieu.ville.isNotEmpty) lieu.ville,
-    if (depuisLaPhoto && distance != null)
-      'à ${distanceLisible(distance)} de la photo',
+    if (repere != null && distance != null)
+      'à ${distanceLisible(distance)} ${repere.libelle}',
   ].join(' · ');
 }

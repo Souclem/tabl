@@ -25,8 +25,11 @@ abstract interface class SouvenirService {
     required Uint8List photo,
   });
 
-  /// Finalise et publie un souvenir. [emotion] est la seule information
-  /// obligatoire en plus de ce qui est déjà acquis (photo, restaurant) —
+  /// Finalise et publie un souvenir. [photos] : au moins une, au plus
+  /// [nombreMaxPhotosSouvenir], la première est la principale ;
+  /// [empreintes] : celles des photos venues de la photothèque, pour
+  /// qu'un import les reconnaisse. [emotion] est la seule information
+  /// obligatoire en plus de ce qui est déjà acquis (photos, restaurant) —
   /// tout le reste ([legende], [amisTaguesIds], la boisson) reste
   /// optionnel, conformément à la maquette de finalisation.
   ///
@@ -41,7 +44,7 @@ abstract interface class SouvenirService {
   /// à ce stade.
   Future<List<String>> publier({
     required LieuRestaurant lieu,
-    required Uint8List photo,
+    required List<Uint8List> photos,
     required Emotion emotion,
     String? legende,
     List<String> amisTaguesIds = const [],
@@ -49,6 +52,7 @@ abstract interface class SouvenirService {
     String? boissonTexte,
     Uint8List? boissonPhoto,
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
+    List<String> empreintes = const [],
   });
 
   /// Ajoute un repas passé à son profil ([NouveauSouvenir]) : il se range

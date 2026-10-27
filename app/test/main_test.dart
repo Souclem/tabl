@@ -134,7 +134,7 @@ class _FauxSouvenirService implements SouvenirService {
   @override
   Future<List<String>> publier({
     required LieuRestaurant lieu,
-    required Uint8List photo,
+    required List<Uint8List> photos,
     required Emotion emotion,
     String? legende,
     List<String> amisTaguesIds = const [],
@@ -142,6 +142,7 @@ class _FauxSouvenirService implements SouvenirService {
     Uint8List? boissonPhoto,
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> impressions = const [],
+    List<String> empreintes = const [],
   }) => throw UnimplementedError();
 
   @override
