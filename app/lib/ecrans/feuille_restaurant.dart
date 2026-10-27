@@ -3,6 +3,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
+import 'feuille_demander_avis.dart';
 
 /// Ouvre la fiche d'un restaurant, en page : d'où qu'on vienne (Explorer,
 /// Feed, profil), c'est la même. Voir [FicheRestaurant].
@@ -13,6 +14,7 @@ Future<void> ouvrirFeuilleRestaurant(
   required SouvenirService souvenirService,
   AbonnementService? abonnementService,
   TableService? tableService,
+  AvisService? avisService,
   String? restaurantId,
   String? resume,
   String? photoUrl,
@@ -33,6 +35,7 @@ Future<void> ouvrirFeuilleRestaurant(
         souvenirService: souvenirService,
         abonnementService: abonnementService,
         tableService: tableService,
+        avisService: avisService,
         onVoirSurLaCarte: onVoirSurLaCarte,
       ),
     ),
@@ -52,6 +55,7 @@ class FicheRestaurant extends StatefulWidget {
     required this.souvenirService,
     this.abonnementService,
     this.tableService,
+    this.avisService,
     this.resume,
     this.photoUrl,
     this.restaurantId,
@@ -77,6 +81,10 @@ class FicheRestaurant extends StatefulWidget {
 
   /// Pour « Proposer » à une Table. `null` : pas de bouton.
   final TableService? tableService;
+
+  /// Pour « Demander » un avis à ceux qui y sont allés. `null` : pas de
+  /// bouton.
+  final AvisService? avisService;
 
   /// `null` pour un lieu qui n'est encore que dans l'annuaire : aucun avis.
   final String? restaurantId;
@@ -350,6 +358,21 @@ class _FicheRestaurantState extends State<FicheRestaurant>
                         icone: Icons.person_add_alt_1_outlined,
                         libelle: 'Proposer',
                         onPresse: _proposer,
+                      ),
+                    if (widget.avisService != null &&
+                        _restaurantId != null &&
+                        r.connaissent.isNotEmpty)
+                      ActionFiche(
+                        icone: Icons.chat_bubble_outline_rounded,
+                        libelle: 'Demander',
+                        onPresse: () => demanderUnAvis(
+                          context,
+                          avisService: widget.avisService!,
+                          restaurantId: _restaurantId!,
+                          nom: widget.nom,
+                          detail: widget.sousTitre,
+                          proches: r.connaissent,
+                        ),
                       ),
                     if (widget.onVoirSurLaCarte != null)
                       ActionFiche(

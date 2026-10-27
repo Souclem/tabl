@@ -5,6 +5,7 @@ export '../theme/tabl_theme.dart';
 export '../theme/tokens.dart';
 export 'aide/formulaire_aide.dart';
 export 'apparition.dart';
+export 'avis.dart';
 export 'avatar.dart';
 export 'barre_navigation.dart';
 export 'bouton_reaction.dart';

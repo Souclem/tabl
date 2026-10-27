@@ -103,6 +103,8 @@ class _EcranFeedState extends State<EcranFeed>
               NotificationServiceSupabase(TablBackend.client),
           abonnementService: widget.abonnementService,
           souvenirService: widget.souvenirService,
+          // Construit seulement ici, au tap sur la cloche.
+          avisService: AvisServiceSupabase(TablBackend.client),
         ),
       ),
     );

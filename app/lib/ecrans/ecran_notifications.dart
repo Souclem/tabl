@@ -3,6 +3,8 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
+import 'ecran_repondre_avis.dart';
+import 'feuille_restaurant.dart';
 import 'page_moment.dart';
 
 /// La cloche du Feed : ce qui m'est arrivé. En tête, les demandes de
@@ -16,11 +18,15 @@ class EcranNotifications extends StatefulWidget {
     required this.notificationService,
     required this.abonnementService,
     required this.souvenirService,
+    this.avisService,
   });
 
   final NotificationService notificationService;
   final AbonnementService abonnementService;
   final SouvenirService souvenirService;
+
+  /// Pour répondre aux demandes d'avis. `null` : elles ouvrent le profil.
+  final AvisService? avisService;
 
   @override
   State<EcranNotifications> createState() => _EcranNotificationsState();
@@ -102,7 +108,44 @@ class _EcranNotificationsState extends State<EcranNotifications>
     }
   }
 
+  /// Répondre à une demande d'avis, sur son propre écran.
+  Future<void> _repondreAvis(LigneNotification l) async {
+    final service = widget.avisService;
+    final demandeId = l.demandeId;
+    if (service == null || demandeId == null) return;
+    final repondu = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EcranRepondreAvis(
+          avisService: service,
+          demandeId: demandeId,
+          demandeur: l.acteur.pseudo,
+          demandeurPhotoUrl: l.acteur.photoUrl,
+          question: l.texte ?? questionAvis(l.restaurantNom ?? 'ce restaurant'),
+          restaurantNom: l.restaurantNom,
+        ),
+      ),
+    );
+    if (repondu == true && mounted) recharger();
+  }
+
   Future<void> _ouvrir(LigneNotification l) async {
+    if (l.type == TypeNotification.demandeAvis && widget.avisService != null) {
+      await _repondreAvis(l);
+      return;
+    }
+    final restaurantId = l.restaurantId;
+    if (l.type == TypeNotification.avisRecu && restaurantId != null) {
+      await ouvrirFeuilleRestaurant(
+        context,
+        nom: l.restaurantNom ?? '',
+        sousTitre: '',
+        restaurantId: restaurantId,
+        souvenirService: widget.souvenirService,
+        abonnementService: widget.abonnementService,
+        avisService: widget.avisService,
+      );
+      return;
+    }
     final souvenirId = l.souvenirId;
     if (souvenirId == null) {
       await ouvrirProfilDe(l.acteur.id, l.acteur.pseudo);
@@ -132,6 +175,8 @@ class _EcranNotificationsState extends State<EcranNotifications>
 
   Widget _ligne(LigneNotification l) {
     final demande = l.type == TypeNotification.demandeSuivi;
+    final avis =
+        l.type == TypeNotification.demandeAvis && widget.avisService != null;
     return TablLigneNotification(
       key: ValueKey(
         '${l.type.valeur}-${l.acteur.id}-${l.souvenirId}-${l.creeLe}',
@@ -142,11 +187,16 @@ class _EcranNotificationsState extends State<EcranNotifications>
       ],
       phrase: phraseNotification(l),
       quand: dateLisibleCommentaire(l.creeLe),
-      nouvelle: l.nouvelle && !demande,
+      nouvelle: l.nouvelle && !demande && !avis,
       vignetteUrl: l.souvenirPhotoUrl,
       onPresse: () => _ouvrir(l),
-      onAccepter: demande ? () => _repondre(l, accepter: true) : null,
+      onAccepter: demande
+          ? () => _repondre(l, accepter: true)
+          : avis
+          ? () => _repondreAvis(l)
+          : null,
       onRefuser: demande ? () => _repondre(l, accepter: false) : null,
+      libelleAccepter: avis ? 'Répondre' : 'Accepter',
     );
   }
 
@@ -240,9 +290,15 @@ class _EcranNotificationsState extends State<EcranNotifications>
                     else ...[
                       if (demandes.isNotEmpty) ...[
                         _section(
-                          demandes.length == 1
-                              ? 'Demande de suivi'
-                              : 'Demandes de suivi',
+                          demandes.every(
+                                (d) => d.type == TypeNotification.demandeSuivi,
+                              )
+                              ? (demandes.length == 1
+                                    ? 'Demande de suivi'
+                                    : 'Demandes de suivi')
+                              : demandes.length == 1
+                              ? 'Une demande'
+                              : 'Demandes',
                         ),
                         for (final d in demandes) _ligne(d),
                       ],

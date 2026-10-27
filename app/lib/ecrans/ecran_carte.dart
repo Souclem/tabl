@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'feuille_demander_avis.dart';
 import 'feuille_filtres_explorer.dart';
 import 'feuille_restaurant.dart';
 
@@ -29,6 +30,7 @@ class EcranCarte extends StatefulWidget {
     this.tableService,
     this.abonnementService,
     this.souvenirService,
+    this.avisService,
     this.filtresInitiaux = FiltresCarte.aucun,
     this.estOnglet = true,
     this.afficherCarte = true,
@@ -49,6 +51,10 @@ class EcranCarte extends StatefulWidget {
 
   /// Pour la fiche d'un restaurant. `null` : pas de fiche.
   final SouvenirService? souvenirService;
+
+  /// Pour « Demander » un avis à un proche qui y est allé. `null` : pas
+  /// de bouton.
+  final AvisService? avisService;
 
   /// Filtres appliqués à l'ouverture ("Voir sur la carte" depuis une
   /// Table ouvre la carte déjà filtrée sur cette Table).
@@ -511,6 +517,7 @@ class _EcranCarteState extends State<EcranCarte> {
       souvenirService: souvenirs,
       abonnementService: widget.abonnementService,
       tableService: widget.tableService,
+      avisService: widget.avisService,
       entrerDansTabl: () => widget.carteService.idRestaurant(lieu),
       onVoirSurLaCarte: widget.afficherCarte
           ? () => _montrerSurLaCarte(lieu)
@@ -617,6 +624,43 @@ class _EcranCarteState extends State<EcranCarte> {
     }
   }
 
+  bool _peutDemander(LieuCarte lieu) =>
+      widget.avisService != null &&
+      widget.souvenirService != null &&
+      lieu.restaurantId != null &&
+      lieu.amis > 0;
+
+  /// « Demander un avis » : à qui de mes proches qui y sont allés ? Leur
+  /// liste vient de leurs moments ici.
+  Future<void> _demander(LieuCarte lieu) async {
+    final avis = widget.avisService;
+    final souvenirs = widget.souvenirService;
+    final id = lieu.restaurantId;
+    if (avis == null || souvenirs == null || id == null) return;
+    final List<SouvenirFeed> moments;
+    try {
+      moments = await souvenirs.souvenirsDuRestaurant(id);
+    } catch (e) {
+      debugPrint('EcranCarte: demander : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    if (!mounted) return;
+    final proches = resumerFiche(moments).connaissent;
+    if (proches.isEmpty) {
+      afficherMessage(context, 'Aucun proche à qui demander ici.');
+      return;
+    }
+    await demanderUnAvis(
+      context,
+      avisService: avis,
+      restaurantId: id,
+      nom: lieu.nom,
+      detail: cuisineEtQuartier(lieu),
+      proches: proches,
+    );
+  }
+
   /// Les actions d'un lieu de la liste.
   Future<void> _options(LieuCarte lieu) async {
     final choix = await showModalBottomSheet<String>(
@@ -667,6 +711,12 @@ class _EcranCarteState extends State<EcranCarte> {
               ),
               if (widget.souvenirService != null)
                 action('fiche', Icons.article_outlined, 'Voir la fiche'),
+              if (_peutDemander(lieu))
+                action(
+                  'demander',
+                  Icons.chat_bubble_outline_rounded,
+                  'Demander un avis',
+                ),
               if (widget.tableService != null && _tables.isNotEmpty)
                 action(
                   'proposer',
@@ -691,6 +741,8 @@ class _EcranCarteState extends State<EcranCarte> {
     switch (choix) {
       case 'fiche':
         _ouvrirFiche(lieu);
+      case 'demander':
+        _demander(lieu);
       case 'proposer':
         _proposer(lieu);
       case 'envie':
@@ -1106,6 +1158,9 @@ class _EcranCarteState extends State<EcranCarte> {
       onEnregistrer: () => _basculerEnvie(lieu),
       onProposer: widget.tableService != null && _tables.isNotEmpty
           ? () => _proposer(lieu)
+          : null,
+      onDemander: _mode != ModeExplorer.maCarte && _peutDemander(lieu)
+          ? () => _demander(lieu)
           : null,
       onSuivant: () => _voisin(1),
       onPrecedent: () => _voisin(-1),

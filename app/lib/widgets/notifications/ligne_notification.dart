@@ -21,6 +21,7 @@ class TablLigneNotification extends StatelessWidget {
     this.vignetteUrl,
     this.onAccepter,
     this.onRefuser,
+    this.libelleAccepter = 'Accepter',
   });
 
   /// Une ou deux têtes.
@@ -37,9 +38,11 @@ class TablLigneNotification extends StatelessWidget {
   final String? vignetteUrl;
   final VoidCallback onPresse;
 
-  /// Une demande de suivi : ses deux boutons.
+  /// Une demande : de quoi y répondre (« Accepter » et « Refuser » pour
+  /// un suivi, « Répondre » pour un avis).
   final VoidCallback? onAccepter;
   final VoidCallback? onRefuser;
+  final String libelleAccepter;
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +128,11 @@ class TablLigneNotification extends StatelessWidget {
             ],
             if (onAccepter != null) ...[
               const SizedBox(width: 10),
-              _Bouton(libelle: 'Accepter', plein: true, onPresse: onAccepter!),
+              _Bouton(
+                libelle: libelleAccepter,
+                plein: true,
+                onPresse: onAccepter!,
+              ),
               if (onRefuser != null) ...[
                 const SizedBox(width: 6),
                 _Bouton(libelle: 'Refuser', onPresse: onRefuser!),

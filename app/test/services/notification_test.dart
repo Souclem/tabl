@@ -107,6 +107,28 @@ void main() {
       _phrase(ligne(TypeNotification.commentaire, ['Emma'], texte: 'Trop bon')),
       'Emma a commenté votre moment chez Bibo : « Trop bon »',
     );
+    expect(
+      _phrase(
+        ligne(TypeNotification.demandeAvis, [
+          'Martin',
+        ], texte: 'Tu me conseilles ?'),
+      ),
+      'Martin vous demande votre avis chez Bibo : « Tu me conseilles ? »',
+    );
+    expect(
+      _phrase(
+        LigneNotification(
+          type: TypeNotification.avisRecu,
+          acteurs: const [(id: 'e', pseudo: 'Emma', photoUrl: null)],
+          creeLe: DateTime(2026),
+          nouvelle: false,
+          restaurantNom: 'Bibo',
+          reponse: ReponseAvis.oui,
+          texte: 'La burrata',
+        ),
+      ),
+      'Emma a répondu chez Bibo : 😍 Oui, vas-y — « La burrata »',
+    );
     // Les noms en gras.
     expect(
       phraseNotification(ligne(TypeNotification.reaction, ['Emma'])).first,

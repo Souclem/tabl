@@ -5,7 +5,16 @@ import '../souvenirs/souvenir_feed.dart';
 import 'presentation_carte.dart';
 
 /// Un proche, sur la fiche d'un restaurant.
-typedef ProcheFiche = ({String id, String pseudo, String? photoUrl, int fois});
+typedef ProcheFiche = ({
+  String id,
+  String pseudo,
+  String? photoUrl,
+  int fois,
+
+  /// Sa dernière visite ici, et le ressenti qu'il en a gardé.
+  DateTime derniere,
+  String? emoji,
+});
 
 /// Ce que la fiche d'un restaurant raconte, tiré des moments de mon
 /// cercle ici (les miens compris) : l'avis du cercle, qui le connaît, qui
@@ -96,18 +105,17 @@ ResumeFiche resumerFiche(List<SouvenirFeed> moments) {
             derniere: ses
                 .map((s) => s.dateVisite)
                 .reduce((a, b) => a.isAfter(b) ? a : b),
+            emoji: parDateDecroissante(
+              ses,
+            ).map((s) => s.emotion?.emoji).whereType<String>().firstOrNull,
           ),
       ]..sort(
         (a, b) => a.fois != b.fois
             ? b.fois.compareTo(a.fois)
             : b.derniere.compareTo(a.derniere),
       );
-  ProcheFiche proche(SouvenirFeed m) => (
-    id: m.auteurId ?? m.auteurPseudo,
-    pseudo: m.auteurPseudo,
-    photoUrl: m.auteurPhotoUrl,
-    fois: parAuteur[m.auteurId ?? m.auteurPseudo]?.length ?? 1,
-  );
+  ProcheFiche proche(SouvenirFeed m) =>
+      proches.firstWhere((p) => p.id == (m.auteurId ?? m.auteurPseudo));
 
   final premier = duPlusAncien.where((m) => !m.estAMoi).firstOrNull;
 
@@ -129,14 +137,10 @@ ResumeFiche resumerFiche(List<SouvenirFeed> moments) {
     avis: ressentis.length,
     sansAvis: deProches.length - ressentis.length,
     emojiDominant: emojiDominant,
-    connaissent: [
-      for (final p in proches)
-        (id: p.id, pseudo: p.pseudo, photoUrl: p.photoUrl, fois: p.fois),
-    ],
+    connaissent: [for (final p in proches) p],
     yRetournent: [
       for (final p in proches)
-        if (p.fois >= 2)
-          (id: p.id, pseudo: p.pseudo, photoUrl: p.photoUrl, fois: p.fois),
+        if (p.fois >= 2) p,
     ],
     premiereDecouverte: premier == null
         ? null

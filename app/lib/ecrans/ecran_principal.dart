@@ -24,6 +24,7 @@ class EcranPrincipal extends StatefulWidget {
     this.tableService,
     this.instantService,
     this.notificationService,
+    this.avisService,
     this.rechercheLieuService,
     this.positionService,
   });
@@ -43,6 +44,7 @@ class EcranPrincipal extends StatefulWidget {
   final TableService? tableService;
   final InstantService? instantService;
   final NotificationService? notificationService;
+  final AvisService? avisService;
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
 
@@ -113,6 +115,9 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
 
   late final CarteService _carteService =
       widget.carteService ?? CarteServiceSupabase(TablBackend.client);
+  // Paresseux comme les autres : seulement à l'ouverture d'Explorer.
+  late final AvisService _avisService =
+      widget.avisService ?? AvisServiceSupabase(TablBackend.client);
   late final TableService _tableService =
       widget.tableService ?? TableServiceSupabase(TablBackend.client);
   late final RechercheLieuService _rechercheLieuService =
@@ -177,6 +182,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                         tableService: _tableService,
                         abonnementService: widget.abonnementService,
                         souvenirService: widget.souvenirService,
+                        avisService: _avisService,
                       )
                     : const SizedBox.shrink(),
                 EcranProfil(
