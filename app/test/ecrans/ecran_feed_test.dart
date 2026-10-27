@@ -127,6 +127,10 @@ class _FauxNotificationService implements NotificationService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  _FauxAbonnementService({this.abonnements = const []});
+
+  final List<ProfilPublic> abonnements;
+
   @override
   Future<CompteursProfil> compteurs(String profilId) =>
       throw UnimplementedError();
@@ -145,7 +149,7 @@ class _FauxAbonnementService implements AbonnementService {
   @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
   abonnesEtAbonnements() async =>
-      (abonnes: <ProfilPublic>[], abonnements: <ProfilPublic>[]);
+      (abonnes: <ProfilPublic>[], abonnements: abonnements);
 
   @override
   Future<Set<String>> mesAbonnesIds() async => {};
@@ -331,6 +335,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(EcranAbonnes), findsOneWidget);
+  });
+
+  testWidgets('bouton d\'ajout en haut du Feed : toucher quelqu\'un ouvre '
+      'son profil', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(),
+          abonnementService: _FauxAbonnementService(
+            abonnements: const [
+              ProfilPublic(
+                id: 'martin-id',
+                pseudo: 'martin',
+                statut: StatutAbonnement.abonne,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.person_add_alt_1_outlined));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abonnements · 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('martin'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranProfilAutre), findsOneWidget);
   });
 
   testWidgets('feed rempli : affiche le contenu de chaque souvenir', (

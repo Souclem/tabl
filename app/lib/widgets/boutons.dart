@@ -183,3 +183,54 @@ class TablBoutonTexte extends StatelessWidget {
     );
   }
 }
+
+/// Petit bouton de ligne (« Suivre », « Accepter », « Refuser ») : plein
+/// et doré pour l'action attendue, sinon contour discret. Assez petit
+/// pour tenir à droite d'une ligne de liste. `onPresse: null` le grise.
+class TablPetitBouton extends StatelessWidget {
+  const TablPetitBouton({
+    super.key,
+    required this.libelle,
+    required this.onPresse,
+    this.plein = false,
+  });
+
+  final String libelle;
+  final VoidCallback? onPresse;
+  final bool plein;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: onPresse != null,
+      label: libelle,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onPresse,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: onPresse == null ? 0.5 : 1,
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: plein ? TablTokens.primaire : Colors.transparent,
+              borderRadius: BorderRadius.circular(TablTokens.arrondiS + 2),
+              border: plein ? null : Border.all(color: TablTokens.bordure),
+            ),
+            child: Text(
+              libelle,
+              style: TablTokens.legende.copyWith(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: plein ? TablTokens.texteSurPrimaire : TablTokens.texte,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

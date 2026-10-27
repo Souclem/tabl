@@ -8,15 +8,15 @@ import 'ecran_profil_autre.dart';
 
 /// Écran "Abonnés" : répondre aux demandes reçues, voir ses abonnés et
 /// ses abonnements (suivi asymétrique type Instagram), et trouver des
-/// personnes par pseudo — la recherche remplace les deux listes tant
-/// qu'elle n'est pas vide.
+/// personnes par pseudo — la recherche remplace les listes tant qu'elle
+/// n'est pas vide. Toucher une personne ouvre son profil.
 ///
 /// Pas encore de suggestions ni d'invitation par lien.
 class EcranAbonnes extends StatefulWidget {
   const EcranAbonnes({
     super.key,
     required this.abonnementService,
-    this.souvenirService,
+    required this.souvenirService,
     this.ongletAbonnes = true,
   });
 
@@ -25,9 +25,8 @@ class EcranAbonnes extends StatefulWidget {
 
   final AbonnementService abonnementService;
 
-  /// Pour ouvrir le profil d'une personne de la liste ; `null` : les noms
-  /// ne sont pas touchables.
-  final SouvenirService? souvenirService;
+  /// Pour ouvrir le profil d'une personne de la liste.
+  final SouvenirService souvenirService;
 
   @override
   State<EcranAbonnes> createState() => _EcranAbonnesState();
@@ -42,6 +41,14 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   List<ProfilPublic> _abonnements = [];
   late bool _ongletAbonnes = widget.ongletAbonnes;
   bool _chargementDemandes = true;
+
+  /// Les listes ont été chargées au moins une fois : les rechargements
+  /// suivants (après chaque geste) se font sans sablier.
+  bool _charge = false;
+
+  /// Une recherche part ou attend sa réponse : pas encore de « personne
+  /// de ce nom ».
+  bool _rechercheEnCours = false;
   final Set<String> _idsEnCours = {};
   Timer? _debounceRecherche;
 
@@ -62,8 +69,9 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   /// chaque caractère tapé déclenche un aller-retour réseau séparé.
   void _rechercherAvecDebounce(String requete) {
     // Bascule tout de suite entre listes et résultats de recherche.
-    setState(() {});
+    setState(() => _rechercheEnCours = requete.trim().isNotEmpty);
     _debounceRecherche?.cancel();
+    if (requete.trim().isEmpty) return;
     _debounceRecherche = Timer(
       const Duration(milliseconds: 350),
       () => _rechercher(requete),
@@ -85,6 +93,7 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
         _demandes = resultats[0] as List<DemandeAbonnement>;
         _abonnes = listes.abonnes;
         _abonnements = listes.abonnements;
+        _charge = true;
       });
     } catch (_) {
       if (!mounted) return;
@@ -98,9 +107,13 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
     try {
       final resultats = await widget.abonnementService.rechercher(requete);
       if (!mounted || _recherche.text != requete) return;
-      setState(() => _resultats = resultats);
+      setState(() {
+        _resultats = resultats;
+        _rechercheEnCours = false;
+      });
     } catch (_) {
       if (!mounted) return;
+      setState(() => _rechercheEnCours = false);
       afficherMessage(context, messageErreurGenerique);
     }
   }
@@ -108,15 +121,13 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   /// Le profil d'une personne ; au retour, les listes sont rechargées
   /// (un abonnement a pu changer depuis son profil).
   Future<void> _ouvrirProfil(String id, String pseudo) async {
-    final souvenirs = widget.souvenirService;
-    if (souvenirs == null) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => EcranProfilAutre(
           profilId: id,
           pseudo: pseudo,
           abonnementService: widget.abonnementService,
-          souvenirService: souvenirs,
+          souvenirService: widget.souvenirService,
         ),
       ),
     );
@@ -181,143 +192,57 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
 
   @override
   Widget build(BuildContext context) {
+    final enRecherche = _recherche.text.trim().isNotEmpty;
     return Scaffold(
       backgroundColor: TablTokens.fond,
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                TablTokens.espaceL,
                 TablTokens.espaceM,
-                TablTokens.espaceL,
+                TablTokens.espaceS,
+                TablTokens.espaceM,
                 0,
               ),
               child: Row(
                 children: [
                   TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
-                  const SizedBox(width: TablTokens.espaceM),
-                  Text('Abonnés', style: TablTokens.titre),
+                  const SizedBox(width: TablTokens.espaceS),
+                  Text(
+                    'Abonnés',
+                    style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(TablTokens.espaceL),
-              child: TablChampTexte(
-                libelle: 'Trouver des personnes',
+              padding: const EdgeInsets.fromLTRB(
+                TablTokens.espaceL - 4,
+                TablTokens.espaceM,
+                TablTokens.espaceL - 4,
+                TablTokens.espaceS,
+              ),
+              child: TablBarreRecherche(
                 controleur: _recherche,
-                indication: 'Un pseudo',
-                iconePrefixe: Icons.search_rounded,
+                indication: 'Trouver des personnes',
                 onChanged: _rechercherAvecDebounce,
               ),
             ),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.only(
+                  bottom:
+                      MediaQuery.paddingOf(context).bottom +
+                      TablTokens.espaceXl,
                 ),
-                children: [
-                  if (_chargementDemandes)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: TablTokens.espaceM,
-                      ),
-                      child: Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: TablTokens.primaire,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_demandes.isNotEmpty) ...[
-                    Text('Demandes', style: TablTokens.sousTitre),
-                    const SizedBox(height: TablTokens.espaceS),
-                    for (final demande in _demandes)
-                      _LigneDemande(
-                        demande: demande,
-                        enCours: _idsEnCours.contains(demande.suiveurId),
-                        onAccepter: () => _accepter(demande),
-                        onOuvrir: () =>
-                            _ouvrirProfil(demande.suiveurId, demande.pseudo),
-                        onRefuser: () => _refuser(demande),
-                      ),
-                    const SizedBox(height: TablTokens.espaceL),
-                  ],
-                  if (_recherche.text.trim().isNotEmpty)
-                    for (final profil in _resultats)
-                      _LigneProfil(
-                        profil: profil,
-                        enCours: _idsEnCours.contains(profil.id),
-                        onSuivre: () => _suivre(profil),
-                        onArreterDeSuivre: () => _arreterDeSuivre(profil),
-                        onOuvrir: () => _ouvrirProfil(profil.id, profil.pseudo),
-                      )
-                  else ...[
-                    SegmentedButton<bool>(
-                      segments: [
-                        ButtonSegment(
-                          value: true,
-                          label: Text('Abonnés · ${_abonnes.length}'),
-                        ),
-                        ButtonSegment(
-                          value: false,
-                          label: Text('Abonnements · ${_abonnements.length}'),
-                        ),
-                      ],
-                      selected: {_ongletAbonnes},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (s) =>
-                          setState(() => _ongletAbonnes = s.first),
-                      style: SegmentedButton.styleFrom(
-                        backgroundColor: TablTokens.surface,
-                        selectedBackgroundColor: TablTokens.primaire,
-                        foregroundColor: TablTokens.texte,
-                        selectedForegroundColor: TablTokens.texteSurPrimaire,
-                      ),
-                    ),
-                    const SizedBox(height: TablTokens.espaceS),
-                    if (_ongletAbonnes)
-                      for (final profil in _abonnes)
-                        _LigneAbonne(
-                          profil: profil,
-                          enCours: _idsEnCours.contains(profil.id),
-                          onSuivreEnRetour: () => _suivre(profil),
-                          onRetirer: () => _retirerAbonne(profil),
-                          onOuvrir: () =>
-                              _ouvrirProfil(profil.id, profil.pseudo),
-                        )
-                    else
-                      for (final profil in _abonnements)
-                        _LigneProfil(
-                          profil: profil,
-                          enCours: _idsEnCours.contains(profil.id),
-                          onSuivre: () => _suivre(profil),
-                          onArreterDeSuivre: () => _arreterDeSuivre(profil),
-                          onOuvrir: () =>
-                              _ouvrirProfil(profil.id, profil.pseudo),
-                        ),
-                    if (!_chargementDemandes &&
-                        (_ongletAbonnes ? _abonnes : _abonnements).isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: TablTokens.espaceL,
-                        ),
-                        child: Text(
-                          _ongletAbonnes
-                              ? 'Personne ne vous suit encore.'
-                              : 'Vous ne suivez personne pour le moment.',
-                          textAlign: TextAlign.center,
-                          style: TablTokens.legende,
-                        ),
-                      ),
-                  ],
-                  const SizedBox(height: TablTokens.espaceL),
-                ],
+                children: enRecherche
+                    ? _resultatsRecherche()
+                    : _demandesEtRelations(),
               ),
             ),
           ],
@@ -325,207 +250,293 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
       ),
     );
   }
-}
 
-class _LigneDemande extends StatelessWidget {
-  const _LigneDemande({
-    required this.demande,
-    required this.enCours,
-    required this.onOuvrir,
-    required this.onAccepter,
-    required this.onRefuser,
-  });
-
-  final DemandeAbonnement demande;
-  final bool enCours;
-
-  /// Tap sur le nom : ouvre le profil.
-  final VoidCallback onOuvrir;
-  final VoidCallback onAccepter;
-  final VoidCallback onRefuser;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Nom(
-              pseudo: demande.pseudo,
-              photoUrl: demande.photoUrl,
-              onPresse: onOuvrir,
-            ),
+  List<Widget> _resultatsRecherche() {
+    if (_resultats.isEmpty) {
+      return [
+        if (_rechercheEnCours)
+          const _Sablier()
+        else
+          const _Vide(
+            icone: Icons.search_off_rounded,
+            texte: 'Personne de ce nom.',
+            detail: 'Vérifiez l\'orthographe du pseudo.',
           ),
-          TextButton(
-            onPressed: enCours ? null : onRefuser,
-            child: const Text('Refuser'),
-          ),
-          const SizedBox(width: TablTokens.espaceXs),
-          FilledButton(
-            onPressed: enCours ? null : onAccepter,
-            style: FilledButton.styleFrom(
-              backgroundColor: TablTokens.primaire,
-              foregroundColor: TablTokens.texteSurPrimaire,
-            ),
-            child: const Text('Accepter'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Un abonné : "Suivre en retour" si je ne le suis pas encore, et
-/// "Retirer" pour qu'il ne me suive plus.
-class _LigneAbonne extends StatelessWidget {
-  const _LigneAbonne({
-    required this.profil,
-    required this.enCours,
-    required this.onOuvrir,
-    required this.onSuivreEnRetour,
-    required this.onRetirer,
-  });
-
-  final ProfilPublic profil;
-  final bool enCours;
-
-  /// Tap sur le nom : ouvre le profil.
-  final VoidCallback onOuvrir;
-  final VoidCallback onSuivreEnRetour;
-  final VoidCallback onRetirer;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Nom(
-              pseudo: profil.pseudo,
-              photoUrl: profil.photoUrl,
-              onPresse: onOuvrir,
-            ),
-          ),
-          TextButton(
-            onPressed: enCours ? null : onRetirer,
-            child: const Text('Retirer'),
-          ),
-          if (profil.statut == StatutAbonnement.aucun) ...[
-            const SizedBox(width: TablTokens.espaceXs),
-            FilledButton(
-              onPressed: enCours ? null : onSuivreEnRetour,
-              style: FilledButton.styleFrom(
-                backgroundColor: TablTokens.primaire,
-                foregroundColor: TablTokens.texteSurPrimaire,
-              ),
-              child: const Text('Suivre en retour'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _LigneProfil extends StatelessWidget {
-  const _LigneProfil({
-    required this.profil,
-    required this.enCours,
-    required this.onOuvrir,
-    required this.onSuivre,
-    required this.onArreterDeSuivre,
-  });
-
-  final ProfilPublic profil;
-  final bool enCours;
-
-  /// Tap sur le nom : ouvre le profil.
-  final VoidCallback onOuvrir;
-  final VoidCallback onSuivre;
-  final VoidCallback onArreterDeSuivre;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
-      child: Row(
-        children: [
-          Expanded(
-            child: _Nom(
-              pseudo: profil.pseudo,
-              photoUrl: profil.photoUrl,
-              onPresse: onOuvrir,
-            ),
-          ),
-          _bouton(),
-        ],
-      ),
-    );
-  }
-
-  Widget _bouton() {
-    switch (profil.statut) {
-      case StatutAbonnement.aucun:
-        return FilledButton(
-          onPressed: enCours ? null : onSuivre,
-          style: FilledButton.styleFrom(
-            backgroundColor: TablTokens.primaire,
-            foregroundColor: TablTokens.texteSurPrimaire,
-          ),
-          child: Text(profil.meSuit ? 'Suivre en retour' : 'Suivre'),
-        );
-      case StatutAbonnement.demandeEnvoyee:
-        return OutlinedButton(
-          onPressed: enCours ? null : onArreterDeSuivre,
-          child: const Text('Demande envoyée'),
-        );
-      case StatutAbonnement.abonne:
-        return OutlinedButton(
-          onPressed: enCours ? null : onArreterDeSuivre,
-          child: const Text('Abonné'),
-        );
-      case StatutAbonnement.demandeRecue:
-        return const Text(
-          'Vous a demandé',
-          style: TablTokens.legende,
-        );
+      ];
     }
+    return [
+      for (final profil in _resultats)
+        TablLignePersonne(
+          pseudo: profil.pseudo,
+          photoUrl: profil.photoUrl,
+          precision: _precision(profil),
+          onPresse: () => _ouvrirProfil(profil.id, profil.pseudo),
+          actions: [?_boutonSuivi(profil)],
+        ),
+    ];
   }
-}
 
-/// Le nom d'une personne dans une liste, touchable pour ouvrir son
-/// profil.
-class _Nom extends StatelessWidget {
-  const _Nom({required this.pseudo, required this.onPresse, this.photoUrl});
-
-  final String pseudo;
-  final String? photoUrl;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPresse,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXs),
-        child: Row(
-          children: [
-            // Sa tête d'abord : on reconnaît quelqu'un avant de lire son
-            // pseudo.
-            TablAvatar(pseudo: pseudo, photoUrl: photoUrl, rayon: 22),
-            const SizedBox(width: TablTokens.espaceM),
-            Flexible(
-              child: Text(
-                pseudo,
-                overflow: TextOverflow.ellipsis,
-                style: TablTokens.corps.copyWith(fontWeight: FontWeight.w500),
+  List<Widget> _demandesEtRelations() {
+    if (!_charge) {
+      return [if (_chargementDemandes) const _Sablier()];
+    }
+    final liste = _ongletAbonnes ? _abonnes : _abonnements;
+    return [
+      if (_demandes.isNotEmpty) ...[
+        _Section(
+          titre: _demandes.length == 1
+              ? 'Demande'
+              : 'Demandes · ${_demandes.length}',
+        ),
+        for (final demande in _demandes)
+          TablLignePersonne(
+            pseudo: demande.pseudo,
+            photoUrl: demande.photoUrl,
+            precision: 'Veut vous suivre',
+            onPresse: () => _ouvrirProfil(demande.suiveurId, demande.pseudo),
+            actions: [
+              TablPetitBouton(
+                libelle: 'Accepter',
+                plein: true,
+                onPresse: _idsEnCours.contains(demande.suiveurId)
+                    ? null
+                    : () => _accepter(demande),
               ),
+              TablPetitBouton(
+                libelle: 'Refuser',
+                onPresse: _idsEnCours.contains(demande.suiveurId)
+                    ? null
+                    : () => _refuser(demande),
+              ),
+            ],
+          ),
+        const SizedBox(height: TablTokens.espaceM),
+      ],
+      TablOngletsTexte(
+        libelles: [
+          'Abonnés · ${_abonnes.length}',
+          'Abonnements · ${_abonnements.length}',
+        ],
+        index: _ongletAbonnes ? 0 : 1,
+        onChoisir: (i) => setState(() => _ongletAbonnes = i == 0),
+      ),
+      const SizedBox(height: TablTokens.espaceS),
+      if (liste.isEmpty)
+        _ongletAbonnes
+            ? const _Vide(
+                icone: Icons.people_outline_rounded,
+                texte: 'Personne ne vous suit encore.',
+                detail:
+                    'Ceux qui vous suivent apparaîtront ici, avec de quoi '
+                    'les suivre en retour.',
+              )
+            : const _Vide(
+                icone: Icons.person_search_rounded,
+                texte: 'Vous ne suivez personne.',
+                detail:
+                    'Cherchez un pseudo ci-dessus pour retrouver vos '
+                    'proches.',
+              )
+      else if (_ongletAbonnes)
+        for (final profil in liste)
+          TablLignePersonne(
+            pseudo: profil.pseudo,
+            photoUrl: profil.photoUrl,
+            precision: _precisionAbonne(profil),
+            onPresse: () => _ouvrirProfil(profil.id, profil.pseudo),
+            actions: [
+              if (profil.statut == StatutAbonnement.aucun)
+                TablPetitBouton(
+                  libelle: 'Suivre en retour',
+                  plein: true,
+                  onPresse: _idsEnCours.contains(profil.id)
+                      ? null
+                      : () => _suivre(profil),
+                ),
+              IconButton(
+                tooltip: 'Options',
+                visualDensity: VisualDensity.compact,
+                onPressed: _idsEnCours.contains(profil.id)
+                    ? null
+                    : () => _optionsAbonne(profil),
+                icon: const Icon(
+                  Icons.more_horiz_rounded,
+                  size: 20,
+                  color: TablTokens.texteDoux,
+                ),
+              ),
+            ],
+          )
+      else
+        for (final profil in liste)
+          TablLignePersonne(
+            pseudo: profil.pseudo,
+            photoUrl: profil.photoUrl,
+            precision: _precision(profil),
+            onPresse: () => _ouvrirProfil(profil.id, profil.pseudo),
+            actions: [?_boutonSuivi(profil)],
+          ),
+    ];
+  }
+
+  /// « Retirer » derrière « ⋯ » : un geste rare, qu'on ne fait pas par
+  /// mégarde en parcourant la liste.
+  void _optionsAbonne(ProfilPublic profil) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      showDragHandle: true,
+      builder: (contexteFeuille) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.person_remove_outlined,
+                color: TablTokens.erreur,
+              ),
+              title: const Text(
+                'Retirer de mes abonnés',
+                style: TextStyle(color: TablTokens.erreur),
+              ),
+              subtitle: Text(
+                '${profil.pseudo} ne verra plus vos moments réservés à '
+                'vos abonnés. Aucune notification ne lui est envoyée.',
+                style: TablTokens.legende,
+              ),
+              onTap: () {
+                Navigator.of(contexteFeuille).pop();
+                _retirerAbonne(profil);
+              },
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Ce que la personne fait de son côté, en plus discret sous son nom.
+  String? _precision(ProfilPublic profil) {
+    if (profil.statut == StatutAbonnement.demandeRecue) {
+      return 'Veut vous suivre';
+    }
+    return profil.meSuit ? 'Vous suit' : null;
+  }
+
+  /// Un abonné : il me suit déjà, par définition ; ce qui compte, c'est
+  /// où j'en suis avec lui.
+  String? _precisionAbonne(ProfilPublic profil) => switch (profil.statut) {
+    StatutAbonnement.abonne => 'Vous vous suivez',
+    StatutAbonnement.demandeEnvoyee => 'Demande envoyée',
+    _ => null,
+  };
+
+  /// Suivre, ou où en est mon suivi ; rien si c'est elle qui m'a fait une
+  /// demande (elle est dans « Demandes »).
+  Widget? _boutonSuivi(ProfilPublic profil) {
+    final enCours = _idsEnCours.contains(profil.id);
+    return switch (profil.statut) {
+      StatutAbonnement.aucun => TablPetitBouton(
+        libelle: profil.meSuit ? 'Suivre en retour' : 'Suivre',
+        plein: true,
+        onPresse: enCours ? null : () => _suivre(profil),
+      ),
+      StatutAbonnement.demandeEnvoyee => TablPetitBouton(
+        libelle: 'Demande envoyée',
+        onPresse: enCours ? null : () => _arreterDeSuivre(profil),
+      ),
+      StatutAbonnement.abonne => TablPetitBouton(
+        libelle: 'Abonné',
+        onPresse: enCours ? null : () => _arreterDeSuivre(profil),
+      ),
+      StatutAbonnement.demandeRecue => null,
+    };
+  }
+}
+
+/// Titre de section, en petites capitales comme dans les notifications.
+class _Section extends StatelessWidget {
+  const _Section({required this.titre});
+
+  final String titre;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceL - 4,
+        TablTokens.espaceM,
+        TablTokens.espaceL - 4,
+        TablTokens.espaceXs,
+      ),
+      child: Text(
+        titre.toUpperCase(),
+        style: TablTokens.legende.copyWith(
+          fontSize: 11,
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.w700,
+          color: TablTokens.texte.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+}
+
+class _Sablier extends StatelessWidget {
+  const _Sablier();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(TablTokens.espaceXl),
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: TablTokens.primaire,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Vide extends StatelessWidget {
+  const _Vide({required this.icone, required this.texte, this.detail});
+
+  final IconData icone;
+  final String texte;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceXl,
+        TablTokens.espaceXl,
+        TablTokens.espaceXl,
+        0,
+      ),
+      child: Column(
+        children: [
+          Icon(icone, size: 34, color: TablTokens.texteDoux),
+          const SizedBox(height: TablTokens.espaceM),
+          Text(
+            texte,
+            textAlign: TextAlign.center,
+            style: TablTokens.titreAffichage.copyWith(fontSize: 20),
+          ),
+          if (detail != null) ...[
+            const SizedBox(height: TablTokens.espaceS),
+            Text(
+              detail!,
+              textAlign: TextAlign.center,
+              style: TablTokens.legende.copyWith(fontSize: 14),
+            ),
+          ],
+        ],
       ),
     );
   }

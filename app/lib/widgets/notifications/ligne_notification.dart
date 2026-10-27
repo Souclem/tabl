@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../boutons.dart';
 import '../bulles_personnes.dart';
 
 /// Une notification : la tête de qui l'a faite (deux têtes pour
@@ -128,14 +129,14 @@ class TablLigneNotification extends StatelessWidget {
             ],
             if (onAccepter != null) ...[
               const SizedBox(width: 10),
-              _Bouton(
+              TablPetitBouton(
                 libelle: libelleAccepter,
                 plein: true,
-                onPresse: onAccepter!,
+                onPresse: onAccepter,
               ),
               if (onRefuser != null) ...[
                 const SizedBox(width: 6),
-                _Bouton(libelle: 'Refuser', onPresse: onRefuser!),
+                TablPetitBouton(libelle: 'Refuser', onPresse: onRefuser),
               ],
             ] else if (vignetteUrl != null) ...[
               const SizedBox(width: 10),
@@ -152,48 +153,6 @@ class TablLigneNotification extends StatelessWidget {
               ),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Bouton extends StatelessWidget {
-  const _Bouton({
-    required this.libelle,
-    required this.onPresse,
-    this.plein = false,
-  });
-
-  final String libelle;
-  final VoidCallback onPresse;
-  final bool plein;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: libelle,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onPresse,
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: plein ? TablTokens.primaire : Colors.transparent,
-            borderRadius: BorderRadius.circular(TablTokens.arrondiS + 2),
-            border: plein ? null : Border.all(color: TablTokens.bordure),
-          ),
-          child: Text(
-            libelle,
-            style: TablTokens.legende.copyWith(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: plein ? TablTokens.texteSurPrimaire : TablTokens.texte,
-            ),
-          ),
         ),
       ),
     );

@@ -290,8 +290,10 @@ class _EcranFeedState extends State<EcranFeed>
   void _allerVersAbonnes() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            EcranAbonnes(abonnementService: widget.abonnementService),
+        builder: (_) => EcranAbonnes(
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+        ),
       ),
     );
   }

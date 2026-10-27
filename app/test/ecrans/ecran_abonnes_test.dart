@@ -82,8 +82,11 @@ class _FauxAbonnementService implements AbonnementService {
     _demandes = _demandes.where((d) => d.suiveurId != suiveurId).toList();
   }
 
+  final List<String> retraitsAppeles = [];
+
   @override
   Future<void> refuserDemande(String suiveurId) async {
+    retraitsAppeles.add(suiveurId);
     _demandes = _demandes.where((d) => d.suiveurId != suiveurId).toList();
   }
 
@@ -124,6 +127,83 @@ void main() {
     expect(find.text('Ce profil est privé'), findsOneWidget);
   });
 
+  testWidgets('toute la ligne ouvre le profil, pas seulement le nom', (
+    tester,
+  ) async {
+    final service = _FauxAbonnementService()
+      ..abonnes = const [
+        ProfilPublic(
+          id: 'a',
+          pseudo: 'emma',
+          statut: StatutAbonnement.abonne,
+          meSuit: true,
+        ),
+      ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Vous vous suivez'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EcranProfilAutre), findsOneWidget);
+  });
+
+  testWidgets('« ⋯ » → « Retirer de mes abonnés »', (tester) async {
+    final service = _FauxAbonnementService()
+      ..abonnes = const [
+        ProfilPublic(id: 'a', pseudo: 'emma', statut: StatutAbonnement.aucun),
+      ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Retirer de mes abonnés'));
+    await tester.pumpAndSettle();
+
+    expect(service.retraitsAppeles, ['a']);
+  });
+
+  testWidgets('recherche sans résultat : « Personne de ce nom. »', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: _FauxAbonnementService(),
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'zzz');
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personne de ce nom.'), findsOneWidget);
+
+    // La croix efface et ramène les listes.
+    await tester.tap(find.byTooltip('Effacer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Personne de ce nom.'), findsNothing);
+    expect(find.text('Abonnés · 0'), findsOneWidget);
+  });
+
   testWidgets('affiche les demandes reçues avec Accepter/Refuser', (
     tester,
   ) async {
@@ -132,12 +212,18 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Demandes'), findsOneWidget);
+    expect(find.text('DEMANDE'), findsOneWidget);
     expect(find.text('martin'), findsOneWidget);
+    expect(find.text('Veut vous suivre'), findsOneWidget);
     expect(find.text('Accepter'), findsOneWidget);
     expect(find.text('Refuser'), findsOneWidget);
   });
@@ -148,7 +234,12 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -156,7 +247,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('martin'), findsNothing);
-    expect(find.text('Demandes'), findsNothing);
+    expect(find.text('DEMANDE'), findsNothing);
   });
 
   testWidgets('refuser une demande la retire de la liste', (tester) async {
@@ -165,7 +256,12 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -206,7 +302,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranAbonnes(abonnementService: service)),
+        MaterialApp(
+          home: EcranAbonnes(
+            abonnementService: service,
+            souvenirService: _FauxSouvenirService(),
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -241,7 +342,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranAbonnes(abonnementService: service)),
+        MaterialApp(
+          home: EcranAbonnes(
+            abonnementService: service,
+            souvenirService: _FauxSouvenirService(),
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -275,7 +381,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: EcranAbonnes(abonnementService: service)),
+        MaterialApp(
+          home: EcranAbonnes(
+            abonnementService: service,
+            souvenirService: _FauxSouvenirService(),
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -300,7 +411,12 @@ void main() {
     final service = _FauxAbonnementService(erreurRecherche: true);
 
     await tester.pumpWidget(
-      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -326,7 +442,12 @@ void main() {
         ProfilPublic(id: 'c', pseudo: 'thomas', statut: StatutAbonnement.abonne),
       ];
     await tester.pumpWidget(
-      MaterialApp(home: EcranAbonnes(abonnementService: service)),
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
