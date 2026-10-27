@@ -9,33 +9,38 @@ import sys
 import tempfile
 
 
-def executer_fichier(chemin_sql: str) -> str:
+def executer_fichier(chemin_sql: str, en_json: bool = False) -> str:
     """Exécute un fichier SQL sur la base liée ; arrête le script en cas
-    d'échec, avec le message de la base."""
-    resultat = subprocess.run(
-        ["supabase", "db", "query", "--linked", "-f", chemin_sql],
-        capture_output=True,
-        text=True,
-    )
+    d'échec, avec le message de la base. [en_json] : la réponse en JSON
+    — sinon la CLI choisit, un tableau quand c'est une personne qui la
+    lance."""
+    commande = ["supabase", "db", "query", "--linked", "-f", chemin_sql]
+    if en_json:
+        commande += ["--output-format", "json"]
+    resultat = subprocess.run(commande, capture_output=True, text=True)
     if resultat.returncode != 0:
         sys.exit(f"Échec sur {chemin_sql} :\n{resultat.stderr or resultat.stdout}")
     return resultat.stdout
 
 
-def executer(sql: str) -> str:
+def executer(sql: str, en_json: bool = False) -> str:
     with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False) as fichier:
         fichier.write(sql)
         chemin = fichier.name
     try:
-        return executer_fichier(chemin)
+        return executer_fichier(chemin, en_json=en_json)
     finally:
         os.unlink(chemin)
 
 
 def lignes(sql: str) -> list[dict]:
-    """Exécute une requête de lecture et renvoie ses lignes."""
-    sortie = executer(sql)
-    return json.loads(sortie[sortie.index("{"):sortie.rindex("}") + 1])["rows"]
+    """Exécute une requête de lecture et renvoie ses lignes. La CLI les
+    donne en liste (lancée par une personne) ou dans `{"rows": …}`
+    (lancée par un agent) : les deux sont lus."""
+    sortie = executer(sql, en_json=True)
+    debut = min(i for i in (sortie.find("["), sortie.find("{")) if i >= 0)
+    donnees, _ = json.JSONDecoder().raw_decode(sortie[debut:])
+    return donnees["rows"] if isinstance(donnees, dict) else donnees
 
 
 def texte(valeur) -> str:
