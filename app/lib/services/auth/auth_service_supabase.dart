@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../config_oauth.dart';
+import '../notifications/notifications_systeme.dart';
 import '../social/photo_profil.dart';
 import 'auth_service.dart';
 import 'utilisateur.dart';
@@ -197,7 +198,11 @@ class AuthServiceSupabase implements AuthService {
   }
 
   @override
-  Future<void> deconnexion() => _client.auth.signOut();
+  Future<void> deconnexion() async {
+    // Tant qu'on est encore connecté : la ligne de l'appareil est à moi.
+    await oublierCetAppareil(_client);
+    await _client.auth.signOut();
+  }
 
   /// Chaîne aléatoire servant de nonce brut pour Sign in with Apple (sa
   /// version hachée en SHA-256 est envoyée à Apple ; la version brute, à

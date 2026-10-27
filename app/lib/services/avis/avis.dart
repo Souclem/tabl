@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../notifications/notifications_systeme.dart';
+
 /// La réponse d'un proche à « Tu me conseilles d'y aller ? », en un
 /// toucher.
 enum ReponseAvis {
@@ -52,15 +54,22 @@ class AvisServiceSupabase implements AvisService {
     required String message,
   }) async {
     if (destinataireIds.isEmpty) return;
-    await _client.from('demandes_avis').insert([
-      for (final id in destinataireIds.toSet())
-        {
-          'demandeur_id': _monId,
-          'destinataire_id': id,
-          'restaurant_id': restaurantId,
-          'message': message.trim(),
-        },
-    ]);
+    final demandes = await _client
+        .from('demandes_avis')
+        .insert([
+          for (final id in destinataireIds.toSet())
+            {
+              'demandeur_id': _monId,
+              'destinataire_id': id,
+              'restaurant_id': restaurantId,
+              'message': message.trim(),
+            },
+        ])
+        .select('id');
+    prevenir(_client, {
+      'evenement': 'demande_avis',
+      'demandes': [for (final d in demandes) d['id']],
+    });
   }
 
   @override
@@ -78,5 +87,6 @@ class AvisServiceSupabase implements AvisService {
           'repondu_le': DateTime.now().toUtc().toIso8601String(),
         })
         .eq('id', demandeId);
+    prevenir(_client, {'evenement': 'avis_recu', 'demande': demandeId});
   }
 }

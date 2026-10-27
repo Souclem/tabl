@@ -26,6 +26,7 @@ export 'instants/type_media_instant.dart';
 export 'notifications/notification.dart';
 export 'notifications/notification_service.dart';
 export 'notifications/notification_service_supabase.dart';
+export 'notifications/notifications_systeme.dart';
 export 'onboarding/etat_onboarding.dart';
 export 'onboarding/etat_onboarding_preferences.dart';
 export 'position/position_service.dart';

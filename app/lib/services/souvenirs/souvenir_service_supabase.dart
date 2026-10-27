@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../notifications/notifications_systeme.dart';
 import '../restaurants/lieu_restaurant.dart';
 import '../restaurants/envies_restaurants.dart';
 import '../restaurants/registre_restaurants.dart';
@@ -508,6 +509,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           'souvenir_id': souvenirId,
           'profil_id': _monId,
         });
+        prevenir(_client, {'evenement': 'reaction', 'souvenir': souvenirId});
       } on PostgrestException catch (e) {
         // Déjà réagi (double-tap rapide) : pas une vraie erreur, on
         // considère juste que l'état voulu est déjà atteint.
@@ -549,10 +551,18 @@ class SouvenirServiceSupabase implements SouvenirService {
 
   @override
   Future<void> commenter(String souvenirId, String texte) async {
-    await _client.from('commentaires').insert({
-      'souvenir_id': souvenirId,
-      'auteur_id': _monId,
-      'texte': texte.trim(),
+    final commentaire = await _client
+        .from('commentaires')
+        .insert({
+          'souvenir_id': souvenirId,
+          'auteur_id': _monId,
+          'texte': texte.trim(),
+        })
+        .select('id')
+        .single();
+    prevenir(_client, {
+      'evenement': 'commentaire',
+      'commentaire': commentaire['id'],
     });
   }
 

@@ -6,6 +6,7 @@ import 'package:app/widgets/widgets.dart';
 
 import 'ecran_carte.dart';
 import 'ecran_feed.dart';
+import 'ecran_notifications.dart';
 import 'ecran_profil.dart';
 import 'ecran_publier.dart';
 import 'ecran_tables.dart';
@@ -25,6 +26,7 @@ class EcranPrincipal extends StatefulWidget {
     this.instantService,
     this.notificationService,
     this.avisService,
+    this.notificationsSysteme,
     this.rechercheLieuService,
     this.positionService,
   });
@@ -45,6 +47,7 @@ class EcranPrincipal extends StatefulWidget {
   final InstantService? instantService;
   final NotificationService? notificationService;
   final AvisService? avisService;
+  final NotificationsSysteme? notificationsSysteme;
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
 
@@ -96,10 +99,47 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
     return false;
   }
 
+  /// Les notifications du téléphone : autorisées et enregistrées une
+  /// fois connecté ; une notification touchée ouvre la cloche.
+  StreamSubscription<String>? _touchees;
+
+  @override
+  void initState() {
+    super.initState();
+    final systeme = _notificationsSysteme;
+    if (systeme != null) {
+      _touchees = systeme.touchees.listen((_) => _ouvrirNotifications());
+      // Après le premier affichage : la question d'iOS arrive sur l'app,
+      // pas sur un écran blanc.
+      WidgetsBinding.instance.addPostFrameCallback((_) => systeme.activer());
+    }
+  }
+
   @override
   void dispose() {
     _reprise?.cancel();
+    _touchees?.cancel();
     super.dispose();
+  }
+
+  Future<void> _ouvrirNotifications() async {
+    final service = _notificationService;
+    if (service == null || !mounted) return;
+    _selectionnerOnglet(TablOnglet.feed);
+    // Ce qui était ouvert par-dessus se referme : la notification passe
+    // devant.
+    final ici = ModalRoute.of(context);
+    Navigator.of(context).popUntil((route) => ici == null || route == ici);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EcranNotifications(
+          notificationService: service,
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+          avisService: _avisService,
+        ),
+      ),
+    );
   }
 
   // Les onglets Tables et Carte ne sont construits qu'une fois réellement
@@ -125,6 +165,12 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
       widget.notificationService ??
       (TablBackend.estDemarre
           ? NotificationServiceSupabase(TablBackend.client)
+          : null);
+
+  late final NotificationsSysteme? _notificationsSysteme =
+      widget.notificationsSysteme ??
+      (TablBackend.estDemarre
+          ? NotificationsSystemeSupabase(TablBackend.client)
           : null);
 
   late final CarteService _carteService =

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../notifications/notifications_systeme.dart';
 import 'abonnement_service.dart';
 import 'photo_profil.dart';
 import 'profil_public.dart';
@@ -162,6 +163,7 @@ class AbonnementServiceSupabase implements AbonnementService {
       // Quand le suivi a commencé : la notification « vous suit ».
       if (immediat) 'accepte_le': DateTime.now().toUtc().toIso8601String(),
     });
+    prevenir(_client, {'evenement': 'suivi', 'cible': suiviId});
     return immediat
         ? StatutAbonnement.abonne
         : StatutAbonnement.demandeEnvoyee;
@@ -214,6 +216,7 @@ class AbonnementServiceSupabase implements AbonnementService {
         })
         .eq('suiveur_id', suiveurId)
         .eq('suivi_id', _monId);
+    prevenir(_client, {'evenement': 'suivi_accepte', 'cible': suiveurId});
   }
 
   @override
