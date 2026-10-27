@@ -44,6 +44,9 @@ class NotificationsSystemeSupabase implements NotificationsSysteme {
       await _canal.invokeMethod<void>('pret');
     } on PlatformException catch (e) {
       debugPrint('NotificationsSysteme: activer : $e');
+    } on MissingPluginException catch (e) {
+      // Une app construite avant le canal natif : pas de notifications.
+      debugPrint('NotificationsSysteme: activer : $e');
     }
   }
 
@@ -97,6 +100,9 @@ void prevenir(SupabaseClient client, Map<String, Object?> evenement) {
   unawaited(
     client.functions
         .invoke('notifier', body: evenement)
-        .then<void>((_) {}, onError: (Object e) => debugPrint('notifier : $e')),
+        .then<void>(
+          (reponse) => debugPrint('notifier : ${reponse.data}'),
+          onError: (Object e) => debugPrint('notifier : $e'),
+        ),
   );
 }
