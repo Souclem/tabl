@@ -47,6 +47,15 @@
 	<string>Tabl utilise votre position pour proposer les restaurants autour de vous et centrer la carte.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Tabl a besoin de l'appareil photo pour capturer le moment d'un souvenir.</string>
+	<!-- Jamais demandées par Tabl, qui n'utilise la position qu'app
+	     ouverte : la carte et la localisation y font référence, et Apple
+	     exige alors une phrase pour chacune. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Tabl utilise votre position pour proposer les restaurants autour de vous et centrer la carte.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Tabl utilise votre position pour proposer les restaurants autour de vous et centrer la carte.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tabl utilise le micro pour le son des vidéos que vous filmez.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Tabl a besoin d'accéder à tes photos pour choisir celle d'un souvenir.</string>
 	<key>UIApplicationSceneManifest</key>
