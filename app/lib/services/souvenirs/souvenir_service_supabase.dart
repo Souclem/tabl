@@ -546,18 +546,29 @@ class SouvenirServiceSupabase implements SouvenirService {
 
   @override
   Future<List<Commentaire>> commentaires(String souvenirId) async {
+    // Les profils par le lien de l'auteur : par les j'aime, un
+    // commentaire en a d'autres.
     final lignes = await _client
         .from('commentaires')
-        .select('id, texte, cree_le, auteur_id, profils(pseudo, photo_url)')
+        .select(
+          'id, texte, cree_le, auteur_id, parent_id, '
+          'profils!commentaires_auteur_id_fkey(pseudo, photo_url), '
+          'commentaires_reactions(profil_id)',
+        )
         .eq('souvenir_id', souvenirId)
         .order('cree_le');
 
     return lignes.map((l) {
       final auteur = l['profils'] as Map<String, dynamic>?;
+      final jaime = [
+        for (final r in (l['commentaires_reactions'] as List?) ?? const [])
+          r['profil_id'] as String,
+      ];
       return Commentaire(
         id: l['id'] as String,
         texte: l['texte'] as String,
         creeLe: DateTime.parse(l['cree_le'] as String),
+        auteurId: l['auteur_id'] as String?,
         auteurPseudo: auteur?['pseudo'] as String? ?? '',
         auteurPhotoUrl: urlPhotoProfil(
           _client,
@@ -565,18 +576,26 @@ class SouvenirServiceSupabase implements SouvenirService {
           miniature: true,
         ),
         estLeMien: l['auteur_id'] == _monId,
+        parentId: l['parent_id'] as String?,
+        nombreJaime: jaime.length,
+        jaiAime: jaime.contains(_monId),
       );
     }).toList();
   }
 
   @override
-  Future<void> commenter(String souvenirId, String texte) async {
+  Future<void> commenter(
+    String souvenirId,
+    String texte, {
+    String? parentId,
+  }) async {
     final commentaire = await _client
         .from('commentaires')
         .insert({
           'souvenir_id': souvenirId,
           'auteur_id': _monId,
           'texte': texte.trim(),
+          'parent_id': ?parentId,
         })
         .select('id')
         .single();
@@ -584,6 +603,34 @@ class SouvenirServiceSupabase implements SouvenirService {
       'evenement': 'commentaire',
       'commentaire': commentaire['id'],
     });
+  }
+
+  @override
+  Future<void> basculerJaimeCommentaire(
+    String commentaireId, {
+    required bool aimer,
+  }) async {
+    if (!aimer) {
+      await _client
+          .from('commentaires_reactions')
+          .delete()
+          .eq('commentaire_id', commentaireId)
+          .eq('profil_id', _monId);
+      return;
+    }
+    try {
+      await _client.from('commentaires_reactions').insert({
+        'commentaire_id': commentaireId,
+        'profil_id': _monId,
+      });
+      prevenir(_client, {
+        'evenement': 'reaction_commentaire',
+        'commentaire': commentaireId,
+      });
+    } on PostgrestException catch (e) {
+      // Déjà aimé (double tap rapide) : l'état voulu est atteint.
+      if (e.code != '23505') rethrow;
+    }
   }
 
   @override

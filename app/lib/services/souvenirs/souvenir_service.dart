@@ -117,11 +117,21 @@ abstract interface class SouvenirService {
   /// Ajoute sa réaction ("j'aime") si [reagir] est vrai, la retire sinon.
   Future<void> basculerReaction(String souvenirId, {required bool reagir});
 
-  /// Les commentaires d'un souvenir, du plus ancien au plus récent.
+  /// Les commentaires d'un souvenir et leurs réponses, du plus ancien au
+  /// plus récent — [filsDeCommentaires] les range en fils.
   Future<List<Commentaire>> commentaires(String souvenirId);
 
-  /// Publie un commentaire.
-  Future<void> commenter(String souvenirId, String texte);
+  /// Publie un commentaire ; avec [parentId], une réponse à ce
+  /// commentaire-là, qui doit répondre au moment lui-même (un seul
+  /// niveau : voir [Commentaire.filId]).
+  Future<void> commenter(String souvenirId, String texte, {String? parentId});
+
+  /// Ajoute son j'aime à un commentaire si [aimer] est vrai, le retire
+  /// sinon.
+  Future<void> basculerJaimeCommentaire(
+    String commentaireId, {
+    required bool aimer,
+  });
 
   /// Retire son propre commentaire.
   Future<void> supprimerCommentaire(String commentaireId);

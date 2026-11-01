@@ -1,6 +1,7 @@
 // Envoie les notifications du téléphone (écran verrouillé) : une demande
 // de suivi, un nouvel abonné, un suivi accepté, un j'aime, un
-// commentaire, une demande d'avis, une réponse.
+// commentaire, une réponse à un commentaire, un j'aime sur un
+// commentaire, une demande d'avis, une réponse à cette demande.
 //
 // L'app l'appelle juste après l'action (comme `transmettre-retours`),
 // sans faire attendre l'utilisateur. La fonction ne la croit pas sur
@@ -184,26 +185,72 @@ async function lire(
         texte: `${pseudo} a aimé votre moment${chez(souvenir.restaurants?.nom)}.`,
       }];
     }
-    // J'ai commenté un moment.
+    // J'ai commenté un moment, ou répondu à un commentaire. L'auteur du
+    // commentaire auquel je réponds l'apprend en « réponse » ; l'auteur
+    // du moment, en « commentaire » — une seule fois s'il est les deux.
     case "commentaire": {
       if (!e.commentaire) return [];
       const c = await une(
         admin
           .from("commentaires")
-          .select("texte, cree_le, souvenirs(auteur_id, restaurants(nom))")
+          .select(
+            "texte, cree_le, parent_id, souvenirs(auteur_id, restaurants(nom))",
+          )
           .eq("id", e.commentaire)
           .eq("auteur_id", moi)
           .maybeSingle(),
       );
       const souvenir = c?.souvenirs;
       if (!c || !recente(c.cree_le) || !souvenir) return [];
-      if (souvenir.auteur_id === moi) return [];
+      const parent = c.parent_id
+        ? await une(
+          admin
+            .from("commentaires")
+            .select("auteur_id")
+            .eq("id", c.parent_id)
+            .maybeSingle(),
+        )
+        : null;
+      const envois: Envoi[] = [];
+      if (parent && parent.auteur_id !== moi) {
+        envois.push({
+          cle: `reponse:${e.commentaire}`,
+          destinataire: parent.auteur_id,
+          type: "reponse",
+          texte: `${pseudo} a répondu à votre commentaire : « ${court(c.texte)} »`,
+        });
+      }
+      if (souvenir.auteur_id !== moi && souvenir.auteur_id !== parent?.auteur_id) {
+        envois.push({
+          cle: `commentaire:${e.commentaire}`,
+          destinataire: souvenir.auteur_id,
+          type: "commentaire",
+          texte: `${pseudo} a commenté votre moment${chez(souvenir.restaurants?.nom)}` +
+            ` : « ${court(c.texte)} »`,
+        });
+      }
+      return envois;
+    }
+    // J'ai aimé un commentaire.
+    case "reaction_commentaire": {
+      if (!e.commentaire) return [];
+      const r = await une(
+        admin
+          .from("commentaires_reactions")
+          .select("cree_le, commentaires(auteur_id, texte)")
+          .eq("commentaire_id", e.commentaire)
+          .eq("profil_id", moi)
+          .maybeSingle(),
+      );
+      const commentaire = r?.commentaires;
+      if (!r || !recente(r.cree_le) || !commentaire) return [];
+      if (commentaire.auteur_id === moi) return [];
       return [{
-        cle: `commentaire:${e.commentaire}`,
-        destinataire: souvenir.auteur_id,
-        type: "commentaire",
-        texte: `${pseudo} a commenté votre moment${chez(souvenir.restaurants?.nom)}` +
-          ` : « ${court(c.texte)} »`,
+        // Sans la date : un j'aime retiré puis remis ne renvoie rien.
+        cle: `reaction_commentaire:${e.commentaire}:${moi}`,
+        destinataire: commentaire.auteur_id,
+        type: "reaction_commentaire",
+        texte: `${pseudo} a aimé votre commentaire : « ${court(commentaire.texte)} »`,
       }];
     }
     // J'ai demandé un avis à un ou plusieurs proches.

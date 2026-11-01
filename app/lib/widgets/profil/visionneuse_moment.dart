@@ -7,7 +7,6 @@ import '../bouton_verre.dart';
 import '../bulles_personnes.dart';
 import '../indicateur_page.dart';
 import '../publication.dart';
-import 'commentaires_moment.dart';
 import 'grille_moments.dart';
 
 /// Un moment agrandi depuis la grille d'un profil : la photo en grand
@@ -31,9 +30,8 @@ class TablVisionneuseMoment extends StatefulWidget {
     required this.libelleReactions,
     this.bullesReactions = const [],
     required this.onReagir,
-    required this.titreCommentaires,
     required this.commentaires,
-    required this.onEnvoyerCommentaire,
+    required this.onCommenter,
     required this.onOuvrirLieu,
     required this.onFermer,
     this.emojiEmotion,
@@ -81,14 +79,12 @@ class TablVisionneuseMoment extends StatefulWidget {
   final VoidCallback? onEnregistrer;
   final VoidCallback onReagir;
 
-  /// "3 commentaires".
-  final String titreCommentaires;
+  /// Les commentaires et le champ pour en écrire un, sous le moment
+  /// (voir `TablCommentairesMoment`).
+  final Widget commentaires;
 
-  /// `null` pendant le chargement.
-  final List<CommentaireAffiche>? commentaires;
-
-  /// `true` une fois le commentaire publié.
-  final Future<bool> Function(String texte) onEnvoyerCommentaire;
+  /// « Commenter » : place le curseur dans le champ.
+  final VoidCallback onCommenter;
   final VoidCallback onOuvrirLieu;
   final VoidCallback onFermer;
 
@@ -101,16 +97,8 @@ class TablVisionneuseMoment extends StatefulWidget {
 }
 
 class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
-  final _focusCommentaire = FocusNode();
-
   /// La photo affichée, quand il y en a plusieurs.
   int _page = 0;
-
-  @override
-  void dispose() {
-    _focusCommentaire.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -186,10 +174,7 @@ class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
                       begin: const Offset(0, 0.06),
                       end: Offset.zero,
                     ).animate(arrivee),
-                    child: _Panneau(
-                      visionneuse: v,
-                      focusCommentaire: _focusCommentaire,
-                    ),
+                    child: _Panneau(visionneuse: v),
                   ),
                 ),
               ],
@@ -235,10 +220,9 @@ class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
 }
 
 class _Panneau extends StatelessWidget {
-  const _Panneau({required this.visionneuse, required this.focusCommentaire});
+  const _Panneau({required this.visionneuse});
 
   final TablVisionneuseMoment visionneuse;
-  final FocusNode focusCommentaire;
 
   @override
   Widget build(BuildContext context) {
@@ -383,7 +367,7 @@ class _Panneau extends StatelessWidget {
           TablActionsPublication(
             jaiReagi: v.jaiReagi,
             onReagir: v.onReagir,
-            onCommenter: focusCommentaire.requestFocus,
+            onCommenter: v.onCommenter,
             enregistre: v.enregistre,
             onEnregistrer: v.onEnregistrer,
           ),
@@ -393,12 +377,7 @@ class _Panneau extends StatelessWidget {
             bulles: v.bullesReactions,
           ),
           const SizedBox(height: TablTokens.espaceL + 4),
-          TablCommentairesMoment(
-            titre: v.titreCommentaires,
-            commentaires: v.commentaires,
-            onEnvoyer: v.onEnvoyerCommentaire,
-            focusNode: focusCommentaire,
-          ),
+          v.commentaires,
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'actions_publications.dart';
+import 'gestion_commentaires.dart';
 
 /// Ouvre un moment agrandi par-dessus le profil : sa photo vole depuis
 /// sa tuile ([cleHero]), le reste arrive en fondu. La croix la renvoie à
@@ -75,62 +76,21 @@ class _PageMoment extends StatefulWidget {
   State<_PageMoment> createState() => _PageMomentState();
 }
 
-class _PageMomentState extends State<_PageMoment> {
+class _PageMomentState extends State<_PageMoment>
+    with GestionCommentaires<_PageMoment> {
   late SouvenirFeed _souvenir = widget.souvenir;
 
-  /// `null` pendant le chargement.
-  List<Commentaire>? _commentaires;
+  @override
+  SouvenirService get souvenirService => widget.souvenirService;
 
   @override
-  void initState() {
-    super.initState();
-    _chargerCommentaires();
-  }
+  String get souvenirCommenteId => widget.souvenir.id;
 
-  Future<void> _chargerCommentaires() async {
-    try {
-      final commentaires = await widget.souvenirService.commentaires(
-        _souvenir.id,
-      );
-      if (!mounted) return;
-      setState(() => _commentaires = commentaires);
-    } catch (e) {
-      debugPrint('PageMoment: commentaires : $e');
-      if (!mounted) return;
-      setState(() => _commentaires = const []);
-      afficherMessage(context, messageErreurGenerique);
-    }
-  }
-
-  Future<bool> _commenter(String texte) async {
-    try {
-      await widget.souvenirService.commenter(_souvenir.id, texte);
-    } catch (_) {
-      if (mounted) afficherMessage(context, messageErreurGenerique);
-      return false;
-    }
-    await _chargerCommentaires();
-    return true;
-  }
-
-  /// Optimiste : le commentaire disparaît tout de suite, et revient si
-  /// la suppression échoue.
-  Future<void> _supprimerCommentaire(Commentaire commentaire) async {
-    final avant = _commentaires;
-    if (avant == null) return;
-    setState(() {
-      _commentaires = [
-        for (final c in avant)
-          if (c.id != commentaire.id) c,
-      ];
-    });
-    try {
-      await widget.souvenirService.supprimerCommentaire(commentaire.id);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _commentaires = avant);
-      afficherMessage(context, messageErreurGenerique);
-    }
+  @override
+  void Function(String profilId, String pseudo)? get ouvrirProfilAuteur {
+    final ouvrir = widget.onOuvrirPersonne;
+    if (ouvrir == null) return null;
+    return (id, pseudo) => ouvrir(PersonnePresente(id: id, pseudo: pseudo));
   }
 
   void _reagir() {
@@ -156,7 +116,6 @@ class _PageMomentState extends State<_PageMoment> {
     final s = _souvenir;
     final presents = s.presents;
     final ouvrirPersonne = widget.onOuvrirPersonne;
-    final commentaires = _commentaires;
     // Un Scaffold à elle : les messages (« Audience mise à jour. »)
     // s'affichent par-dessus le moment agrandi, pas sous lui.
     return Scaffold(
@@ -188,26 +147,12 @@ class _PageMomentState extends State<_PageMoment> {
         enregistre: s.estEnvie,
         audienceRestreinte: s.audienceRestreinte,
         onReagir: _reagir,
-        // Pendant le chargement, le nombre déjà connu : le titre ne
-        // saute pas quand la liste arrive.
-        titreCommentaires: titreCommentaires(
-          commentaires?.length ?? s.nombreCommentaires,
+        commentaires: TablCommentairesMoment(
+          titre: titreDesCommentaires(s.nombreCommentaires),
+          fils: filsAffiches,
+          saisie: champCommentaire,
         ),
-        commentaires: commentaires == null
-            ? null
-            : [
-                for (final c in commentaires)
-                  CommentaireAffiche(
-                    pseudo: c.auteurPseudo,
-                    photoUrl: c.auteurPhotoUrl,
-                    texte: c.texte,
-                    quand: dateLisibleCommentaire(c.creeLe),
-                    onSupprimer: c.estLeMien
-                        ? () => _supprimerCommentaire(c)
-                        : null,
-                  ),
-              ],
-        onEnvoyerCommentaire: _commenter,
+        onCommenter: focusCommentaire.requestFocus,
         onOuvrirLieu: () => widget.onOuvrirLieu(s),
         onEnregistrer: widget.onEnregistrer == null ? null : _enregistrer,
         onOptions: widget.onOptions == null ? null : () => widget.onOptions!(s),

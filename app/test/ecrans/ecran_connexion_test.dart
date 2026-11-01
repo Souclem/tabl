@@ -164,8 +164,17 @@ class _FauxSouvenirService implements SouvenirService {
       throw UnimplementedError();
 
   @override
-  Future<void> commenter(String souvenirId, String texte) =>
-      throw UnimplementedError();
+  Future<void> commenter(
+    String souvenirId,
+    String texte, {
+    String? parentId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> basculerJaimeCommentaire(
+    String commentaireId, {
+    required bool aimer,
+  }) => throw UnimplementedError();
 
   @override
   Future<void> supprimerCommentaire(String commentaireId) =>

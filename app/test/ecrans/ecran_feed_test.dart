@@ -7,7 +7,6 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'package:app/ecrans/ecran_abonnes.dart';
-import 'package:app/ecrans/ecran_commentaires.dart';
 import 'package:app/ecrans/ecran_creer_instant.dart';
 import 'package:app/ecrans/ecran_feed.dart';
 import 'package:app/ecrans/ecran_profil_autre.dart';
@@ -102,8 +101,17 @@ class _FauxSouvenirService implements SouvenirService {
   Future<List<Commentaire>> commentaires(String souvenirId) async => [];
 
   @override
-  Future<void> commenter(String souvenirId, String texte) =>
-      throw UnimplementedError();
+  Future<void> commenter(
+    String souvenirId,
+    String texte, {
+    String? parentId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> basculerJaimeCommentaire(
+    String commentaireId, {
+    required bool aimer,
+  }) => throw UnimplementedError();
 
   @override
   Future<void> supprimerCommentaire(String commentaireId) =>
@@ -541,7 +549,9 @@ void main() {
     },
   );
 
-  testWidgets('taper sur "Commenter" ouvre EcranCommentaires', (tester) async {
+  testWidgets('"Commenter" ouvre les commentaires par-dessus le Feed', (
+    tester,
+  ) async {
     _agrandirSurface(tester);
     final souvenirs = [_souvenirDeTest()];
 
@@ -558,7 +568,10 @@ void main() {
     await tester.tap(find.byTooltip('Commenter'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(EcranCommentaires), findsOneWidget);
+    // Une feuille, pas une autre page : le Feed reste derrière.
+    expect(find.byType(TablFeuilleCommentaires), findsOneWidget);
+    expect(find.byType(EcranFeed), findsOneWidget);
+    expect(find.text('Aucun commentaire pour l\'instant.'), findsOneWidget);
   });
 
   testWidgets(

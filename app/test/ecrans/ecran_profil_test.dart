@@ -62,7 +62,11 @@ class _FauxSouvenirService implements SouvenirService {
       List.of(commentairesParMoment[souvenirId] ?? const <Commentaire>[]);
 
   @override
-  Future<void> commenter(String souvenirId, String texte) async {
+  Future<void> commenter(
+    String souvenirId,
+    String texte, {
+    String? parentId,
+  }) async {
     commentairesParMoment
         .putIfAbsent(souvenirId, () => [])
         .add(
@@ -338,7 +342,8 @@ void main() {
 
     expect(find.text('1 commentaire'), findsOneWidget);
     expect(find.text('On y retourne quand ?'), findsOneWidget);
-    expect(find.text('3 h'), findsOneWidget);
+    // L'heure suit le pseudo, sur la même ligne.
+    expect(find.textContaining('Emma  3 h'), findsOneWidget);
     // Pas le sien : rien à supprimer.
     expect(find.text('Supprimer'), findsNothing);
 

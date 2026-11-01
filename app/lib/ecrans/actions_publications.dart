@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-import 'ecran_commentaires.dart';
 import 'ecran_profil_autre.dart';
+import 'feuille_commentaires.dart';
 import 'feuille_restaurant.dart';
 
 /// Ce que partagent tous les écrans qui affichent une liste de
@@ -25,8 +25,8 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   /// une réaction met à jour la liste en place, sans tout recharger.
   List<SouvenirFeed>? souvenirs;
 
-  /// Relance le chargement complet de la liste — appelé au retour des
-  /// commentaires, dont le nombre a pu changer.
+  /// Relance le chargement complet de la liste — appelé au retour d'une
+  /// page (restaurant, profil) où ce qui est visible a pu changer.
   void recharger();
 
   Future<void> basculerReaction(SouvenirFeed souvenir) async {
@@ -79,20 +79,20 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     });
   }
 
-  Future<void> ouvrirCommentaires(SouvenirFeed souvenir) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranCommentaires(
-          souvenirService: souvenirService,
-          souvenirId: souvenir.id,
-        ),
-      ),
+  /// Les commentaires, dans une feuille par-dessus la liste : on reste
+  /// à sa place dans le Feed, et le moment suit leur nombre.
+  Future<void> ouvrirCommentaires(SouvenirFeed souvenir) {
+    return ouvrirFeuilleCommentaires(
+      context,
+      souvenirService: souvenirService,
+      souvenir: souvenir,
+      onOuvrirProfil: abonnementService == null ? null : ouvrirProfilDe,
+      onNombre: (nombre) {
+        final actuel = souvenirs?.where((s) => s.id == souvenir.id).firstOrNull;
+        if (actuel == null || actuel.nombreCommentaires == nombre) return;
+        remplacer(actuel.copierAvec(nombreCommentaires: nombre));
+      },
     );
-    // Le nombre de commentaires a pu changer pendant la visite : on
-    // recharge tout au retour plutôt que de suivre les ajouts un par un
-    // — plus simple, et cet écran n'est pas quitté souvent.
-    if (!mounted) return;
-    recharger();
   }
 
   /// La page du restaurant d'une publication, en feuille par-dessus

@@ -76,6 +76,16 @@ String dateLisibleCommentaire(DateTime creeLe, {DateTime? maintenant}) {
 String titreCommentaires(int nombre) =>
     nombre == 0 ? 'Commentaires' : pluriel(nombre, 'commentaire');
 
+/// "1 j'aime", "12 j'aime" sous un commentaire ; `null` tant que
+/// personne ne l'a aimé.
+String? libelleJaimeCommentaire(int nombre) =>
+    nombre == 0 ? null : '$nombre j\'aime';
+
+/// Pour déplier les réponses à un commentaire : "Voir la réponse",
+/// "Voir les 3 réponses".
+String libelleVoirReponses(int nombre) =>
+    nombre == 1 ? 'Voir la réponse' : 'Voir les $nombre réponses';
+
 /// La légende d'un moment telle qu'affichée partout dans l'app : entre
 /// guillemets « », c'est la voix de son auteur. Les guillemets que
 /// l'auteur aurait tapés lui-même ne sont pas doublés. `null` si vide.
