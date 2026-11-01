@@ -82,4 +82,50 @@ void main() {
     await tester.tap(find.byTooltip('Enregistrer'));
     expect(enregistrements, 1);
   });
+
+  testWidgets('Les photos d\'un moment défilent du doigt, dans le Feed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListView(
+            children: [
+              TablPublication(
+                contexte: ContextePublication.feed,
+                auteurPseudo: 'martin',
+                dateLisible: '20 août',
+                photoUrl: 'https://exemple.com/1.jpg',
+                autresPhotosUrls: const [
+                  'https://exemple.com/2.jpg',
+                  'https://exemple.com/3.jpg',
+                ],
+                restaurantNom: 'Le Comptoir',
+                ville: 'Paris',
+                jaiReagi: false,
+                libelleReactions: "Personne n'a encore aimé",
+                onReagir: () {},
+                onCommenter: () {},
+                onOuvrirLieu: () {},
+                onEnregistrer: () {},
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    int page() =>
+        tester.widget<TablIndicateurPage>(find.byType(TablIndicateurPage)).index;
+    expect(page(), 0);
+
+    // Le dégradé posé sur la photo ne doit pas retenir le doigt.
+    final photo = find.byType(PageView);
+    await tester.fling(photo, const Offset(-300, 0), 1200);
+    await tester.pumpAndSettle();
+    expect(page(), 1);
+
+    await tester.fling(photo, const Offset(-300, 0), 1200);
+    await tester.pumpAndSettle();
+    expect(page(), 2);
+  });
 }

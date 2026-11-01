@@ -391,19 +391,24 @@ class _PhotoState extends State<_Photo> {
                     )
                   else if (photoUrls.isNotEmpty)
                     _image(photoUrls.first),
+                  // Le dégradé ne fait que se voir : touchable, il
+                  // retiendrait le doigt, et les photos ne défileraient
+                  // plus.
                   Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.18),
-                            Colors.black.withValues(alpha: 0.62),
-                            Colors.black.withValues(alpha: 0.9),
-                          ],
-                          stops: const [0.4, 0.62, 0.83, 1.0],
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.18),
+                              Colors.black.withValues(alpha: 0.62),
+                              Colors.black.withValues(alpha: 0.9),
+                            ],
+                            stops: const [0.4, 0.62, 0.83, 1.0],
+                          ),
                         ),
                       ),
                     ),
@@ -487,10 +492,7 @@ class _PhotoState extends State<_Photo> {
                     color: TablTokens.primaire.withValues(alpha: 0.18),
                   ),
                 ),
-                child: Text(
-                  emojiEmotion,
-                  style: const TextStyle(fontSize: 19),
-                ),
+                child: Text(emojiEmotion, style: const TextStyle(fontSize: 19)),
               ),
             ),
         ],
