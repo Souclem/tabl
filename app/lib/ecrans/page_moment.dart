@@ -143,7 +143,7 @@ class _PageMomentState extends State<_PageMoment>
         impressions: s.impressions,
         jaiReagi: s.jaiReagi,
         libelleReactions: libelleReactionsSouvenir(s),
-        bullesReactions: bullesAmisQuiOntAime(s),
+        bullesReactions: bullesQuiOntAime(s),
         enregistre: s.estEnvie,
         audienceRestreinte: s.audienceRestreinte,
         onReagir: _reagir,

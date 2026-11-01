@@ -128,6 +128,8 @@ void main() {
         .widget<TablIndicateurPage>(find.byType(TablIndicateurPage))
         .index;
     expect(page(), 0);
+    // On voit qu'il y en a plusieurs.
+    expect(find.text('1/3'), findsOneWidget);
 
     // Le dégradé posé sur la photo ne doit pas retenir le doigt.
     final photo = find.byType(PageView);
@@ -138,5 +140,6 @@ void main() {
     await tester.fling(photo, const Offset(-300, 0), 1200);
     await tester.pumpAndSettle();
     expect(page(), 2);
+    expect(find.text('3/3'), findsOneWidget);
   });
 }

@@ -71,7 +71,7 @@ class TablVisionneuseMoment extends StatefulWidget {
   final bool jaiReagi;
   final String libelleReactions;
 
-  /// Ceux que je suis parmi eux, en têtes à côté de [libelleReactions].
+  /// Leurs têtes, à côté de [libelleReactions].
   final List<BullePersonne> bullesReactions;
   final bool enregistre;
 

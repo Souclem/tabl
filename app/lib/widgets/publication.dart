@@ -101,8 +101,8 @@ class TablPublication extends StatelessWidget {
   /// Phrase déjà composée ("Martin et 2 autres ont aimé").
   final String libelleReactions;
 
-  /// Les têtes de ceux que je suis parmi eux, à côté de la phrase (3 au
-  /// plus) ; vide : rien à côté.
+  /// Les têtes de ceux qui ont aimé, à côté de la phrase (3 au plus) ;
+  /// vide : rien à côté.
   final List<BullePersonne> bullesReactions;
 
   final bool enregistre;
@@ -413,17 +413,15 @@ class _PhotoState extends State<_Photo> {
                       ),
                     ),
                   ),
+                  // Plusieurs photos : ça se voit, sur une photo claire
+                  // comme sombre — on sait qu'on peut glisser.
                   if (photoUrls.length > 1)
                     Positioned(
-                      left: 0,
-                      right: 0,
                       top: 12,
+                      right: 12,
                       child: IgnorePointer(
-                        child: Center(
-                          child: TablIndicateurPage(
-                            total: photoUrls.length,
-                            index: _page,
-                          ),
+                        child: _CompteurPhotos(
+                          texte: '${_page + 1}/${photoUrls.length}',
                         ),
                       ),
                     ),
@@ -477,6 +475,22 @@ class _PhotoState extends State<_Photo> {
               ),
             ),
           ),
+          // Les points, sous la photo, dans le blanc qui la sépare de la
+          // légende.
+          if (photoUrls.length > 1)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: -14,
+              child: IgnorePointer(
+                child: Center(
+                  child: TablIndicateurPage(
+                    total: photoUrls.length,
+                    index: _page,
+                  ),
+                ),
+              ),
+            ),
           if (emojiEmotion != null)
             Positioned(
               left: 10,
@@ -496,6 +510,32 @@ class _PhotoState extends State<_Photo> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// « 1/3 » en haut d'une photo parmi plusieurs.
+class _CompteurPhotos extends StatelessWidget {
+  const _CompteurPhotos({required this.texte});
+
+  final String texte;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        texte,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFFF8F4EE),
+        ),
       ),
     );
   }
@@ -574,8 +614,8 @@ class TablActionsPublication extends StatelessWidget {
   }
 }
 
-/// Sous les actions d'un moment : qui l'a aimé, en une phrase, avec la
-/// tête de ceux que je suis devant.
+/// Sous les actions d'un moment : qui l'a aimé, en une phrase, avec
+/// leurs têtes devant.
 class TablLigneReactions extends StatelessWidget {
   const TablLigneReactions({
     super.key,

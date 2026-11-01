@@ -1,5 +1,5 @@
 /// Quelqu'un qui a aimé un moment, prêt à afficher : son nom dans
-/// « Emma et 3 autres ont aimé », et sa tête à côté si je la suis.
+/// « Emma et 3 autres ont aimé », et sa tête à côté.
 class PersonneQuiAime {
   const PersonneQuiAime({
     required this.pseudo,
@@ -12,7 +12,7 @@ class PersonneQuiAime {
   /// Miniature de sa photo de profil, `null` s'il n'en a pas.
   final String? photoUrl;
 
-  /// Je la suis.
+  /// Je la suis : elle passe devant les autres.
   final bool suivie;
 }
 

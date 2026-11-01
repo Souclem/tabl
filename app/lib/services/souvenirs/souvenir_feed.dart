@@ -20,6 +20,7 @@ class SouvenirFeed {
     required this.nombreCommentaires,
     this.emotion,
     this.premieresReactions = const [],
+    this.monVisage,
     this.presents = const [],
     this.categories = const [],
     this.impressions = const [],
@@ -65,10 +66,14 @@ class SouvenirFeed {
   final Emotion? emotion;
 
   /// Les personnes nommées parmi celles qui ont aimé (au plus 3, celles
-  /// que je suis d'abord, voir [personnesNommees]) — pour la phrase
-  /// "Martin, Sarah et 12 autres ont aimé" plutôt qu'un chiffre brut, et
-  /// la tête de celles que je suis à côté.
+  /// que je suis d'abord, jamais moi : voir [personnesNommees]) — pour
+  /// la phrase "Martin, Sarah et 12 autres ont aimé" plutôt qu'un
+  /// chiffre brut, et leur tête à côté.
   final List<PersonneQuiAime> premieresReactions;
+
+  /// Ma tête, en tête de celles qui ont aimé quand j'aime ce moment —
+  /// aussitôt le geste fait, sans attendre le réseau.
+  final PersonneQuiAime? monVisage;
 
   /// Les personnes taguées comme présentes lors de ce moment.
   final List<PersonnePresente> presents;
@@ -139,6 +144,7 @@ class SouvenirFeed {
       nombreCommentaires: nombreCommentaires ?? this.nombreCommentaires,
       emotion: emotion,
       premieresReactions: premieresReactions ?? this.premieresReactions,
+      monVisage: monVisage,
       presents: presents,
       categories: categories,
       impressions: impressions,

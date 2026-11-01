@@ -209,6 +209,7 @@ SouvenirFeed _souvenirDeTest({
   bool jaiReagi = false,
   int nombreCommentaires = 0,
   List<PersonneQuiAime> premieresReactions = const [],
+  PersonneQuiAime? monVisage,
   bool estAMoi = false,
   String? restaurantId = 'resto-1',
   String auteurPseudo = 'martin',
@@ -227,6 +228,7 @@ SouvenirFeed _souvenirDeTest({
     jaiReagi: jaiReagi,
     nombreCommentaires: nombreCommentaires,
     premieresReactions: premieresReactions,
+    monVisage: monVisage,
     estAMoi: estAMoi,
     restaurantId: restaurantId,
     auteurId: estAMoi ? 'moi-id' : '$auteurPseudo-id',
@@ -419,22 +421,25 @@ void main() {
     // Jamais un chiffre brut mis en avant pour les réactions : une phrase.
     expect(find.text('Louise, Arthur et 1 autre ont aimé'), findsOneWidget);
     expect(find.text('Votre feed est encore vide.'), findsNothing);
-    // Ni l'une ni l'autre n'est suivie : aucune tête à côté.
-    expect(find.byType(TablBullesPersonnes), findsNothing);
+    // Leurs têtes, à côté de la phrase.
+    final bulles = tester.widget<TablBullesPersonnes>(
+      find.byType(TablBullesPersonnes),
+    );
+    expect([for (final b in bulles.bulles) b.pseudo], ['Louise', 'Arthur']);
   });
 
-  testWidgets('les amis qui ont aimé : leur tête à côté de « ont aimé »', (
+  testWidgets("ceux qui ont aimé : ma tête d'abord quand j'aime, 3 au plus", (
     tester,
   ) async {
     _agrandirSurface(tester);
     final souvenirs = [
       _souvenirDeTest(
-        nombreReactions: 5,
+        nombreReactions: 3,
         premieresReactions: const [
           PersonneQuiAime(pseudo: 'Louise', suivie: true),
-          PersonneQuiAime(pseudo: 'Arthur', suivie: true),
-          PersonneQuiAime(pseudo: 'Inconnu'),
+          PersonneQuiAime(pseudo: 'Arthur'),
         ],
+        monVisage: const PersonneQuiAime(pseudo: 'moi'),
       ),
     ];
 
@@ -448,14 +453,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Louise, Arthur, Inconnu et 2 autres ont aimé'),
-      findsOneWidget,
-    );
-    final bulles = tester.widget<TablBullesPersonnes>(
-      find.byType(TablBullesPersonnes),
-    );
-    expect([for (final b in bulles.bulles) b.pseudo], ['Louise', 'Arthur']);
+    List<String> tetes() => [
+      for (final b
+          in tester
+              .widget<TablBullesPersonnes>(find.byType(TablBullesPersonnes))
+              .bulles)
+        b.pseudo,
+    ];
+    expect(tetes(), ['Louise', 'Arthur']);
+
+    // J'aime : ma tête arrive devant, tout de suite.
+    await tester.tap(find.byType(TablBoutonReaction));
+    await tester.pumpAndSettle();
+    expect(find.text('Vous et 3 autres avez aimé'), findsOneWidget);
+    expect(tetes(), ['moi', 'Louise', 'Arthur']);
   });
 
   testWidgets('erreur de chargement → message générique affiché', (

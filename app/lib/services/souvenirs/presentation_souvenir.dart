@@ -124,9 +124,10 @@ String libelleReactionsSouvenir(SouvenirFeed s) {
       : '$tete $verbe';
 }
 
-/// Ceux que je suis parmi les personnes nommées sous un moment : leur
-/// tête s'affiche à côté de « a aimé ».
-List<PersonneQuiAime> amisQuiOntAime(SouvenirFeed s) => [
-  for (final p in s.premieresReactions)
-    if (p.suivie) p,
-];
+/// Les têtes à côté de « a aimé » : la mienne d'abord si j'ai aimé
+/// (la phrase commence par « Vous »), puis celles des personnes
+/// nommées — 3 au plus.
+List<PersonneQuiAime> visagesQuiOntAime(SouvenirFeed s) => [
+  if (s.jaiReagi) ?s.monVisage,
+  ...s.premieresReactions,
+].take(nombreMaxPersonnesNommees).toList();

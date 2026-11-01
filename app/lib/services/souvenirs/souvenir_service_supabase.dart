@@ -489,6 +489,7 @@ class SouvenirServiceSupabase implements SouvenirService {
       nombreCommentaires,
       presents,
       envies,
+      monVisage,
     ) = await (
       liensSignes(_client, 'souvenirs', [
         ...lignes.map((l) => l['photo_url'] as String?).whereType<String>(),
@@ -498,6 +499,7 @@ class SouvenirServiceSupabase implements SouvenirService {
       _nombreCommentairesParSouvenir(ids),
       _presentsParSouvenir(ids),
       EnviesRestaurants(_client).mesEnviesIds(),
+      _monVisage(),
     ).wait;
 
     return lignes.map((l) {
@@ -522,6 +524,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         nombreCommentaires: nombreCommentaires[id] ?? 0,
         emotion: Emotion.depuisEmoji(l['emotion'] as String?),
         premieresReactions: donneesReactions.nommees,
+        monVisage: monVisage,
         presents: presents[id] ?? const [],
         categories:
             (restaurant?['categories'] as List?)?.cast<String>() ?? const [],
@@ -771,6 +774,25 @@ class SouvenirServiceSupabase implements SouvenirService {
           ),
         ),
     };
+  }
+
+  /// Ma tête, pour la montrer parmi ceux qui ont aimé.
+  Future<PersonneQuiAime?> _monVisage() async {
+    final profil = await _client
+        .from('profils')
+        .select('pseudo, photo_url')
+        .eq('id', _monId)
+        .maybeSingle();
+    final pseudo = profil?['pseudo'] as String?;
+    if (pseudo == null) return null;
+    return PersonneQuiAime(
+      pseudo: pseudo,
+      photoUrl: urlPhotoProfil(
+        _client,
+        profil?['photo_url'] as String?,
+        miniature: true,
+      ),
+    );
   }
 
   /// Même principe que [_reactionsParSouvenir], pour le nombre de
