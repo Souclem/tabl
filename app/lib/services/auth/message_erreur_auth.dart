@@ -26,10 +26,12 @@ String messageErreurAuth({String? code, required String message}) {
     return 'Mot de passe trop simple : choisis-en un plus long.';
   }
   // L'envoi de l'e-mail de confirmation est refusé : adresse non
-  // autorisée par le service d'envoi, ou trop d'e-mails récents. Rien
-  // que l'utilisateur puisse corriger lui-même.
+  // autorisée par le service d'envoi, trop d'e-mails récents, ou envoi
+  // en échec (« Error sending confirmation email », code générique
+  // unexpected_failure). Rien que l'utilisateur puisse corriger lui-même.
   if (est('email_address_not_authorized', 'not authorized') ||
-      est('over_email_send_rate_limit', 'email rate limit')) {
+      est('over_email_send_rate_limit', 'email rate limit') ||
+      m.contains('error sending')) {
     return "Impossible d'envoyer l'e-mail de confirmation pour l'instant. "
         'Réessaie plus tard, ou continue avec Google.';
   }

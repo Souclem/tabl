@@ -30,6 +30,13 @@ void main() {
         messageErreurAuth(message: 'email rate limit exceeded'),
         attendu,
       );
+      expect(
+        messageErreurAuth(
+          code: 'unexpected_failure',
+          message: 'Error sending confirmation email',
+        ),
+        attendu,
+      );
     });
 
     test('sans code, lit le message', () {
