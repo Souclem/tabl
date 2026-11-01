@@ -8,6 +8,7 @@ NotificationTabl _n(
   String? souvenir,
   String? restaurant,
   String? texte,
+  String? commentaire,
 }) => NotificationTabl(
   type: type,
   acteur: (id: qui, pseudo: qui, photoUrl: null),
@@ -15,6 +16,7 @@ NotificationTabl _n(
   souvenirId: souvenir,
   restaurantNom: restaurant,
   texte: texte,
+  commentaireId: commentaire,
 );
 
 String _phrase(LigneNotification l) =>
@@ -134,6 +136,50 @@ void main() {
       phraseNotification(ligne(TypeNotification.reaction, ['Emma'])).first,
       (texte: 'Emma', gras: true),
     );
+  });
+
+  test("les j'aime d'un même commentaire rassemblés, les réponses seules", () {
+    final r = rangerNotifications([
+      _n(
+        TypeNotification.reactionCommentaire,
+        'Emma',
+        DateTime(2026, 11, 1, 10),
+        souvenir: 's1',
+        commentaire: 'c1',
+        texte: 'Superbe',
+      ),
+      _n(
+        TypeNotification.reponseCommentaire,
+        'Louise',
+        DateTime(2026, 11, 1, 9),
+        souvenir: 's1',
+        commentaire: 'r1',
+        texte: 'Je confirme',
+      ),
+      _n(
+        TypeNotification.reactionCommentaire,
+        'Martin',
+        DateTime(2026, 11, 1, 8),
+        souvenir: 's1',
+        commentaire: 'c1',
+        texte: 'Superbe',
+      ),
+      // Un autre commentaire du même moment : une ligne à part.
+      _n(
+        TypeNotification.reactionCommentaire,
+        'Arthur',
+        DateTime(2026, 11, 1, 7),
+        souvenir: 's1',
+        commentaire: 'c2',
+        texte: 'Bof',
+      ),
+    ], vuesLe: vues);
+
+    expect([for (final l in r.autres) _phrase(l)], [
+      'Emma et Martin ont aimé votre commentaire : « Superbe »',
+      'Louise a répondu à votre commentaire : « Je confirme »',
+      'Arthur a aimé votre commentaire : « Bof »',
+    ]);
   });
 
   test('la pastille : au moins une notification depuis la dernière visite', () {

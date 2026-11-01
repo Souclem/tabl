@@ -55,6 +55,7 @@ class NotificationServiceSupabase implements NotificationService {
               texte: l['texte'] as String?,
               reponse: ReponseAvis.depuisValeur(l['reponse'] as String?),
               demandeId: l['demande_id'] as String?,
+              commentaireId: l['commentaire_id'] as String?,
             ),
       ],
       vuesLe: vuesLe == null ? null : DateTime.parse(vuesLe).toLocal(),

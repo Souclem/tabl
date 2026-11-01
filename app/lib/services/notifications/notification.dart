@@ -18,6 +18,12 @@ enum TypeNotification {
   /// Commentaire sur l'un de mes souvenirs.
   commentaire('commentaire'),
 
+  /// Réponse à l'un de mes commentaires.
+  reponseCommentaire('reponse'),
+
+  /// J'aime sur l'un de mes commentaires.
+  reactionCommentaire('reaction_commentaire'),
+
   /// On me demande mon avis sur un restaurant (pas encore répondu).
   demandeAvis('demande_avis'),
 
@@ -49,6 +55,7 @@ class NotificationTabl {
     this.texte,
     this.reponse,
     this.demandeId,
+    this.commentaireId,
   });
 
   final TypeNotification type;
@@ -63,6 +70,9 @@ class NotificationTabl {
   /// La demande d'avis concernée.
   final String? demandeId;
 
+  /// Le commentaire concerné (écrit, ou aimé).
+  final String? commentaireId;
+
   /// Déjà signée, prête à afficher.
   final String? souvenirPhotoUrl;
   final String? restaurantNom;
@@ -72,8 +82,8 @@ class NotificationTabl {
 }
 
 /// Une ligne de l'écran des notifications : un événement, ou plusieurs
-/// j'aime sur le même souvenir rassemblés (« Emma, Martin et 3 autres
-/// ont aimé… »).
+/// j'aime sur le même souvenir (ou le même commentaire) rassemblés
+/// (« Emma, Martin et 3 autres ont aimé… »).
 class LigneNotification {
   const LigneNotification({
     required this.type,
@@ -109,9 +119,10 @@ class LigneNotification {
 }
 
 /// Les notifications rangées pour l'écran : les demandes (de suivi,
-/// d'avis) à part, en tête (elles attendent une réponse) ; puis le reste, les j'aime
-/// d'un même souvenir rassemblés, du plus récent au plus ancien. Une
-/// ligne est « nouvelle » si elle est arrivée après [vuesLe].
+/// d'avis) à part, en tête (elles attendent une réponse) ; puis le reste,
+/// les j'aime d'un même souvenir — ou d'un même commentaire —
+/// rassemblés, du plus récent au plus ancien. Une ligne est « nouvelle »
+/// si elle est arrivée après [vuesLe].
 ({List<LigneNotification> demandes, List<LigneNotification> autres})
 rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
   bool nouvelle(DateTime d) => vuesLe == null || d.isAfter(vuesLe);
@@ -137,13 +148,22 @@ rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
     for (final n in tri)
       if (attend(n)) seule(n),
   ];
+  // Ce que des j'aime ont en commun : le même souvenir, ou le même
+  // commentaire.
+  String? cible(NotificationTabl n) => switch (n.type) {
+    TypeNotification.reaction when n.souvenirId != null =>
+      'souvenir:${n.souvenirId}',
+    TypeNotification.reactionCommentaire when n.commentaireId != null =>
+      'commentaire:${n.commentaireId}',
+    _ => null,
+  };
   final autres = <LigneNotification>[];
-  final jaimeParSouvenir = <String, int>{};
+  final jaimeParCible = <String, int>{};
   for (final n in tri) {
     if (attend(n)) continue;
-    final souvenir = n.souvenirId;
-    if (n.type == TypeNotification.reaction && souvenir != null) {
-      final i = jaimeParSouvenir[souvenir];
+    final cle = cible(n);
+    if (cle != null) {
+      final i = jaimeParCible[cle];
       if (i != null) {
         final ligne = autres[i];
         autres[i] = LigneNotification(
@@ -153,11 +173,13 @@ rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
           nouvelle: ligne.nouvelle || nouvelle(n.creeLe),
           souvenirId: ligne.souvenirId,
           souvenirPhotoUrl: ligne.souvenirPhotoUrl,
+          restaurantId: ligne.restaurantId,
           restaurantNom: ligne.restaurantNom,
+          texte: ligne.texte,
         );
         continue;
       }
-      jaimeParSouvenir[souvenir] = autres.length;
+      jaimeParCible[cle] = autres.length;
     }
     autres.add(seule(n));
   }
@@ -204,6 +226,16 @@ List<({String texte, bool gras})> phraseNotification(LigneNotification l) {
     case TypeNotification.commentaire:
       final texte = l.texte?.trim();
       normal(' a commenté votre moment$ou');
+      normal(texte == null || texte.isEmpty ? '.' : ' : « $texte »');
+    case TypeNotification.reponseCommentaire:
+      final texte = l.texte?.trim();
+      normal(' a répondu à votre commentaire');
+      normal(texte == null || texte.isEmpty ? '.' : ' : « $texte »');
+    case TypeNotification.reactionCommentaire:
+      final texte = l.texte?.trim();
+      normal(
+        plusieurs ? ' ont aimé votre commentaire' : ' a aimé votre commentaire',
+      );
       normal(texte == null || texte.isEmpty ? '.' : ' : « $texte »');
     case TypeNotification.demandeAvis:
       final texte = l.texte?.trim();
