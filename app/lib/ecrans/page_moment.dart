@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'actions_publications.dart';
+
 /// Ouvre un moment agrandi par-dessus le profil : sa photo vole depuis
 /// sa tuile ([cleHero]), le reste arrive en fondu. La croix la renvoie à
 /// sa place.
@@ -182,6 +184,7 @@ class _PageMomentState extends State<_PageMoment> {
         impressions: s.impressions,
         jaiReagi: s.jaiReagi,
         libelleReactions: libelleReactionsSouvenir(s),
+        bullesReactions: bullesAmisQuiOntAime(s),
         enregistre: s.estEnvie,
         audienceRestreinte: s.audienceRestreinte,
         onReagir: _reagir,

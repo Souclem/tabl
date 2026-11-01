@@ -192,7 +192,7 @@ SouvenirFeed _souvenirDeTest({
   int nombreReactions = 0,
   bool jaiReagi = false,
   int nombreCommentaires = 0,
-  List<String> premieresReactions = const [],
+  List<PersonneQuiAime> premieresReactions = const [],
   bool estAMoi = false,
   String? restaurantId = 'resto-1',
   String auteurPseudo = 'martin',
@@ -376,7 +376,10 @@ void main() {
       _souvenirDeTest(
         nombreReactions: 3,
         nombreCommentaires: 2,
-        premieresReactions: ['Louise', 'Arthur'],
+        premieresReactions: const [
+          PersonneQuiAime(pseudo: 'Louise'),
+          PersonneQuiAime(pseudo: 'Arthur'),
+        ],
       ),
     ];
 
@@ -400,6 +403,43 @@ void main() {
     // Jamais un chiffre brut mis en avant pour les réactions : une phrase.
     expect(find.text('Louise, Arthur et 1 autre ont aimé'), findsOneWidget);
     expect(find.text('Votre feed est encore vide.'), findsNothing);
+    // Ni l'une ni l'autre n'est suivie : aucune tête à côté.
+    expect(find.byType(TablBullesPersonnes), findsNothing);
+  });
+
+  testWidgets('les amis qui ont aimé : leur tête à côté de « ont aimé »', (
+    tester,
+  ) async {
+    _agrandirSurface(tester);
+    final souvenirs = [
+      _souvenirDeTest(
+        nombreReactions: 5,
+        premieresReactions: const [
+          PersonneQuiAime(pseudo: 'Louise', suivie: true),
+          PersonneQuiAime(pseudo: 'Arthur', suivie: true),
+          PersonneQuiAime(pseudo: 'Inconnu'),
+        ],
+      ),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(souvenirs: souvenirs),
+          abonnementService: _FauxAbonnementService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Louise, Arthur, Inconnu et 2 autres ont aimé'),
+      findsOneWidget,
+    );
+    final bulles = tester.widget<TablBullesPersonnes>(
+      find.byType(TablBullesPersonnes),
+    );
+    expect([for (final b in bulles.bulles) b.pseudo], ['Louise', 'Arthur']);
   });
 
   testWidgets('erreur de chargement → message générique affiché', (

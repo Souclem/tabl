@@ -13,6 +13,7 @@ import 'emotion.dart';
 import 'filtre_reseau.dart';
 import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
+import 'personne_qui_aime.dart';
 import 'precompletion_souvenir.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
@@ -346,6 +347,8 @@ class SouvenirServiceSupabase implements SouvenirService {
     bool sansSouvenirs = false,
     String? id,
   }) async {
+    // Le réseau filtre le Feed, et dit qui nommer sous chaque moment.
+    final futurSuivis = mesSuivis(_client, _monId);
     final presentsFiltres = avecPresent == null
         ? ''
         : ', souvenirs_amis_tagues!inner(profil_id)';
@@ -371,7 +374,9 @@ class SouvenirServiceSupabase implements SouvenirService {
     if (auteurId != null) {
       requete = requete.eq('auteur_id', auteurId);
     } else if (id == null) {
-      requete = requete.or(await conditionSouvenirsDuReseau(_client, _monId));
+      requete = requete.or(
+        conditionSouvenirsDuReseau(_monId, await futurSuivis),
+      );
     }
     // Les plus récents seulement : au-delà, les requêtes groupées qui
     // suivent (réactions, commentaires...) dépasseraient la longueur
@@ -407,7 +412,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         ...lignes.map((l) => l['photo_url'] as String?).whereType<String>(),
         for (final chemins in autresChemins.values) ...chemins,
       ]),
-      _reactionsParSouvenir(ids),
+      futurSuivis.then((suivis) => _reactionsParSouvenir(ids, suivis)),
       _nombreCommentairesParSouvenir(ids),
       _presentsParSouvenir(ids),
       EnviesRestaurants(_client).mesEnviesIds(),
@@ -419,7 +424,8 @@ class SouvenirServiceSupabase implements SouvenirService {
       final chemin = l['photo_url'] as String?;
       final id = l['id'] as String;
       final donneesReactions =
-          reactions[id] ?? (nombre: 0, jaiReagi: false, pseudos: <String>[]);
+          reactions[id] ??
+          (nombre: 0, jaiReagi: false, nommees: const <PersonneQuiAime>[]);
       return SouvenirFeed(
         id: id,
         photoUrl: chemin == null ? null : urlParChemin[chemin],
@@ -433,7 +439,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         jaiReagi: donneesReactions.jaiReagi,
         nombreCommentaires: nombreCommentaires[id] ?? 0,
         emotion: Emotion.depuisEmoji(l['emotion'] as String?),
-        premieresReactions: donneesReactions.pseudos,
+        premieresReactions: donneesReactions.nommees,
         presents: presents[id] ?? const [],
         categories:
             (restaurant?['categories'] as List?)?.cast<String>() ?? const [],
@@ -586,32 +592,42 @@ class SouvenirServiceSupabase implements SouvenirService {
   }
 
   /// Réactions des souvenirs donnés, regroupées : pour chaque souvenir,
-  /// le nombre total, si j'ai réagi, et les pseudos des 3 dernières
-  /// réactions (pour l'affichage "Martin, Sarah et 12 autres").
-  Future<Map<String, ({int nombre, bool jaiReagi, List<String> pseudos})>>
-  _reactionsParSouvenir(List<String> souvenirIds) async {
+  /// le nombre total, si j'ai réagi, et les personnes à nommer
+  /// ("Martin, Sarah et 12 autres"), celles que je [suivis] d'abord.
+  Future<
+    Map<String, ({int nombre, bool jaiReagi, List<PersonneQuiAime> nommees})>
+  >
+  _reactionsParSouvenir(List<String> souvenirIds, Set<String> suivis) async {
     if (souvenirIds.isEmpty) return {};
 
     final lignes = await _client
         .from('reactions')
-        .select('souvenir_id, profil_id, cree_le, profils(pseudo)')
+        .select('souvenir_id, profil_id, cree_le, profils(pseudo, photo_url)')
         .inFilter('souvenir_id', souvenirIds)
         .order('cree_le', ascending: false);
 
     final comptes = <String, int>{};
     final mesReactions = <String>{};
-    final pseudosParSouvenir = <String, List<String>>{};
+    final parSouvenir =
+        <String, List<({String id, String pseudo, String? photoUrl})>>{};
     for (final l in lignes) {
       final id = l['souvenir_id'] as String;
+      final profilId = l['profil_id'] as String;
       comptes[id] = (comptes[id] ?? 0) + 1;
-      if (l['profil_id'] == _monId) mesReactions.add(id);
+      if (profilId == _monId) mesReactions.add(id);
 
-      final pseudos = pseudosParSouvenir.putIfAbsent(id, () => []);
-      if (pseudos.length < 3) {
-        final profil = l['profils'] as Map<String, dynamic>?;
-        final pseudo = profil?['pseudo'] as String?;
-        if (pseudo != null) pseudos.add(pseudo);
-      }
+      final profil = l['profils'] as Map<String, dynamic>?;
+      final pseudo = profil?['pseudo'] as String?;
+      if (pseudo == null) continue;
+      parSouvenir.putIfAbsent(id, () => []).add((
+        id: profilId,
+        pseudo: pseudo,
+        photoUrl: urlPhotoProfil(
+          _client,
+          profil?['photo_url'] as String?,
+          miniature: true,
+        ),
+      ));
     }
 
     return {
@@ -619,7 +635,11 @@ class SouvenirServiceSupabase implements SouvenirService {
         id: (
           nombre: comptes[id] ?? 0,
           jaiReagi: mesReactions.contains(id),
-          pseudos: pseudosParSouvenir[id] ?? const [],
+          nommees: personnesNommees(
+            parSouvenir[id] ?? const [],
+            suivis: suivis,
+            monId: _monId,
+          ),
         ),
     };
   }

@@ -114,8 +114,9 @@ void main() {
         ),
       ),
     );
-    int page() =>
-        tester.widget<TablIndicateurPage>(find.byType(TablIndicateurPage)).index;
+    int page() => tester
+        .widget<TablIndicateurPage>(find.byType(TablIndicateurPage))
+        .index;
     expect(page(), 0);
 
     // Le dégradé posé sur la photo ne doit pas retenir le doigt.

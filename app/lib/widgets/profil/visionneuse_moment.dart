@@ -29,6 +29,7 @@ class TablVisionneuseMoment extends StatefulWidget {
     required this.details,
     required this.jaiReagi,
     required this.libelleReactions,
+    this.bullesReactions = const [],
     required this.onReagir,
     required this.titreCommentaires,
     required this.commentaires,
@@ -71,6 +72,9 @@ class TablVisionneuseMoment extends StatefulWidget {
   final List<String> impressions;
   final bool jaiReagi;
   final String libelleReactions;
+
+  /// Ceux que je suis parmi eux, en têtes à côté de [libelleReactions].
+  final List<BullePersonne> bullesReactions;
   final bool enregistre;
 
   /// `null` : pas de bouton Enregistrer (son propre moment).
@@ -384,7 +388,10 @@ class _Panneau extends StatelessWidget {
             onEnregistrer: v.onEnregistrer,
           ),
           const SizedBox(height: 4),
-          Text(v.libelleReactions, style: TablTokens.legende),
+          TablLigneReactions(
+            libelle: v.libelleReactions,
+            bulles: v.bullesReactions,
+          ),
           const SizedBox(height: TablTokens.espaceL + 4),
           TablCommentairesMoment(
             titre: v.titreCommentaires,

@@ -1,5 +1,6 @@
 import 'emotion.dart';
 import 'personne_presente.dart';
+import 'personne_qui_aime.dart';
 
 /// Un souvenir tel qu'affiché dans le Feed — déjà résolu et prêt à
 /// afficher (l'URL de la photo est une URL signée, pas le chemin brut du
@@ -63,10 +64,11 @@ class SouvenirFeed {
   /// `null` pour un souvenir publié avant l'introduction de ce champ.
   final Emotion? emotion;
 
-  /// Pseudos des personnes ayant réagi le plus récemment — sert à
-  /// composer la phrase "Martin, Sarah et 12 autres ont aimé" plutôt
-  /// qu'un chiffre brut mis en avant.
-  final List<String> premieresReactions;
+  /// Les personnes nommées parmi celles qui ont aimé (au plus 3, celles
+  /// que je suis d'abord, voir [personnesNommees]) — pour la phrase
+  /// "Martin, Sarah et 12 autres ont aimé" plutôt qu'un chiffre brut, et
+  /// la tête de celles que je suis à côté.
+  final List<PersonneQuiAime> premieresReactions;
 
   /// Les personnes taguées comme présentes lors de ce moment.
   final List<PersonnePresente> presents;
@@ -120,7 +122,7 @@ class SouvenirFeed {
     int? nombreReactions,
     bool? jaiReagi,
     int? nombreCommentaires,
-    List<String>? premieresReactions,
+    List<PersonneQuiAime>? premieresReactions,
     bool? estEnvie,
   }) {
     return SouvenirFeed(

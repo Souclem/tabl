@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import 'avatar.dart';
 import 'bouton_reaction.dart';
+import 'bulles_personnes.dart';
 import 'indicateur_page.dart';
 import 'instants/bouton_ajouter_instant.dart';
 import 'instants/signal_instants_post.dart';
@@ -58,6 +59,7 @@ class TablPublication extends StatelessWidget {
     required this.ville,
     required this.jaiReagi,
     required this.libelleReactions,
+    this.bullesReactions = const [],
     required this.onReagir,
     required this.onCommenter,
     required this.onOuvrirLieu,
@@ -99,6 +101,10 @@ class TablPublication extends StatelessWidget {
 
   /// Phrase déjà composée ("Martin et 2 autres ont aimé").
   final String libelleReactions;
+
+  /// Les têtes de ceux que je suis parmi eux, à côté de la phrase (3 au
+  /// plus) ; vide : rien à côté.
+  final List<BullePersonne> bullesReactions;
 
   final bool enregistre;
 
@@ -201,11 +207,9 @@ class TablPublication extends StatelessWidget {
                   onEnregistrer: _afficheEnregistrer ? onEnregistrer : null,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  libelleReactions,
-                  style: TablTokens.legende.copyWith(
-                    color: TablTokens.texteDoux.withValues(alpha: 0.9),
-                  ),
+                TablLigneReactions(
+                  libelle: libelleReactions,
+                  bulles: bullesReactions,
                 ),
                 if (aDesInstants || onAjouterInstant != null) ...[
                   const SizedBox(height: 6),
@@ -569,6 +573,42 @@ class TablActionsPublication extends StatelessWidget {
             actif: enregistre,
             onPresse: onEnregistrer!,
           ),
+      ],
+    );
+  }
+}
+
+/// Sous les actions d'un moment : qui l'a aimé, en une phrase, avec la
+/// tête de ceux que je suis devant.
+class TablLigneReactions extends StatelessWidget {
+  const TablLigneReactions({
+    super.key,
+    required this.libelle,
+    this.bulles = const [],
+  });
+
+  /// "Martin, Sarah et 12 autres ont aimé".
+  final String libelle;
+
+  /// 3 au plus ; vide : la phrase seule.
+  final List<BullePersonne> bulles;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        if (bulles.isNotEmpty) ...[
+          TablBullesPersonnes(bulles: bulles, taille: 22),
+          const SizedBox(width: TablTokens.espaceS),
+        ],
+        Flexible(
+          child: Text(
+            libelle,
+            style: TablTokens.legende.copyWith(
+              color: TablTokens.texteDoux.withValues(alpha: 0.9),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1,3 +1,4 @@
+import 'personne_qui_aime.dart';
 import 'souvenir_feed.dart';
 
 const List<String> _moisAnnee = [
@@ -104,7 +105,7 @@ String libelleReactionsSouvenir(SouvenirFeed s) {
         : 'Vous et $autres autre${autres > 1 ? 's' : ''} avez aimé';
   }
   final verbe = s.nombreReactions > 1 ? 'ont aimé' : 'a aimé';
-  final noms = s.premieresReactions;
+  final noms = [for (final p in s.premieresReactions) p.pseudo];
   if (noms.isEmpty) return verbe;
   final reste = s.nombreReactions - noms.length;
   final tete = noms.join(', ');
@@ -112,3 +113,10 @@ String libelleReactionsSouvenir(SouvenirFeed s) {
       ? '$tete et $reste autre${reste > 1 ? 's' : ''} $verbe'
       : '$tete $verbe';
 }
+
+/// Ceux que je suis parmi les personnes nommées sous un moment : leur
+/// tête s'affiche à côté de « a aimé ».
+List<PersonneQuiAime> amisQuiOntAime(SouvenirFeed s) => [
+  for (final p in s.premieresReactions)
+    if (p.suivie) p,
+];

@@ -220,6 +220,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       impressions: souvenir.impressions,
       jaiReagi: souvenir.jaiReagi,
       libelleReactions: libelleReactionsSouvenir(souvenir),
+      bullesReactions: bullesAmisQuiOntAime(souvenir),
       enregistre: souvenir.estEnvie,
       audienceRestreinte: souvenir.audienceRestreinte,
       onReagir: () => basculerReaction(souvenir),
@@ -237,3 +238,10 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     );
   }
 }
+
+/// Les têtes de ceux que je suis parmi qui a aimé [souvenir], à côté de
+/// « a aimé » — sur une publication comme sur un moment agrandi.
+List<BullePersonne> bullesAmisQuiOntAime(SouvenirFeed souvenir) => [
+  for (final p in amisQuiOntAime(souvenir))
+    BullePersonne(pseudo: p.pseudo, photoUrl: p.photoUrl),
+];
