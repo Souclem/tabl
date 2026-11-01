@@ -32,7 +32,15 @@ class _FauxSouvenirService implements SouvenirService {
     required bool envie,
   }) async {}
 
-  _FauxSouvenirService({this.erreur = false, this.tablesEnEchec = const []});
+  _FauxSouvenirService({
+    this.erreur = false,
+    this.tablesEnEchec = const [],
+    this.momentAModifier,
+  });
+
+  /// Ce que [momentModifiable] renvoie.
+  final MomentModifiable? momentAModifier;
+  final List<({String id, MomentModifiable moment})> appelsModifier = [];
 
   final bool erreur;
 
@@ -123,6 +131,20 @@ class _FauxSouvenirService implements SouvenirService {
     String commentaireId, {
     required bool aimer,
   }) => throw UnimplementedError();
+
+  @override
+  Future<MomentModifiable> momentModifiable(String souvenirId) async =>
+      momentAModifier!;
+
+  @override
+  Future<List<String>> modifier(
+    String souvenirId,
+    MomentModifiable moment,
+  ) async {
+    if (erreur) throw Exception('erreur réseau');
+    appelsModifier.add((id: souvenirId, moment: moment));
+    return const [];
+  }
 
   @override
   Future<void> supprimerCommentaire(String commentaireId) =>
@@ -377,6 +399,7 @@ Future<void> _ouvrir(
   RechercheLieuService? rechercheLieuService,
   PositionService? positionService,
   bool sansAnnuaire = false,
+  SouvenirFeed? aModifier,
 }) async {
   tester.view.physicalSize = const Size(1000, 2200);
   tester.view.devicePixelRatio = 1.0;
@@ -401,6 +424,7 @@ Future<void> _ouvrir(
                   positionService: positionService ?? _FaussePosition(),
                   prendrePhoto: () async => _octetsPhoto,
                   choisirPhotos: (restant) async => [_octetsPhoto],
+                  aModifier: aModifier,
                 ),
               ),
             ),
@@ -809,5 +833,150 @@ void main() {
     expect(service.appelsBrouillon, isEmpty);
     expect(service.appelsPublier, isEmpty);
     expect(find.byType(EcranPublier), findsNothing);
+  });
+
+  group('modifier un moment déjà publié', () {
+    final publie = SouvenirFeed(
+      id: 'm1',
+      photoUrl: 'https://exemple.com/1.jpg',
+      legende: 'Onze petites assiettes.',
+      restaurantNom: 'Le Comptoir',
+      ville: 'Liège',
+      moment: 'soir',
+      dateVisite: DateTime(2026, 8, 20),
+      auteurPseudo: 'moi',
+      nombreReactions: 0,
+      jaiReagi: false,
+      nombreCommentaires: 0,
+      estAMoi: true,
+    );
+    const tel = MomentModifiable(
+      lieu: LieuRestaurant(
+        nom: 'Le Comptoir',
+        ville: 'Liège',
+        restaurantId: 'resto-1',
+      ),
+      emotion: Emotion.satisfait,
+      legende: 'Onze petites assiettes.',
+      amisTaguesIds: {'ami-1'},
+      impressions: ['Prix · Correct'],
+      boissonTexte: 'Un Margaux 2018',
+    );
+    final sarah = _FauxAbonnementService(amis: const [_sarah]);
+
+    testWidgets('tout est prérempli ; pas de photo à ajouter, ni de '
+        'restaurant proposé', (tester) async {
+      final annuaire = _FausseRechercheLieu(proches: const [_comoEnCasa]);
+      await _ouvrir(
+        tester,
+        _FauxSouvenirService(momentAModifier: tel),
+        abonnementService: sarah,
+        rechercheLieuService: annuaire,
+        aModifier: publie,
+      );
+
+      expect(find.text('MOMENT · 20 AOÛT'), findsOneWidget);
+      expect(find.text('Le Comptoir'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, 'Onze petites assiettes.'),
+        findsOneWidget,
+      );
+      expect(find.text('Avec sarah'), findsOneWidget);
+      expect(find.text('Prix · Correct'), findsOneWidget);
+      expect(find.text('Un Margaux 2018'), findsOneWidget);
+      expect(find.text('Enregistrer'), findsOneWidget);
+      expect(find.text('Prendre une photo'), findsNothing);
+      expect(find.text('Retirer'), findsNothing);
+      expect(annuaire.autourDe, isEmpty);
+    });
+
+    testWidgets('« Enregistrer » envoie le moment modifié, et ferme', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService(momentAModifier: tel);
+      await _ouvrir(
+        tester,
+        service,
+        abonnementService: sarah,
+        aModifier: publie,
+      );
+
+      await tester.tap(find.text('😍'));
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Onze petites assiettes.'),
+        'Douze, finalement.',
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Enregistrer'));
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+
+      final appel = service.appelsModifier.single;
+      expect(appel.id, 'm1');
+      expect(appel.moment.emotion, Emotion.coupDeCoeur);
+      expect(appel.moment.legende, 'Douze, finalement.');
+      expect(appel.moment.lieu.restaurantId, 'resto-1');
+      expect(appel.moment.amisTaguesIds, {'ami-1'});
+      expect(appel.moment.impressions, ['Prix · Correct']);
+      expect(appel.moment.boissonTexte, 'Un Margaux 2018');
+      expect(find.byType(EcranPublier), findsNothing);
+    });
+
+    testWidgets('fermer sans rien changer ne demande rien', (tester) async {
+      await _ouvrir(
+        tester,
+        _FauxSouvenirService(momentAModifier: tel),
+        abonnementService: sarah,
+        aModifier: publie,
+      );
+
+      await tester.tap(find.byTooltip('Fermer'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EcranPublier), findsNothing);
+    });
+
+    testWidgets('fermer après un changement demande confirmation', (
+      tester,
+    ) async {
+      final service = _FauxSouvenirService(momentAModifier: tel);
+      await _ouvrir(
+        tester,
+        service,
+        abonnementService: sarah,
+        aModifier: publie,
+      );
+
+      await tester.tap(find.text('😍'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Fermer'));
+      await tester.pumpAndSettle();
+      expect(find.text('Abandonner les modifications ?'), findsOneWidget);
+
+      await tester.tap(find.text('Abandonner'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EcranPublier), findsNothing);
+      expect(service.appelsModifier, isEmpty);
+    });
+
+    testWidgets('revenir en arrière après avoir tapé du texte demande '
+        'confirmation', (tester) async {
+      await _ouvrir(
+        tester,
+        _FauxSouvenirService(momentAModifier: tel),
+        abonnementService: sarah,
+        aModifier: publie,
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Onze petites assiettes.'),
+        'Douze.',
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Abandonner les modifications ?'), findsOneWidget);
+    });
   });
 }

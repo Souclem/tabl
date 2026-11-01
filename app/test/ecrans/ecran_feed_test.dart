@@ -114,6 +114,14 @@ class _FauxSouvenirService implements SouvenirService {
   }) => throw UnimplementedError();
 
   @override
+  Future<MomentModifiable> momentModifiable(String souvenirId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<String>> modifier(String souvenirId, MomentModifiable moment) =>
+      throw UnimplementedError();
+
+  @override
   Future<void> supprimerCommentaire(String commentaireId) =>
       throw UnimplementedError();
 }
@@ -548,6 +556,34 @@ void main() {
       expect(find.text(messageErreurGenerique), findsOneWidget);
     },
   );
+
+  testWidgets('ses propres moments ont un menu « ⋯ », pas ceux des autres', (
+    tester,
+  ) async {
+    _agrandirSurface(tester);
+    final souvenirs = [
+      _souvenirDeTest(id: 'a-moi', estAMoi: true, restaurantNom: 'Bibo'),
+      _souvenirDeTest(id: 'a-martin', restaurantNom: 'Le Comptoir'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranFeed(
+          souvenirService: _FauxSouvenirService(souvenirs: souvenirs),
+          abonnementService: _FauxAbonnementService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Options'), findsOneWidget);
+    await tester.tap(find.byTooltip('Options'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modifier'), findsOneWidget);
+    expect(find.text('Qui peut voir'), findsOneWidget);
+    expect(find.text('Supprimer'), findsOneWidget);
+  });
 
   testWidgets('"Commenter" ouvre les commentaires par-dessus le Feed', (
     tester,

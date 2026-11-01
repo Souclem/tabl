@@ -1,15 +1,14 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
 import 'apercu_photos.dart';
 
-/// Les photos d'un souvenir ou d'un moment en cours de création : en
-/// grand, la photo regardée — « ★ Principale » et « Retirer » posés
-/// dessus —, les vignettes dessous. Après la dernière photo, on glisse
-/// sur une page pour en ajouter une ; la vignette « + » y mène aussi.
-/// Sans photo, toute la place est à cette page d'ajout.
+/// Les photos d'un souvenir ou d'un moment en cours de création (ou de
+/// modification) : en grand, la photo regardée — « ★ Principale » et
+/// « Retirer » posés dessus, quand on peut les ranger —, les vignettes
+/// dessous. Après la dernière photo, on glisse sur une page pour en
+/// ajouter une ; la vignette « + » y mène aussi. Sans photo, toute la
+/// place est à cette page d'ajout.
 ///
 /// Composant pur : la page affichée et les photos viennent de l'écran,
 /// les gestes y repartent.
@@ -20,21 +19,25 @@ class TablZonePhotos extends StatelessWidget {
     required this.page,
     required this.hauteur,
     required this.onPage,
-    required this.onRendrePrincipale,
-    required this.onRetirer,
     required this.actionsAjout,
+    this.onRendrePrincipale,
+    this.onRetirer,
     this.titreAjout,
   });
 
   /// La première est la principale.
-  final List<Uint8List> photos;
+  final List<ImageProvider> photos;
 
   /// La page affichée ; `photos.length` : celle d'ajout.
   final int page;
   final double hauteur;
   final ValueChanged<int> onPage;
-  final VoidCallback onRendrePrincipale;
-  final VoidCallback onRetirer;
+
+  /// `null` : les photos ne se rangent pas (« ★ Principale » absent).
+  final VoidCallback? onRendrePrincipale;
+
+  /// `null` : les photos ne se retirent pas.
+  final VoidCallback? onRetirer;
 
   /// Les façons d'ajouter une photo ; vide : il n'y a plus de place.
   final List<ActionAjoutPhoto> actionsAjout;
@@ -52,6 +55,7 @@ class TablZonePhotos extends StatelessWidget {
             titre: photos.isEmpty ? titreAjout : 'Une autre photo ?',
           );
     final surUnePhoto = page < photos.length;
+    final principale = page > 0 ? onRendrePrincipale : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -68,25 +72,27 @@ class TablZonePhotos extends StatelessWidget {
                       onPage: onPage,
                       pageAjout: ajout,
                     ),
-                    if (surUnePhoto)
+                    if (surUnePhoto &&
+                        (principale != null || onRetirer != null))
                       Positioned(
                         right: TablTokens.espaceM,
                         bottom: TablTokens.espaceL + 22,
                         child: Row(
                           children: [
-                            if (page > 0) ...[
+                            if (principale != null)
                               TablPiluleVerre(
                                 icone: Icons.star_rounded,
                                 libelle: 'Principale',
-                                onPresse: onRendrePrincipale,
+                                onPresse: principale,
                               ),
+                            if (principale != null && onRetirer != null)
                               const SizedBox(width: TablTokens.espaceS),
-                            ],
-                            TablPiluleVerre(
-                              icone: Icons.delete_outline_rounded,
-                              libelle: 'Retirer',
-                              onPresse: onRetirer,
-                            ),
+                            if (onRetirer != null)
+                              TablPiluleVerre(
+                                icone: Icons.delete_outline_rounded,
+                                libelle: 'Retirer',
+                                onPresse: onRetirer,
+                              ),
                           ],
                         ),
                       ),

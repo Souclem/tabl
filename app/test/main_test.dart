@@ -190,6 +190,14 @@ class _FauxSouvenirService implements SouvenirService {
   }) => throw UnimplementedError();
 
   @override
+  Future<MomentModifiable> momentModifiable(String souvenirId) =>
+      throw UnimplementedError();
+
+  @override
+  Future<List<String>> modifier(String souvenirId, MomentModifiable moment) =>
+      throw UnimplementedError();
+
+  @override
   Future<void> supprimerCommentaire(String commentaireId) =>
       throw UnimplementedError();
 }

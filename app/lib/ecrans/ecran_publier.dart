@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app/services/services.dart';
@@ -31,6 +32,10 @@ const List<String> _impressionsDisponibles = [
 /// [PropositionLieu]) pour un repas de maintenant, qui part dans le Feed.
 ///
 /// Se ferme sur `true` une fois le moment publié.
+///
+/// Avec [aModifier], le même écran modifie un moment déjà publié : tout
+/// s'y change sauf ses photos et sa date — c'est ce qui a eu lieu. Se
+/// ferme sur `true` une fois enregistré.
 class EcranPublier extends StatefulWidget {
   const EcranPublier({
     super.key,
@@ -41,6 +46,7 @@ class EcranPublier extends StatefulWidget {
     this.positionService,
     this.prendrePhoto = photoDeLAppareil,
     this.choisirPhotos = photosDuTelephone,
+    this.aModifier,
   });
 
   final SouvenirService souvenirService;
@@ -58,6 +64,9 @@ class EcranPublier extends StatefulWidget {
   final PositionService? positionService;
   final PrendrePhoto prendrePhoto;
   final ChoisirPhotos choisirPhotos;
+
+  /// Le moment à modifier (l'un des siens) ; `null` : en publier un.
+  final SouvenirFeed? aModifier;
 
   @override
   State<EcranPublier> createState() => _EcranPublierState();
@@ -89,6 +98,11 @@ class _EcranPublierState extends State<EcranPublier>
   /// Publié : la coche s'affiche, puis l'écran se ferme.
   bool _publie = false;
 
+  bool get _modification => widget.aModifier != null;
+
+  /// Le moment à modifier tel qu'il était ; `null` tant qu'il se charge.
+  MomentModifiable? _initial;
+
   // Chargé une fois : sert à la fois aux personnes à taguer, au libellé
   // de l'audience et à la feuille "Qui peut voir ?".
   late final Future<DonneesAudience> _futurAudience = chargerDonneesAudience(
@@ -100,7 +114,11 @@ class _EcranPublierState extends State<EcranPublier>
   @override
   void initState() {
     super.initState();
-    _localiser();
+    if (_modification) {
+      _chargerMoment();
+    } else {
+      _localiser();
+    }
     _futurAudience.then((donnees) {
       if (mounted) setState(() => _donnees = donnees);
     }, onError: (Object e) => debugPrint('EcranPublier: audience : $e'));
@@ -111,6 +129,49 @@ class _EcranPublierState extends State<EcranPublier>
     _legende.dispose();
     _boissonTexte.dispose();
     super.dispose();
+  }
+
+  /// Le moment à modifier : tout est prérempli, et son restaurant ne
+  /// sera pas remplacé par une proposition.
+  Future<void> _chargerMoment() async {
+    try {
+      final m = await widget.souvenirService.momentModifiable(
+        widget.aModifier!.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _initial = m;
+        lieu = m.lieu;
+        lieuChoisi = true;
+        _emotion = m.emotion;
+        _legende.text = m.legende ?? '';
+        _amisTaguesIds.addAll(m.amisTaguesIds);
+        _impressions.addAll(m.impressions);
+        _boissonTexte.text = m.boissonTexte ?? '';
+        _audience = m.audience;
+      });
+    } catch (e) {
+      debugPrint('EcranPublier: moment à modifier : $e');
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+      Navigator.of(context).pop();
+    }
+  }
+
+  /// Quelque chose a changé depuis l'ouverture du moment à modifier.
+  bool get _aChange {
+    final i = _initial;
+    if (i == null) return false;
+    return lieu?.restaurantId != i.lieu.restaurantId ||
+        lieu?.nom != i.lieu.nom ||
+        _emotion != i.emotion ||
+        _legende.text.trim() != (i.legende ?? '').trim() ||
+        !setEquals(_amisTaguesIds, i.amisTaguesIds) ||
+        !setEquals(_impressions, i.impressions.toSet()) ||
+        _boissonTexte.text.trim() != (i.boissonTexte ?? '').trim() ||
+        _audience.mode != i.audience.mode ||
+        !setEquals(_audience.tableIds, i.audience.tableIds) ||
+        !setEquals(_audience.personneIds, i.audience.personneIds);
   }
 
   Future<void> _localiser() async {
@@ -323,14 +384,18 @@ class _EcranPublierState extends State<EcranPublier>
               onChanged: (_) => redessiner(),
             ),
           ),
-          const SizedBox(width: TablTokens.espaceS),
-          _VignetteBoisson(
-            photo: _boissonPhoto,
-            onPresse: () async {
-              await _photographierBoisson();
-              redessiner();
-            },
-          ),
+          // Une fois publié, la photo de la boisson reste ce qu'elle
+          // était, comme les autres photos.
+          if (!_modification) ...[
+            const SizedBox(width: TablTokens.espaceS),
+            _VignetteBoisson(
+              photo: _boissonPhoto,
+              onPresse: () async {
+                await _photographierBoisson();
+                redessiner();
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -380,7 +445,8 @@ class _EcranPublierState extends State<EcranPublier>
 
   /// Ce qui manque encore pour publier ; `null` : rien.
   String? get _manque {
-    if (photos.isEmpty) return 'Une photo d\'abord.';
+    if (_modification && _initial == null) return null;
+    if (!_modification && photos.isEmpty) return 'Une photo d\'abord.';
     if (lieu == null) return 'Où êtes-vous ?';
     if (_emotion == null) return 'Comment c\'était ?';
     return null;
@@ -436,9 +502,84 @@ class _EcranPublierState extends State<EcranPublier>
     }
   }
 
+  /// Enregistre les changements du moment à modifier.
+  Future<void> _enregistrer() async {
+    final lieu = this.lieu;
+    final emotion = _emotion;
+    if (lieu == null || emotion == null) return;
+    final legende = _legende.text.trim();
+    final erreurLegende = ValidationSouvenir.legende(legende);
+    if (erreurLegende != null) {
+      afficherMessage(context, erreurLegende);
+      return;
+    }
+    final boisson = _boissonTexte.text.trim();
+
+    setState(() => _enCours = true);
+    try {
+      final tablesEnEchec = await widget.souvenirService.modifier(
+        widget.aModifier!.id,
+        MomentModifiable(
+          lieu: lieu,
+          emotion: emotion,
+          legende: legende.isEmpty ? null : legende,
+          amisTaguesIds: Set.of(_amisTaguesIds),
+          impressions: _impressions.toList(),
+          boissonTexte: boisson.isEmpty ? null : boisson,
+          audience: _audience,
+        ),
+      );
+      if (!mounted) return;
+      if (tablesEnEchec.isNotEmpty) {
+        afficherMessage(
+          context,
+          'Modifié, mais impossible de le partager avec '
+          '${pluriel(tablesEnEchec.length, 'Table')}.',
+        );
+      }
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      debugPrint('EcranPublier: modification : $e');
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+      setState(() => _enCours = false);
+    }
+  }
+
+  /// Fermer un moment modifié : les changements ne se perdent pas sans
+  /// le vouloir.
+  Future<void> _fermerModification() async {
+    if (!_aChange) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final abandonner = await showDialog<bool>(
+      context: context,
+      builder: (contexteDialogue) => AlertDialog(
+        backgroundColor: TablTokens.surface,
+        title: const Text('Abandonner les modifications ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(false),
+            child: const Text('Continuer'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(true),
+            child: const Text(
+              'Abandonner',
+              style: TextStyle(color: TablTokens.erreur),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (abandonner == true && mounted) Navigator.of(context).pop();
+  }
+
   /// Fermer avec des photos : rien ne se perd sans le vouloir. Avec un
   /// restaurant, on peut aussi le garder pour plus tard (brouillon).
   Future<void> _fermer() async {
+    if (_modification) return _fermerModification();
     if (photos.isEmpty) {
       Navigator.of(context).pop();
       return;
@@ -508,8 +649,12 @@ class _EcranPublierState extends State<EcranPublier>
         const <String>{};
     final manque = _manque;
 
+    final aModifier = widget.aModifier;
     return PopScope(
-      canPop: photos.isEmpty && !_enCours,
+      // Un moment modifié passe toujours par [_fermer] : taper du texte
+      // ne redessine pas l'écran, [_aChange] ne se lit qu'au moment de
+      // partir.
+      canPop: !_enCours && !_modification && photos.isEmpty,
       onPopInvokedWithResult: (aQuitte, _) {
         if (!aQuitte && !_enCours && !_publie) _fermer();
       },
@@ -522,11 +667,28 @@ class _EcranPublierState extends State<EcranPublier>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  zonePhotos(
-                    context,
-                    actions: _actionsPhoto,
-                    titreAjout: 'Le plat, la table, la tablée',
-                  ),
+                  if (aModifier != null)
+                    TablZonePhotos(
+                      photos: [
+                        for (final url in [
+                          ?aModifier.photoUrl,
+                          ...aModifier.autresPhotosUrls,
+                        ])
+                          NetworkImage(url),
+                      ],
+                      page: page,
+                      hauteur: hauteurPhotosCreation(
+                        MediaQuery.sizeOf(context),
+                      ),
+                      onPage: (p) => setState(() => page = p),
+                      actionsAjout: const [],
+                    )
+                  else
+                    zonePhotos(
+                      context,
+                      actions: _actionsPhoto,
+                      titreAjout: 'Le plat, la table, la tablée',
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
                       TablTokens.espaceL - 4,
@@ -539,7 +701,9 @@ class _EcranPublierState extends State<EcranPublier>
                       children: [
                         TablSurtitreSouvenir(
                           icone: Icons.restaurant_rounded,
-                          texte: momentDuJour(DateTime.now()) == 'midi'
+                          texte: aModifier != null
+                              ? 'Moment · ${dateLisibleSouvenir(aModifier.dateVisite)}'
+                              : momentDuJour(DateTime.now()) == 'midi'
                               ? 'Moment · ce midi'
                               : 'Moment · ce soir',
                         ),
@@ -733,11 +897,18 @@ class _EcranPublierState extends State<EcranPublier>
                           ),
                           const SizedBox(height: TablTokens.espaceS),
                         ],
-                        TablBouton(
-                          libelle: 'Garder ce moment.',
-                          enCours: _enCours,
-                          onPresse: manque == null ? _garderCeMoment : null,
-                        ),
+                        if (_modification)
+                          TablBouton(
+                            libelle: 'Enregistrer',
+                            enCours: _enCours || _initial == null,
+                            onPresse: manque == null ? _enregistrer : null,
+                          )
+                        else
+                          TablBouton(
+                            libelle: 'Garder ce moment.',
+                            enCours: _enCours,
+                            onPresse: manque == null ? _garderCeMoment : null,
+                          ),
                       ],
                     ),
                   ),

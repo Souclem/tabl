@@ -3,6 +3,8 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'ecran_profil_autre.dart';
+import 'ecran_publier.dart';
+import 'feuille_audience.dart';
 import 'feuille_commentaires.dart';
 import 'feuille_restaurant.dart';
 
@@ -14,8 +16,15 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   SouvenirService get souvenirService;
 
   /// Pour ouvrir le profil d'un auteur ; `null` (par défaut) : les
-  /// auteurs ne sont pas touchables.
+  /// auteurs ne sont pas touchables, et ses propres publications n'ont
+  /// pas de menu « ⋯ ».
   AbonnementService? get abonnementService => null;
+
+  /// Pour « Qui peut voir » et « Modifier » ; `null` (par défaut) :
+  /// construits à la demande.
+  TableService? get tableService => null;
+  RechercheLieuService? get rechercheLieuService => null;
+  PositionService? get positionService => null;
 
   /// La publication dépliée sur place (une seule à la fois), voir
   /// [publicationDepliable].
@@ -179,6 +188,171 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       ),
       onReduire: () => setState(() => publicationOuverte = null),
     );
+  }
+
+  /// Le menu « ⋯ » de l'une de mes publications : la modifier (un
+  /// moment), choisir qui la voit, la supprimer.
+  void optionsPublication(SouvenirFeed souvenir) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      builder: (contexteFeuille) {
+        void choisir(Future<void> Function(SouvenirFeed) action) {
+          Navigator.of(contexteFeuille).pop();
+          action(souvenir);
+        }
+
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Un souvenir se range par sa date : il a son propre écran,
+              // pas encore modifiable.
+              if (!souvenir.estSouvenir)
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Modifier'),
+                  onTap: () => choisir(modifierPublication),
+                ),
+              ListTile(
+                leading: const Icon(Icons.visibility_outlined),
+                title: const Text('Qui peut voir'),
+                onTap: () => choisir(modifierAudience),
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: TablTokens.erreur,
+                ),
+                title: const Text(
+                  'Supprimer',
+                  style: TextStyle(color: TablTokens.erreur),
+                ),
+                onTap: () => choisir(supprimerPublication),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  TableService get _tables =>
+      tableService ?? TableServiceSupabase(TablBackend.client);
+
+  /// Le moment s'ouvre dans l'écran qui l'a publié, prérempli.
+  Future<void> modifierPublication(SouvenirFeed souvenir) async {
+    final abonnements = abonnementService;
+    if (abonnements == null) return;
+    final modifie = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EcranPublier(
+          souvenirService: souvenirService,
+          abonnementService: abonnements,
+          tableService: _tables,
+          rechercheLieuService:
+              rechercheLieuService ??
+              RechercheLieuServiceSupabase(TablBackend.client),
+          positionService: positionService ?? PositionServiceGeolocator(),
+          aModifier: souvenir,
+        ),
+      ),
+    );
+    if (modifie != true || !mounted) return;
+    _revenirIci();
+    recharger();
+    afficherMessage(context, 'Moment modifié.');
+  }
+
+  Future<void> modifierAudience(SouvenirFeed souvenir) async {
+    final abonnements = abonnementService;
+    if (abonnements == null) return;
+    final ({AudienceSouvenir audience, Set<String> amisTaguesIds}) actuelle;
+    try {
+      actuelle = await souvenirService.audienceActuelle(souvenir.id);
+    } catch (_) {
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    if (!mounted) return;
+    final choisie = await ouvrirFeuilleAudience(
+      context,
+      audienceInitiale: actuelle.audience,
+      abonnementService: abonnements,
+      tableService: _tables,
+      amisTaguesIds: actuelle.amisTaguesIds,
+    );
+    if (choisie == null || !mounted) return;
+    try {
+      final tablesEnEchec = await souvenirService.modifierAudience(
+        souvenir.id,
+        choisie,
+      );
+      if (!mounted) return;
+      afficherMessage(
+        context,
+        tablesEnEchec.isEmpty
+            ? 'Audience mise à jour.'
+            : 'Mise à jour, mais impossible de partager avec '
+                  '${pluriel(tablesEnEchec.length, 'Table')}.',
+      );
+      recharger();
+    } catch (_) {
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
+    }
+  }
+
+  /// Après confirmation : c'est définitif.
+  Future<void> supprimerPublication(SouvenirFeed souvenir) async {
+    final quoi = souvenir.estSouvenir ? 'ce souvenir' : 'ce moment';
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (contexteDialogue) => AlertDialog(
+        backgroundColor: TablTokens.surface,
+        title: Text('Supprimer $quoi ?'),
+        content: const Text(
+          'Il disparaîtra de votre profil, avec ses photos, ses réactions '
+          'et ses commentaires. C\'est définitif.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(true),
+            child: const Text(
+              'Supprimer',
+              style: TextStyle(color: TablTokens.erreur),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true || !mounted) return;
+    try {
+      await souvenirService.supprimer(souvenir.id);
+    } catch (e) {
+      debugPrint('ActionsPublications: suppression : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    if (!mounted) return;
+    _revenirIci();
+    recharger();
+    afficherMessage(
+      context,
+      souvenir.estSouvenir ? 'Souvenir supprimé.' : 'Moment supprimé.',
+    );
+  }
+
+  /// Le moment agrandi, s'il était ouvert par-dessus, n'est plus à jour :
+  /// on revient sur cet écran.
+  void _revenirIci() {
+    final ici = ModalRoute.of(context);
+    Navigator.of(context).popUntil((route) => ici == null || route == ici);
   }
 
   void remplacer(SouvenirFeed souvenir) {

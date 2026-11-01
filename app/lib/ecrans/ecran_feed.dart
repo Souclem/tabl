@@ -23,6 +23,9 @@ class EcranFeed extends StatefulWidget {
     required this.abonnementService,
     this.instantService,
     this.notificationService,
+    this.tableService,
+    this.rechercheLieuService,
+    this.positionService,
     super.key,
   });
 
@@ -39,6 +42,12 @@ class EcranFeed extends StatefulWidget {
   /// Pour la cloche. `null` : pas de pastille, et le service est
   /// construit à l'ouverture des notifications (jamais dans les tests).
   final NotificationService? notificationService;
+
+  /// Pour modifier ses propres moments et choisir qui les voit. `null` :
+  /// construits à la demande (jamais dans les tests).
+  final TableService? tableService;
+  final RechercheLieuService? rechercheLieuService;
+  final PositionService? positionService;
 
   @override
   State<EcranFeed> createState() => _EcranFeedState();
@@ -58,6 +67,15 @@ class _EcranFeedState extends State<EcranFeed>
 
   @override
   AbonnementService get abonnementService => widget.abonnementService;
+
+  @override
+  TableService? get tableService => widget.tableService;
+
+  @override
+  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
+
+  @override
+  PositionService? get positionService => widget.positionService;
 
   @override
   void recharger() {
@@ -323,6 +341,11 @@ class _EcranFeedState extends State<EcranFeed>
           souvenir,
           contexte: ContextePublication.feed,
           onOuvrirLieu: () => ouvrirRestaurant(souvenir),
+          // Ses propres moments : les modifier, choisir qui les voit,
+          // les supprimer, depuis le Feed aussi.
+          onOptions: souvenir.estAMoi
+              ? () => optionsPublication(souvenir)
+              : null,
           signal: signal,
           onOuvrirInstants: (signal?.aDesInstants ?? false)
               ? () => _ouvrirInstants(souvenir.id)

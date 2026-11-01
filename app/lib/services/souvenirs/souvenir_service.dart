@@ -4,6 +4,7 @@ import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import 'emotion.dart';
+import 'moment_modifiable.dart';
 import 'nouveau_souvenir.dart';
 import 'souvenir_feed.dart';
 
@@ -80,6 +81,16 @@ abstract interface class SouvenirService {
     String souvenirId,
     AudienceSouvenir audience,
   );
+
+  /// Un de ses moments tel qu'il est, pour le modifier. Réservé à
+  /// l'auteur (RLS).
+  Future<MomentModifiable> momentModifiable(String souvenirId);
+
+  /// Enregistre [moment] sur l'un de ses moments, à la place de ce qu'il
+  /// disait. Ses photos, sa date et sa place dans le Feed ne bougent pas
+  /// (comme [modifierAudience]). Même retour : les Tables dont
+  /// l'association a échoué.
+  Future<List<String>> modifier(String souvenirId, MomentModifiable moment);
 
   /// Le Feed : les souvenirs qu'on a le droit de voir (les siens, et ceux
   /// des abonnements acceptés — la RLS de `souvenirs` s'en charge, ce

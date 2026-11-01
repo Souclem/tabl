@@ -235,6 +235,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                   abonnementService: widget.abonnementService,
                   instantService: _instantService,
                   notificationService: _notificationService,
+                  // Les nullables, comme pour EcranProfil : construits
+                  // ici, ils le seraient avant que Supabase soit prêt.
+                  tableService: widget.tableService,
+                  rechercheLieuService: widget.rechercheLieuService,
+                  positionService: widget.positionService,
                 ),
                 _ongletsConstruits.contains(TablOnglet.tables)
                     ? EcranTables(

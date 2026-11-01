@@ -17,8 +17,7 @@ enum ContextePublication {
   feed,
 
   /// Son propre profil : pas d'auteur (c'est toujours soi), pas
-  /// d'"Enregistrer" (on n'ajoute pas sa propre adresse à ses envies),
-  /// mais un menu d'options sur ses propres posts.
+  /// d'"Enregistrer" (on n'ajoute pas sa propre adresse à ses envies).
   profilPerso,
 
   /// Le profil de quelqu'un d'autre : pas d'auteur (la page le dit
@@ -119,8 +118,8 @@ class TablPublication extends StatelessWidget {
   /// Ignoré sur son propre profil.
   final VoidCallback? onEnregistrer;
 
-  /// Menu "⋯" — affiché seulement sur son propre profil, et seulement si
-  /// fourni.
+  /// Menu "⋯" de ses propres moments (Feed, son profil) ; `null` :
+  /// aucun.
   final VoidCallback? onOptions;
 
   /// Tap sur l'avatar ou le pseudo de l'auteur (ouvre son profil) ;
@@ -140,9 +139,6 @@ class TablPublication extends StatelessWidget {
 
   bool get _afficheEnregistrer => contexte != ContextePublication.profilPerso;
 
-  bool get _afficheOptions =>
-      contexte == ContextePublication.profilPerso && onOptions != null;
-
   @override
   Widget build(BuildContext context) {
     final aDesInstants = instantsTotal > 0 && onOuvrirInstants != null;
@@ -156,7 +152,7 @@ class TablPublication extends StatelessWidget {
             auteurPhotoUrl: auteurPhotoUrl,
             dateLisible: dateLisible,
             audienceRestreinte: audienceRestreinte,
-            onOptions: _afficheOptions ? onOptions : null,
+            onOptions: onOptions,
             onTapAuteur: onTapAuteur,
           ),
           _Photo(

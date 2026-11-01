@@ -9,7 +9,6 @@ import 'ecran_accueil.dart';
 import 'ecran_aide.dart';
 import 'ecran_abonnes.dart';
 import 'ecran_choix_souvenir.dart';
-import 'feuille_audience.dart';
 
 /// Onglet Profil : en haut, qui on est (photo, prénom, moments, abonnés,
 /// abonnements) ; dessous, son journal en grille par mois et son bilan
@@ -61,7 +60,16 @@ class _EcranProfilState extends State<EcranProfil>
   String? get prenomProfil => null;
 
   @override
-  void Function(SouvenirFeed)? get optionsMoment => _ouvrirOptions;
+  void Function(SouvenirFeed)? get optionsMoment => optionsPublication;
+
+  @override
+  TableService? get tableService => widget.tableService;
+
+  @override
+  RechercheLieuService? get rechercheLieuService => widget.rechercheLieuService;
+
+  @override
+  PositionService? get positionService => widget.positionService;
 
   @override
   VoidCallback get onAjouterSouvenir => _ajouterDesSouvenirs;
@@ -76,10 +84,9 @@ class _EcranProfilState extends State<EcranProfil>
           abonnementService: widget.abonnementService,
           tableService: _tableService,
           rechercheLieuService:
-              widget.rechercheLieuService ??
+              rechercheLieuService ??
               RechercheLieuServiceSupabase(TablBackend.client),
-          positionService:
-              widget.positionService ?? PositionServiceGeolocator(),
+          positionService: positionService ?? PositionServiceGeolocator(),
           photosRecentes: [
             for (final s in souvenirs ?? const <SouvenirFeed>[]) ?s.photoUrl,
           ].take(3).toList(),
@@ -369,125 +376,6 @@ class _EcranProfilState extends State<EcranProfil>
       afficherMessage(context, 'Photo de profil mise à jour.');
     } catch (e) {
       debugPrint('EcranProfil: photo : $e');
-      if (!mounted) return;
-      afficherMessage(context, messageErreurGenerique);
-    }
-  }
-
-  void _ouvrirOptions(SouvenirFeed souvenir) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: TablTokens.surface,
-      builder: (contexteSheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.visibility_outlined),
-              title: const Text('Qui peut voir'),
-              onTap: () {
-                Navigator.of(contexteSheet).pop();
-                _modifierAudience(souvenir);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.delete_outline_rounded,
-                color: TablTokens.erreur,
-              ),
-              title: const Text(
-                'Supprimer',
-                style: TextStyle(color: TablTokens.erreur),
-              ),
-              onTap: () {
-                Navigator.of(contexteSheet).pop();
-                _supprimer(souvenir);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Après confirmation : c'est définitif.
-  Future<void> _supprimer(SouvenirFeed souvenir) async {
-    final quoi = souvenir.estSouvenir ? 'ce souvenir' : 'ce moment';
-    final confirme = await showDialog<bool>(
-      context: context,
-      builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
-        title: Text('Supprimer $quoi ?'),
-        content: const Text(
-          'Il disparaîtra de votre profil, avec ses photos, ses réactions '
-          'et ses commentaires. C\'est définitif.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(contexteDialogue).pop(false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(contexteDialogue).pop(true),
-            child: const Text(
-              'Supprimer',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirme != true || !mounted) return;
-    try {
-      await widget.souvenirService.supprimer(souvenir.id);
-    } catch (e) {
-      debugPrint('EcranProfil: suppression : $e');
-      if (mounted) afficherMessage(context, messageErreurGenerique);
-      return;
-    }
-    if (!mounted) return;
-    // Le moment agrandi, s'il était ouvert, n'a plus rien à montrer.
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    recharger();
-    afficherMessage(
-      context,
-      souvenir.estSouvenir ? 'Souvenir supprimé.' : 'Moment supprimé.',
-    );
-  }
-
-  Future<void> _modifierAudience(SouvenirFeed souvenir) async {
-    final ({AudienceSouvenir audience, Set<String> amisTaguesIds}) actuelle;
-    try {
-      actuelle = await widget.souvenirService.audienceActuelle(souvenir.id);
-    } catch (_) {
-      if (!mounted) return;
-      afficherMessage(context, messageErreurGenerique);
-      return;
-    }
-    if (!mounted) return;
-    final choisie = await ouvrirFeuilleAudience(
-      context,
-      audienceInitiale: actuelle.audience,
-      abonnementService: widget.abonnementService,
-      tableService: _tableService,
-      amisTaguesIds: actuelle.amisTaguesIds,
-    );
-    if (choisie == null || !mounted) return;
-    try {
-      final tablesEnEchec = await widget.souvenirService.modifierAudience(
-        souvenir.id,
-        choisie,
-      );
-      if (!mounted) return;
-      afficherMessage(
-        context,
-        tablesEnEchec.isEmpty
-            ? 'Audience mise à jour.'
-            : 'Mise à jour, mais impossible de partager avec '
-                  '${tablesEnEchec.length} Table${tablesEnEchec.length > 1 ? 's' : ''}.',
-      );
-      recharger();
-    } catch (_) {
       if (!mounted) return;
       afficherMessage(context, messageErreurGenerique);
     }

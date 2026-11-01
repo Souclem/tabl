@@ -52,6 +52,7 @@ export 'souvenirs/import_souvenirs.dart';
 export 'souvenirs/filtre_reseau.dart';
 export 'souvenirs/journal_profil.dart';
 export 'souvenirs/metadonnees_photo.dart';
+export 'souvenirs/moment_modifiable.dart';
 export 'souvenirs/nouveau_souvenir.dart';
 export 'souvenirs/personne_presente.dart';
 export 'souvenirs/personne_qui_aime.dart';

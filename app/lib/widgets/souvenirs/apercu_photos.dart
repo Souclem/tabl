@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -31,7 +30,8 @@ class TablApercuPhotos extends StatefulWidget {
     this.pageAjout,
   });
 
-  final List<Uint8List> photos;
+  /// Celles du téléphone (en cours de création) ou déjà en ligne.
+  final List<ImageProvider> photos;
   final int page;
   final ValueChanged<int> onPage;
   final Widget? pageAjout;
@@ -73,7 +73,14 @@ class _TablApercuPhotosState extends State<TablApercuPhotos> {
           itemCount: photos.length + (widget.pageAjout == null ? 0 : 1),
           onPageChanged: widget.onPage,
           itemBuilder: (_, i) => i < photos.length
-              ? Image.memory(photos[i], fit: BoxFit.cover, gaplessPlayback: true)
+              ? Image(
+                  image: photos[i],
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  // Une photo en ligne qui ne vient pas : le fond, pas
+                  // une erreur.
+                  errorBuilder: (_, _, _) => const SizedBox(),
+                )
               : widget.pageAjout!,
         ),
         // Le haut s'assombrit pour les boutons, le bas se fond dans la
@@ -277,7 +284,7 @@ class TablBandeVignettes extends StatelessWidget {
   });
 
   /// La première est la principale.
-  final List<Uint8List> photos;
+  final List<ImageProvider> photos;
   final int page;
   final ValueChanged<int> onChoisir;
 
@@ -326,7 +333,11 @@ class TablBandeVignettes extends StatelessWidget {
                         ),
                         child: Opacity(
                           opacity: i == page ? 1 : 0.6,
-                          child: Image.memory(photos[i], fit: BoxFit.cover),
+                          child: Image(
+                            image: photos[i],
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => const SizedBox(),
+                          ),
                         ),
                       ),
                       if (i == 0)

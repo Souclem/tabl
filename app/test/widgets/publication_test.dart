@@ -34,14 +34,25 @@ void main() {
   testWidgets('Feed : auteur et "Enregistrer" visibles, pas de menu', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      _publication(ContextePublication.feed, onOptions: () {}),
-    );
+    await tester.pumpWidget(_publication(ContextePublication.feed));
 
     expect(find.text('martin'), findsOneWidget);
     expect(find.text('20 août'), findsOneWidget);
     expect(find.byTooltip('Enregistrer'), findsOneWidget);
     expect(find.byTooltip('Options'), findsNothing);
+  });
+
+  testWidgets('Feed, son propre moment : le menu d\'options aussi', (
+    tester,
+  ) async {
+    var options = 0;
+    await tester.pumpWidget(
+      _publication(ContextePublication.feed, onOptions: () => options++),
+    );
+
+    expect(find.text('martin'), findsOneWidget);
+    await tester.tap(find.byTooltip('Options'));
+    expect(options, 1);
   });
 
   testWidgets('Profil perso : ni auteur ni "Enregistrer", menu d\'options', (
@@ -69,7 +80,6 @@ void main() {
     await tester.pumpWidget(
       _publication(
         ContextePublication.profilAutre,
-        onOptions: () {},
         onEnregistrer: () => enregistrements++,
       ),
     );

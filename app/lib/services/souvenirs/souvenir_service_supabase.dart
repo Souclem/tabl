@@ -11,6 +11,7 @@ import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
+import 'moment_modifiable.dart';
 import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
 import 'personne_qui_aime.dart';
@@ -228,6 +229,87 @@ class SouvenirServiceSupabase implements SouvenirService {
       ),
       amisTaguesIds: ids(resultats[3], 'profil_id'),
     );
+  }
+
+  @override
+  Future<MomentModifiable> momentModifiable(String souvenirId) async {
+    final (ligne, actuelle) = await (
+      _client
+          .from('souvenirs')
+          .select(
+            'legende, emotion, impressions, boisson_texte, restaurant_id, '
+            'restaurants(nom, ville, categories, prive)',
+          )
+          .eq('id', souvenirId)
+          .single(),
+      audienceActuelle(souvenirId),
+    ).wait;
+    final restaurant = ligne['restaurants'] as Map<String, dynamic>?;
+    final nom = restaurant?['nom'] as String? ?? '';
+    final restaurantId = ligne['restaurant_id'] as String?;
+    return MomentModifiable(
+      lieu: restaurant?['prive'] == true
+          ? LieuRestaurant.personnel(nom: nom, restaurantId: restaurantId)
+          : LieuRestaurant(
+              nom: nom,
+              ville: restaurant?['ville'] as String? ?? '',
+              restaurantId: restaurantId,
+              categories:
+                  (restaurant?['categories'] as List?)?.cast<String>() ??
+                  const [],
+            ),
+      emotion: Emotion.depuisEmoji(ligne['emotion'] as String?),
+      legende: ligne['legende'] as String?,
+      amisTaguesIds: actuelle.amisTaguesIds,
+      impressions: (ligne['impressions'] as List?)?.cast<String>() ?? const [],
+      boissonTexte: ligne['boisson_texte'] as String?,
+      audience: actuelle.audience,
+    );
+  }
+
+  @override
+  Future<List<String>> modifier(
+    String souvenirId,
+    MomentModifiable moment,
+  ) async {
+    final restaurantId = await _restaurants.idPour(moment.lieu);
+    await _client
+        .from('souvenirs')
+        .update({
+          'restaurant_id': restaurantId,
+          'emotion': moment.emotion?.emoji,
+          'legende': moment.legende,
+          'impressions': moment.impressions,
+          'boisson_texte': moment.boissonTexte,
+        })
+        .eq('id', souvenirId);
+
+    // Les personnes taguées : seulement ce qui change, pour ne pas
+    // retirer puis remettre ceux qui restent.
+    final lignes = await _client
+        .from('souvenirs_amis_tagues')
+        .select('profil_id')
+        .eq('souvenir_id', souvenirId);
+    final avant = {for (final l in lignes) l['profil_id'] as String};
+    final retires = avant.difference(moment.amisTaguesIds);
+    final ajoutes = moment.amisTaguesIds.difference(avant);
+    await (
+      retires.isEmpty
+          ? Future<void>.value()
+          : _client
+                .from('souvenirs_amis_tagues')
+                .delete()
+                .eq('souvenir_id', souvenirId)
+                .inFilter('profil_id', retires.toList()),
+      ajoutes.isEmpty
+          ? Future<void>.value()
+          : _client.from('souvenirs_amis_tagues').insert([
+              for (final profilId in ajoutes)
+                {'souvenir_id': souvenirId, 'profil_id': profilId},
+            ]),
+    ).wait;
+
+    return modifierAudience(souvenirId, moment.audience);
   }
 
   @override

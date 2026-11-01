@@ -116,7 +116,7 @@ mixin EditionPhotos<T extends StatefulWidget> on State<T> {
     String? titreAjout,
   }) {
     return TablZonePhotos(
-      photos: [for (final p in photos) p.octets],
+      photos: [for (final p in photos) MemoryImage(p.octets)],
       page: page,
       hauteur: hauteurPhotosCreation(MediaQuery.sizeOf(context)),
       onPage: (p) => setState(() => page = p),
