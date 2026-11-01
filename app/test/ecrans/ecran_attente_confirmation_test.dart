@@ -216,13 +216,13 @@ void main() {
       expect(find.text('Vérifie ta boîte mail'), findsOneWidget);
       expect(find.byType(EcranPrincipal), findsNothing);
 
-      // Deux tics du minuteur (4s chacun) : toujours pas confirmé.
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pump(const Duration(seconds: 4));
+      // Deux tics du minuteur (15 s chacun) : toujours pas confirmé.
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(seconds: 15));
       expect(find.byType(EcranPrincipal), findsNothing);
 
       // Troisième tic : la fausse connexion réussit.
-      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(seconds: 15));
       await tester.pumpAndSettle();
 
       expect(find.byType(EcranPrincipal), findsOneWidget);
@@ -255,6 +255,36 @@ void main() {
     await tester.tap(find.text('Déjà confirmé ? Vérifier maintenant'));
     await tester.pump();
     await tester.pumpAndSettle();
+    expect(find.byType(EcranPrincipal), findsOneWidget);
+  });
+
+  testWidgets("vérifie au retour dans l'app, sans attendre le minuteur", (
+    tester,
+  ) async {
+    final authService = _FauxAuthService(echecsAvantSucces: 0);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAttenteConfirmation(
+          authService: authService,
+          abonnementService: _FauxAbonnementService(),
+          souvenirService: _FauxSouvenirService(),
+          email: 'camille@exemple.com',
+          motDePasse: 'motdepasse123',
+        ),
+      ),
+    );
+    expect(find.byType(EcranPrincipal), findsNothing);
+
+    // Parti dans sa boîte mail, puis revenu.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
     expect(find.byType(EcranPrincipal), findsOneWidget);
   });
 }

@@ -11,6 +11,7 @@ import '../../config_oauth.dart';
 import '../notifications/notifications_systeme.dart';
 import '../social/photo_profil.dart';
 import 'auth_service.dart';
+import 'message_erreur_auth.dart';
 import 'utilisateur.dart';
 
 /// Authentification adossée à Supabase.
@@ -84,6 +85,12 @@ class AuthServiceSupabase implements AuthService {
     final compte = reponse.user;
     if (compte == null) {
       throw const ErreurAuth('Création du compte impossible. Réessaie.');
+    }
+    // L'adresse a déjà un compte : pour ne pas le révéler à n'importe
+    // qui, Supabase répond comme à une inscription, mais sans identité
+    // ni e-mail envoyé. Attendre une confirmation serait sans fin.
+    if (compte.identities?.isEmpty ?? false) {
+      throw const ErreurAuth('Un compte existe déjà avec cette adresse.');
     }
 
     // Sans session, l'utilisateur doit d'abord confirmer son e-mail :
@@ -317,22 +324,10 @@ class AuthServiceSupabase implements AuthService {
     }
   }
 
-  /// Traduit les messages de Supabase, qui sont en anglais et parfois
-  /// techniques, en quelque chose de présentable.
+  /// Ce qu'on affiche d'un refus de Supabase ; l'original, en anglais,
+  /// part dans les journaux pour comprendre ce qui s'est passé.
   String _messageLisible(AuthException e) {
-    final m = e.message.toLowerCase();
-    if (m.contains('invalid login credentials')) {
-      return 'E-mail ou mot de passe incorrect.';
-    }
-    if (m.contains('already registered') || m.contains('already exists')) {
-      return 'Un compte existe déjà avec cette adresse.';
-    }
-    if (m.contains('email not confirmed')) {
-      return "Confirme d'abord ton adresse e-mail.";
-    }
-    if (m.contains('rate limit')) {
-      return "Trop de tentatives récentes. Réessaie dans quelques minutes.";
-    }
-    return e.message;
+    debugPrint('AuthService: ${e.statusCode} ${e.code} ${e.message}');
+    return messageErreurAuth(code: e.code, message: e.message);
   }
 }

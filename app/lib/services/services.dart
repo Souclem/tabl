@@ -6,6 +6,7 @@ export 'aide/retour_service.dart';
 export 'aide/retour_service_supabase.dart';
 export 'auth/auth_service.dart';
 export 'auth/auth_service_supabase.dart';
+export 'auth/message_erreur_auth.dart';
 export 'auth/utilisateur.dart';
 export 'auth/validation.dart';
 export 'avis/avis.dart';
