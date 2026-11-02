@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -7,38 +9,57 @@ sealed class ChoixRecherche {
   const ChoixRecherche();
 }
 
-/// Une adresse : sa fiche s'ouvre.
+/// Un endroit (une ville, un quartier, une adresse) : l'Explorer s'y
+/// rend.
+class EndroitChoisi extends ChoixRecherche {
+  const EndroitChoisi(this.zone);
+
+  final ZoneCarte zone;
+}
+
+/// « Autour de moi ».
+class AutourDeMoiChoisi extends ChoixRecherche {
+  const AutourDeMoiChoisi();
+}
+
+/// Un restaurant : sa fiche s'ouvre.
 class AdresseChoisie extends ChoixRecherche {
   const AdresseChoisie(this.lieu);
 
   final LieuCarte lieu;
 }
 
-/// Un proche : la grille ne montre plus que ses adresses.
-class ProcheChoisi extends ChoixRecherche {
-  const ProcheChoisi(this.proche);
-
-  final ProfilPublic proche;
-}
-
-/// « Rechercher » (maquette de Martin) : les restaurants du cercle dans
-/// la zone regardée, puis ceux d'ailleurs, puis les proches dont le
-/// prénom correspond. `null` si on annule.
+/// « Rechercher » : par défaut, on cherche un endroit où explorer — les
+/// villes de mon cercle d'abord, puis toute ville, tout quartier, toute
+/// adresse. En tête des résultats, de quoi chercher plutôt les
+/// restaurants de ce nom. `null` si on annule.
+///
+/// La pilule de la barre glisse jusqu'en haut pour devenir le champ.
 Future<ChoixRecherche?> ouvrirRechercheExplorer(
   BuildContext context, {
   required List<LieuCarte> ici,
   required List<LieuCarte> ailleurs,
-  required List<ProfilPublic> proches,
+  required List<VilleCercle> villes,
+  required RechercheEndroitService rechercheEndroit,
+  required String Function(int nombre) compte,
+  ({double latitude, double longitude})? position,
 }) {
   return Navigator.of(context).push<ChoixRecherche>(
     PageRouteBuilder(
-      opaque: true,
-      transitionDuration: const Duration(milliseconds: 260),
-      reverseTransitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (_, _, _) =>
-          _RechercheExplorer(ici: ici, ailleurs: ailleurs, proches: proches),
-      transitionsBuilder: (_, animation, _, enfant) =>
-          FadeTransition(opacity: animation, child: enfant),
+      transitionDuration: const Duration(milliseconds: 420),
+      reverseTransitionDuration: const Duration(milliseconds: 320),
+      pageBuilder: (_, _, _) => _RechercheExplorer(
+        ici: ici,
+        ailleurs: ailleurs,
+        villes: villes,
+        rechercheEndroit: rechercheEndroit,
+        compte: compte,
+        position: position,
+      ),
+      transitionsBuilder: (_, animation, _, enfant) => FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: enfant,
+      ),
     ),
   );
 }
@@ -47,12 +68,18 @@ class _RechercheExplorer extends StatefulWidget {
   const _RechercheExplorer({
     required this.ici,
     required this.ailleurs,
-    required this.proches,
+    required this.villes,
+    required this.rechercheEndroit,
+    required this.compte,
+    required this.position,
   });
 
   final List<LieuCarte> ici;
   final List<LieuCarte> ailleurs;
-  final List<ProfilPublic> proches;
+  final List<VilleCercle> villes;
+  final RechercheEndroitService rechercheEndroit;
+  final String Function(int nombre) compte;
+  final ({double latitude, double longitude})? position;
 
   @override
   State<_RechercheExplorer> createState() => _RechercheExplorerState();
@@ -61,13 +88,53 @@ class _RechercheExplorer extends StatefulWidget {
 class _RechercheExplorerState extends State<_RechercheExplorer> {
   final _saisie = TextEditingController();
 
+  /// On cherche des restaurants par leur nom, plutôt qu'un endroit.
+  bool _restaurants = false;
+
+  List<EndroitTrouve> _endroits = const [];
+  Timer? _attente;
+  int _demande = 0;
+
   /// Au-delà, on demande de préciser.
   static const _maxParSection = 8;
 
   @override
   void dispose() {
+    _attente?.cancel();
     _saisie.dispose();
     super.dispose();
+  }
+
+  void _changer(String texte) {
+    setState(() {
+      if (texte.trim().isEmpty) {
+        _restaurants = false;
+        _endroits = const [];
+      }
+    });
+    _chercherEndroits();
+  }
+
+  /// Une courte pause dans la frappe avant de demander au géocodage.
+  void _chercherEndroits() {
+    _attente?.cancel();
+    final texte = _saisie.text.trim();
+    if (texte.isEmpty) return;
+    _attente = Timer(const Duration(milliseconds: 300), () async {
+      final numero = ++_demande;
+      try {
+        final endroits = await widget.rechercheEndroit.chercher(
+          texte,
+          latitude: widget.position?.latitude,
+          longitude: widget.position?.longitude,
+        );
+        if (mounted && numero == _demande) {
+          setState(() => _endroits = endroits);
+        }
+      } catch (e) {
+        debugPrint('Recherche : endroits : $e');
+      }
+    });
   }
 
   List<LieuCarte> _correspondants(List<LieuCarte> lieux, String q) => [
@@ -81,80 +148,27 @@ class _RechercheExplorerState extends State<_RechercheExplorer> {
     TeinteLieu.vous => GenreTuile.vous,
   };
 
+  void _choisir(ChoixRecherche choix) => Navigator.of(context).pop(choix);
+
   @override
   Widget build(BuildContext context) {
     final palette = PaletteExplorer.of(context);
-    final q = normaliserPourRecherche(_saisie.text);
-    final ici = q.isEmpty
-        ? const <LieuCarte>[]
-        : _correspondants(widget.ici, q);
-    final ailleurs = q.isEmpty
-        ? const <LieuCarte>[]
-        : _correspondants(widget.ailleurs, q);
-    final proches = q.isEmpty
-        ? const <ProfilPublic>[]
-        : prochesCorrespondants(widget.proches, q).proches;
-    Widget adresse(LieuCarte l) => TablLigneAdresse(
-      nom: l.nom,
-      resume: resumeRecherche(l),
-      genre: _genre(l),
-      onPresse: () => Navigator.of(context).pop(AdresseChoisie(l)),
-    );
     return Scaffold(
       backgroundColor: palette.surface,
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+              padding: const EdgeInsets.fromLTRB(16, 12, 6, 6),
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: palette == PaletteExplorer.clair
-                            ? Colors.white
-                            : palette.barre,
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: palette.trait),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.search_rounded,
-                            size: 21,
-                            color: palette.texte,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _saisie,
-                              autofocus: true,
-                              autocorrect: false,
-                              onChanged: (_) => setState(() {}),
-                              cursorColor: palette.texte,
-                              style: TablTokens.corps.copyWith(
-                                fontSize: 16,
-                                color: palette.texte,
-                              ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                filled: false,
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                hintText: 'Un restaurant, un proche',
-                                hintStyle: TablTokens.corps.copyWith(
-                                  fontSize: 16,
-                                  color: palette.texteDoux,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: TablChampRechercheExplorer(
+                      controleur: _saisie,
+                      onChanged: _changer,
+                      indication: _restaurants
+                          ? 'Le nom d’un restaurant'
+                          : 'Une ville, un quartier, une adresse',
                     ),
                   ),
                   TextButton(
@@ -175,45 +189,102 @@ class _RechercheExplorerState extends State<_RechercheExplorer> {
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.only(bottom: TablTokens.espaceXl),
-                children: [
-                  if (q.isNotEmpty &&
-                      ici.isEmpty &&
-                      ailleurs.isEmpty &&
-                      proches.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(TablTokens.espaceXl),
-                      child: Text(
-                        'Rien ne correspond à « ${_saisie.text.trim()} ».',
-                        textAlign: TextAlign.center,
-                        style: TablTokens.corps.copyWith(
-                          color: palette.texteDoux,
-                        ),
-                      ),
-                    ),
-                  if (ici.isNotEmpty) ...[
-                    const TablTitreRecherche('Restaurants de votre cercle'),
-                    for (final l in ici) adresse(l),
-                  ],
-                  if (ailleurs.isNotEmpty) ...[
-                    const TablTitreRecherche('Ailleurs'),
-                    for (final l in ailleurs) adresse(l),
-                  ],
-                  if (proches.isNotEmpty) ...[
-                    const TablTitreRecherche('Vos proches'),
-                    for (final p in proches)
-                      TablLigneProcheRecherche(
-                        pseudo: p.pseudo,
-                        photoUrl: p.photoUrl,
-                        onPresse: () =>
-                            Navigator.of(context).pop(ProcheChoisi(p)),
-                      ),
-                  ],
-                ],
+                children: _restaurants
+                    ? _resultatsRestaurants()
+                    : _resultatsEndroits(),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  List<Widget> _resultatsEndroits() {
+    final texte = _saisie.text.trim();
+    final q = normaliserPourRecherche(texte);
+    final villes = [
+      for (final v in widget.villes)
+        if (q.isEmpty || normaliserPourRecherche(v.nom).contains(q)) v,
+    ].take(_maxParSection).toList();
+    final dejaLa = {for (final v in villes) normaliserPourRecherche(v.nom)};
+    final endroits = [
+      for (final e in _endroits)
+        if (!dejaLa.contains(normaliserPourRecherche(e.nom))) e,
+    ];
+    return [
+      if (texte.isNotEmpty)
+        TablLigneEndroit(
+          icone: Icons.restaurant_rounded,
+          nom: 'Chercher les restaurants dont le nom est « $texte »',
+          enAvant: true,
+          onPresse: () => setState(() => _restaurants = true),
+        )
+      else if (widget.position != null)
+        TablLigneEndroit(
+          icone: Icons.near_me_rounded,
+          nom: 'Autour de moi',
+          detail: 'Votre position',
+          onPresse: () => _choisir(const AutourDeMoiChoisi()),
+        ),
+      if (villes.isNotEmpty) ...[
+        const TablTitreRecherche('Là où votre cercle a des adresses'),
+        for (final v in villes)
+          TablLigneEndroit(
+            icone: Icons.location_city_rounded,
+            nom: v.nom,
+            detail: widget.compte(v.compte),
+            onPresse: () => _choisir(EndroitChoisi(v.zone)),
+          ),
+      ],
+      if (endroits.isNotEmpty) ...[
+        const TablTitreRecherche('Ailleurs'),
+        for (final e in endroits)
+          TablLigneEndroit(
+            icone: Icons.place_outlined,
+            nom: e.nom,
+            detail: e.detail,
+            onPresse: () => _choisir(EndroitChoisi(e.zone)),
+          ),
+      ],
+    ];
+  }
+
+  List<Widget> _resultatsRestaurants() {
+    final palette = PaletteExplorer.of(context);
+    final texte = _saisie.text.trim();
+    final q = normaliserPourRecherche(texte);
+    final ici = _correspondants(widget.ici, q);
+    final ailleurs = _correspondants(widget.ailleurs, q);
+    Widget adresse(LieuCarte l) => TablLigneAdresse(
+      nom: l.nom,
+      resume: resumeRecherche(l),
+      genre: _genre(l),
+      onPresse: () => _choisir(AdresseChoisie(l)),
+    );
+    return [
+      TablLigneEndroit(
+        icone: Icons.place_outlined,
+        nom: 'Chercher plutôt un endroit',
+        onPresse: () => setState(() => _restaurants = false),
+      ),
+      if (ici.isEmpty && ailleurs.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(TablTokens.espaceXl),
+          child: Text(
+            'Aucun restaurant de votre cercle ne s’appelle « $texte ».',
+            textAlign: TextAlign.center,
+            style: TablTokens.corps.copyWith(color: palette.texteDoux),
+          ),
+        ),
+      if (ici.isNotEmpty) ...[
+        const TablTitreRecherche('Restaurants de votre cercle'),
+        for (final l in ici) adresse(l),
+      ],
+      if (ailleurs.isNotEmpty) ...[
+        const TablTitreRecherche('Ailleurs'),
+        for (final l in ailleurs) adresse(l),
+      ],
+    ];
   }
 }

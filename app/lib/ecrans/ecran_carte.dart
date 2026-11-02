@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import '../config_mapbox.dart';
+
 import 'feuille_demander_avis.dart';
 import 'feuille_filtres_explorer.dart';
 import 'feuille_restaurant.dart';
@@ -35,6 +37,7 @@ class EcranCarte extends StatefulWidget {
     this.abonnementService,
     this.souvenirService,
     this.avisService,
+    this.rechercheEndroit,
     this.filtresInitiaux = FiltresCarte.aucun,
     this.estOnglet = true,
     this.afficherCarte = true,
@@ -62,6 +65,10 @@ class EcranCarte extends StatefulWidget {
 
   /// Filtres appliqués à l'ouverture ("Voir sur la carte" depuis une
   /// Table ouvre la carte déjà filtrée sur cette Table).
+  /// Pour chercher une ville, un quartier, une adresse. `null` : le
+  /// géocodage de Mapbox, construit à la demande (jamais dans les tests).
+  final RechercheEndroitService? rechercheEndroit;
+
   final FiltresCarte filtresInitiaux;
 
   /// `false` quand l'Explorer est ouvert par-dessus un autre écran :
@@ -388,9 +395,10 @@ class _EcranCarteState extends State<EcranCarte> {
     position: _position,
   );
 
-  /// « Rechercher » : les adresses d'ici, puis d'ailleurs, puis les
-  /// proches. Une adresse ouvre sa fiche ; un proche filtre la grille.
+  /// « Rechercher » : un endroit où aller (par défaut), ou un restaurant
+  /// par son nom, dont la fiche s'ouvre.
   Future<void> _ouvrirRecherche() async {
+    final p = _position;
     final choix = await ouvrirRechercheExplorer(
       context,
       ici: _lieuxVisibles,
@@ -398,15 +406,45 @@ class _EcranCarteState extends State<EcranCarte> {
         for (final l in _lieux)
           if (!_zone.contient(l.latitude, l.longitude)) l,
       ],
-      proches: _personnes,
+      villes: _villes,
+      rechercheEndroit:
+          widget.rechercheEndroit ?? RechercheEndroitMapbox(ConfigMapbox.token),
+      compte: _compte,
+      position: p == null
+          ? null
+          : (latitude: p.latitude, longitude: p.longitude),
     );
     if (!mounted || choix == null) return;
+    setState(() => _selection = null);
     switch (choix) {
+      case EndroitChoisi(:final zone):
+        await _allerVers(zone);
+      case AutourDeMoiChoisi():
+        if (p != null) {
+          await _controleur.centrerSur(p.latitude, p.longitude, zoom: 13.5);
+        }
       case AdresseChoisie(:final lieu):
         _ouvrirFiche(lieu);
-      case ProcheChoisi(:final proche):
-        _appliquerFiltres(_filtres.copierAvec(personneId: () => proche.id));
     }
+  }
+
+  /// Cadre [zone] : la carte s'y rend, la grille montre ce qui s'y trouve.
+  Future<void> _allerVers(ZoneCarte zone) async {
+    // Sans carte (tests), la zone se règle d'elle-même.
+    if (!widget.afficherCarte) {
+      setState(() {
+        _zone = zone;
+        _zoom = 12;
+      });
+    }
+    await _controleur.cadrer(
+      sud: zone.sud,
+      ouest: zone.ouest,
+      nord: zone.nord,
+      est: zone.est,
+      haut: _hauteurEnTete,
+      bas: _margeBarre,
+    );
   }
 
   Future<void> _ouvrirOuChercher() async {
@@ -426,23 +464,7 @@ class _EcranCarteState extends State<EcranCarte> {
       }
       return;
     }
-    if (choix is VilleCercle) {
-      // Sans carte (liste, tests), la zone se règle d'elle-même.
-      if (!widget.afficherCarte) {
-        setState(() {
-          _zone = choix.zone;
-          _zoom = 12;
-        });
-      }
-      await _controleur.cadrer(
-        sud: choix.zone.sud,
-        ouest: choix.zone.ouest,
-        nord: choix.zone.nord,
-        est: choix.zone.est,
-        haut: _hauteurEnTete,
-        bas: _margeBarre,
-      );
-    }
+    if (choix is VilleCercle) await _allerVers(choix.zone);
   }
 
   // ---------------------------------------------------------------

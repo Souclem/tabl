@@ -21,6 +21,7 @@ export 'carte/geojson_carte.dart';
 export 'carte/lieu_carte.dart';
 export 'carte/presentation_carte.dart';
 export 'carte/presentation_filtres.dart';
+export 'carte/recherche_endroit.dart';
 export 'instants/instant_affichable.dart';
 export 'instants/instant_service.dart';
 export 'instants/instant_service_supabase.dart';

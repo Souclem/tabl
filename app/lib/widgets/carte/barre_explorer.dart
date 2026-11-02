@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme/apparence.dart';
 import '../../theme/tokens.dart';
+import 'recherche_explorer.dart';
 
 /// La barre qui flotte en bas de l'Explorer (maquette de Martin) :
 /// « Rechercher » en grand, les filtres avec le nombre d'actifs, et le
@@ -54,30 +55,25 @@ class TablBarreExplorer extends StatelessWidget {
               excludeSemantics: true,
               child: GestureDetector(
                 onTap: onRechercher,
-                child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: TablTokens.texte,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.search_rounded,
-                        size: 21,
-                        color: TablTokens.encre,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Rechercher',
-                        style: TablTokens.corps.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: TablTokens.encre,
+                child: Hero(
+                  tag: heroRechercheExplorer,
+                  flightShuttleBuilder: TablPiluleRecherche.enVol,
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: SizedBox(
+                      height: 50,
+                      child: TablPiluleRecherche(
+                        contenu: Text(
+                          'Rechercher',
+                          maxLines: 1,
+                          style: TablTokens.corps.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: TablTokens.encre,
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

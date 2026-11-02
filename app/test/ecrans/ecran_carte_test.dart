@@ -74,6 +74,29 @@ class _FauxAbonnementService implements AbonnementService {
 
 /// Un restaurant où Emma est allée (à Liège, sauf [latitude] et
 /// [longitude] données).
+/// Le géocodage, sans réseau : « par… » trouve Paris.
+class _FausseRechercheEndroit implements RechercheEndroitService {
+  @override
+  Future<List<EndroitTrouve>> chercher(
+    String texte, {
+    double? latitude,
+    double? longitude,
+  }) async => normaliserPourRecherche(texte).startsWith('par')
+      ? const [
+          EndroitTrouve(
+            nom: 'Paris',
+            detail: 'Île-de-France, France',
+            zone: ZoneCarte(sud: 48.81, ouest: 2.22, nord: 48.91, est: 2.47),
+          ),
+          EndroitTrouve(
+            nom: 'Parme',
+            detail: 'Émilie-Romagne, Italie',
+            zone: ZoneCarte(sud: 44.77, ouest: 10.29, nord: 44.83, est: 10.36),
+          ),
+        ]
+      : const [];
+}
+
 LieuCarte _lieu(
   String nom, {
   bool coupDeCoeur = false,
@@ -121,6 +144,7 @@ Future<_FauxCarteService> _ouvrir(
       home: EcranCarte(
         carteService: service,
         abonnementService: _FauxAbonnementService(),
+        rechercheEndroit: _FausseRechercheEndroit(),
         afficherCarte: false,
       ),
     ),
@@ -227,10 +251,47 @@ void main() {
     );
   });
 
-  testWidgets('« Rechercher » : ici, ailleurs, et les proches', (
+  testWidgets('« Rechercher » : un endroit d\'abord, et l\'Explorer s\'y '
+      'rend', (tester) async {
+    await _ouvrir(tester, [
+      _lieu('Bibo'),
+      _lieu(
+        'Le Comptoir Paris',
+        ville: 'Paris',
+        latitude: 48.86,
+        longitude: 2.35,
+      ),
+    ]);
+    expect(_tuiles(tester), ['Bibo']);
+
+    await tester.tap(find.bySemanticsLabel('Rechercher'));
+    await tester.pumpAndSettle();
+    // Sans rien taper : les villes de mon cercle.
+    expect(find.text('Là où votre cercle a des adresses'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'par');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    // En tête : chercher plutôt les restaurants de ce nom.
+    expect(
+      find.text('Chercher les restaurants dont le nom est « par »'),
+      findsOneWidget,
+    );
+    // Ailleurs : ce que trouve le géocodage, sans redire les villes du
+    // cercle.
+    expect(find.text('Parme'), findsOneWidget);
+    expect(find.text('Île-de-France, France'), findsNothing);
+
+    // Paris, ville du cercle, d'abord : la grille s'y rend.
+    await tester.tap(find.text('Paris').first);
+    await tester.pumpAndSettle();
+    expect(_tuiles(tester), ['Le Comptoir Paris']);
+  });
+
+  testWidgets('« Rechercher » : les restaurants de ce nom, sur demande', (
     tester,
   ) async {
-    final service = await _ouvrir(tester, [
+    await _ouvrir(tester, [
       _lieu('Bibo'),
       _lieu('Le Comptoir Paris', latitude: 48.86, longitude: 2.35),
     ]);
@@ -238,23 +299,23 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Rechercher'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'comptoir');
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Chercher les restaurants dont le nom est « comptoir »'),
+    );
+    await tester.pumpAndSettle();
+
     expect(find.text('Ailleurs'), findsOneWidget);
     expect(find.text('Le Comptoir Paris'), findsOneWidget);
     expect(find.text('Restaurants de votre cercle'), findsNothing);
 
     await tester.enterText(find.byType(TextField), 'zzz');
     await tester.pumpAndSettle();
-    expect(find.text('Rien ne correspond à « zzz ».'), findsOneWidget);
-
-    // Un proche : la grille ne garde que ses adresses.
-    await tester.enterText(find.byType(TextField), 'em');
-    await tester.pumpAndSettle();
-    expect(find.text('Vos proches'), findsOneWidget);
-    await tester.tap(find.text('Emma'));
-    await tester.pumpAndSettle();
-    expect(service.recherches.last.personneId, 'emma');
-    expect(find.bySemanticsLabel('Retirer le filtre Emma'), findsOneWidget);
+    expect(
+      find.text('Aucun restaurant de votre cercle ne s’appelle « zzz ».'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('les filtres : une feuille, puis des puces à retirer', (
