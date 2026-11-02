@@ -144,9 +144,23 @@ class _FauxNotificationService implements NotificationService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
-  _FauxAbonnementService({this.abonnements = const []});
+  _FauxAbonnementService({
+    this.abonnements = const [],
+    this.suggestionsProposees = const [],
+  });
 
   final List<ProfilPublic> abonnements;
+  final List<SuggestionAmi> suggestionsProposees;
+  final List<String> suivis = [];
+  final List<String> ecartes = [];
+
+  @override
+  Future<List<SuggestionAmi>> suggestions() async => suggestionsProposees;
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {
+    ecartes.add(profilId);
+  }
 
   @override
   Future<CompteursProfil> compteurs(String profilId) =>
@@ -182,7 +196,10 @@ class _FauxAbonnementService implements AbonnementService {
       throw UnimplementedError();
 
   @override
-  Future<StatutAbonnement> suivre(String suiviId) => throw UnimplementedError();
+  Future<StatutAbonnement> suivre(String suiviId) async {
+    suivis.add(suiviId);
+    return StatutAbonnement.abonne;
+  }
 
   @override
   Future<void> arreterDeSuivre(String suiviId) => throw UnimplementedError();
@@ -202,6 +219,27 @@ class _FauxAbonnementService implements AbonnementService {
   @override
   Future<List<ProfilPublic>> mesRelations() async => [];
 }
+
+class _FausseMemoireSuggestions implements MemoireSuggestions {
+  _FausseMemoireSuggestions([this.vueLe]);
+
+  DateTime? vueLe;
+
+  @override
+  Future<DateTime?> derniereApparition() async => vueLe;
+
+  @override
+  Future<void> noterApparition(DateTime quand) async => vueLe = quand;
+}
+
+const _anna = SuggestionAmi(
+  profil: ProfilPublic(
+    id: 'anna-id',
+    pseudo: 'anna',
+    statut: StatutAbonnement.aucun,
+    meSuit: true,
+  ),
+);
 
 SouvenirFeed _souvenirDeTest({
   String id = '1',
@@ -906,5 +944,100 @@ void main() {
     final avant = notifications.appels;
     await tester.pump(const Duration(minutes: 1));
     expect(notifications.appels, avant + 1);
+  });
+
+  group('Suggestions dans le Feed', () {
+    Future<_FauxAbonnementService> ouvrir(
+      WidgetTester tester, {
+      required List<SouvenirFeed> souvenirs,
+      _FausseMemoireSuggestions? memoire,
+    }) async {
+      _agrandirSurface(tester);
+      final abonnements = _FauxAbonnementService(
+        suggestionsProposees: const [_anna],
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EcranFeed(
+            souvenirService: _FauxSouvenirService(souvenirs: souvenirs),
+            abonnementService: abonnements,
+            memoireSuggestions: memoire ?? _FausseMemoireSuggestions(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return abonnements;
+    }
+
+    // Un seul : une publication occupe déjà presque tout l'écran de test.
+    final unPost = [_souvenirDeTest(restaurantNom: 'Bibo')];
+
+    testWidgets('la carte se glisse après les publications, et la date est '
+        'retenue', (tester) async {
+      final memoire = _FausseMemoireSuggestions();
+      await ouvrir(tester, souvenirs: unPost, memoire: memoire);
+
+      final titre = find.text('Vous les connaissez peut-être');
+      expect(titre, findsOneWidget);
+      expect(find.text('Vous suit'), findsOneWidget);
+      // Feed court : après la dernière publication.
+      expect(
+        tester.getTopLeft(titre).dy,
+        greaterThan(tester.getTopLeft(find.text('Bibo')).dy),
+      );
+      expect(memoire.vueLe, isNotNull);
+    });
+
+    testWidgets('vue il y a moins de trois jours : pas de carte', (
+      tester,
+    ) async {
+      await ouvrir(
+        tester,
+        souvenirs: unPost,
+        memoire: _FausseMemoireSuggestions(
+          DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      );
+
+      expect(find.text('Vous les connaissez peut-être'), findsNothing);
+    });
+
+    testWidgets('« Suivre en retour » la suit, et le bouton le dit', (
+      tester,
+    ) async {
+      final abonnements = await ouvrir(tester, souvenirs: unPost);
+
+      await tester.tap(find.text('Suivre en retour'));
+      await tester.pumpAndSettle();
+
+      expect(abonnements.suivis, ['anna-id']);
+      expect(find.text('Abonné'), findsOneWidget);
+      expect(find.text('Suivre en retour'), findsNothing);
+    });
+
+    testWidgets('la croix l’écarte, et la carte vide disparaît', (
+      tester,
+    ) async {
+      final abonnements = await ouvrir(tester, souvenirs: unPost);
+
+      await tester.tap(find.byTooltip('Ne plus suggérer'));
+      await tester.pumpAndSettle();
+
+      expect(abonnements.ecartes, ['anna-id']);
+      expect(find.text('Vous les connaissez peut-être'), findsNothing);
+    });
+
+    testWidgets('Feed vide : les suggestions sous l’invitation, même vues '
+        'récemment', (tester) async {
+      await ouvrir(
+        tester,
+        souvenirs: const [],
+        memoire: _FausseMemoireSuggestions(DateTime.now()),
+      );
+
+      expect(find.text('Votre feed est encore vide.'), findsOneWidget);
+      expect(find.text('Vous les connaissez peut-être'), findsOneWidget);
+      expect(find.text('anna'), findsOneWidget);
+    });
   });
 }

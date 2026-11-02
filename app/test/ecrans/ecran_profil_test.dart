@@ -92,6 +92,12 @@ class _FauxSouvenirService implements SouvenirService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<List<SuggestionAmi>> suggestions() async => const [];
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {}
+
   final List<bool> reglagesPrive = [];
 
   @override

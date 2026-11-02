@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'profil_public.dart';
+import 'suggestion_ami.dart';
 
 /// Contrat du graphe social de Tabl.
 ///
@@ -71,4 +72,13 @@ abstract interface class AbonnementService {
   /// les demandes en attente, comme Instagram : elles n'ont plus de
   /// raison d'attendre.
   Future<void> definirProfilPrive(bool prive);
+
+  /// Des gens que je connais peut-être, déjà classés (voir
+  /// [classerSuggestions]) : ni moi, ni ceux que je suis ou à qui j'ai
+  /// demandé, ni ceux qui attendent ma réponse, ni ceux que j'ai écartés.
+  Future<List<SuggestionAmi>> suggestions();
+
+  /// Le « ✕ » d'une suggestion : elle ne revient plus. La personne n'en
+  /// sait rien, et reste trouvable par la recherche.
+  Future<void> ecarterSuggestion(String profilId);
 }

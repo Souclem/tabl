@@ -22,6 +22,12 @@ class _FauxNotificationService implements NotificationService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<List<SuggestionAmi>> suggestions() async => const [];
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {}
+
   final List<String> acceptees = [];
   final List<String> refusees = [];
 

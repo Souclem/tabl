@@ -63,6 +63,7 @@ export 'souvenirs/methode_souvenir.dart';
 export 'souvenirs/panneau_souvenir.dart';
 export 'souvenirs/roues_date.dart';
 export 'souvenirs/zone_photos.dart';
+export 'suggestions/carte_suggestions.dart';
 export 'tables/bulle_message_organisation.dart';
 export 'tables/calendrier_jours.dart';
 export 'tables/couverture_table.dart';

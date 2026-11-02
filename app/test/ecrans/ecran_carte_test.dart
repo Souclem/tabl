@@ -54,6 +54,12 @@ class _FauxCarteService implements CarteService {
 
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<List<SuggestionAmi>> suggestions() async => const [];
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {}
+
+  @override
   Future<({List<ProfilPublic> abonnes, List<ProfilPublic> abonnements})>
   abonnesEtAbonnements() async => (
     abonnes: <ProfilPublic>[],

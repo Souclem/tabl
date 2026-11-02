@@ -9,6 +9,7 @@ import 'ecran_abonnes.dart';
 import 'ecran_creer_instant.dart';
 import 'ecran_notifications.dart';
 import 'ecran_viewer_instants.dart';
+import 'gestion_suggestions.dart';
 
 /// Onglet Feed : les souvenirs des gens qu'on suit (et les siens), du
 /// plus récent au plus ancien, avec réaction, commentaires et wishlist.
@@ -26,6 +27,7 @@ class EcranFeed extends StatefulWidget {
     this.tableService,
     this.rechercheLieuService,
     this.positionService,
+    this.memoireSuggestions,
     super.key,
   });
 
@@ -49,12 +51,19 @@ class EcranFeed extends StatefulWidget {
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
 
+  /// Quand la carte des suggestions est apparue pour la dernière
+  /// fois. `null` : retenu sur l'appareil.
+  final MemoireSuggestions? memoireSuggestions;
+
   @override
   State<EcranFeed> createState() => _EcranFeedState();
 }
 
 class _EcranFeedState extends State<EcranFeed>
-    with ActionsPublications<EcranFeed>, WidgetsBindingObserver {
+    with
+        ActionsPublications<EcranFeed>,
+        GestionSuggestions<EcranFeed>,
+        WidgetsBindingObserver {
   // Calculé une seule fois : cet écran vit dans l'IndexedStack de
   // EcranPrincipal, un changement d'onglet ne doit pas relancer la
   // requête (même raisonnement que le badge de EcranProfil). Mutable
@@ -85,6 +94,51 @@ class _EcranFeedState extends State<EcranFeed>
       _signauxCharges = false;
     });
     _verifierNotifications();
+    // La carte reste où elle est ; ses boutons, eux, se remettent à
+    // jour (on a pu suivre quelqu'un depuis son profil).
+    if (_suggestionsDansLeFeed) chargerSuggestions();
+  }
+
+  @override
+  Future<void> ouvrirProfilSuggere(String profilId, String pseudo) =>
+      ouvrirProfilDe(profilId, pseudo);
+
+  @override
+  void apresSuiviSuggere(StatutAbonnement statut) {
+    // Un Feed vide se remplit dès qu'on suit quelqu'un de public.
+    if (statut == StatutAbonnement.abonne && (souvenirs?.isEmpty ?? false)) {
+      recharger();
+    }
+  }
+
+  /// La place des suggestions a été décidée pour ce Feed.
+  bool _suggestionsDecidees = false;
+
+  /// Les suggestions ont leur carte au milieu des publications.
+  bool _suggestionsDansLeFeed = false;
+
+  /// Une fois par Feed : un Feed vide montre toujours les suggestions ;
+  /// sinon, elles s'y glissent de temps en temps (voir
+  /// [suggestionsDuesDansLeFeed]).
+  Future<void> _deciderSuggestions(List<SouvenirFeed> souvenirs) async {
+    if (_suggestionsDecidees) return;
+    _suggestionsDecidees = true;
+    final memoire =
+        widget.memoireSuggestions ?? MemoireSuggestionsPreferences();
+    final maintenant = DateTime.now();
+    if (souvenirs.isNotEmpty &&
+        !suggestionsDuesDansLeFeed(
+          derniereApparition: await memoire.derniereApparition(),
+          maintenant: maintenant,
+        )) {
+      return;
+    }
+    await chargerSuggestions();
+    if (!mounted || souvenirs.isEmpty || (suggestions?.isEmpty ?? true)) {
+      return;
+    }
+    setState(() => _suggestionsDansLeFeed = true);
+    await memoire.noterApparition(maintenant);
   }
 
   /// Du nouveau dans les notifications : la pastille de la cloche.
@@ -321,6 +375,8 @@ class _EcranFeedState extends State<EcranFeed>
   }
 
   Widget _liste(List<SouvenirFeed> souvenirs) {
+    final carte = _suggestionsDansLeFeed ? carteSuggestions : null;
+    final position = positionSuggestionsDansLeFeed(souvenirs.length);
     return ListView.builder(
       // La barre de navigation flotte par-dessus (voir EcranPrincipal) :
       // une marge basse généreuse évite qu'elle ne masque le dernier post.
@@ -330,12 +386,22 @@ class _EcranFeedState extends State<EcranFeed>
         0,
         TablTokens.espaceXxl + TablTokens.espaceL,
       ),
-      itemCount: souvenirs.length + 1,
+      itemCount: souvenirs.length + 1 + (carte == null ? 0 : 1),
       itemBuilder: (context, index) {
-        if (index == souvenirs.length) {
+        var i = index;
+        if (carte != null) {
+          if (i == position) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceL),
+              child: carte,
+            );
+          }
+          if (i > position) i--;
+        }
+        if (i == souvenirs.length) {
           return const _PiedDeFeed();
         }
-        final souvenir = souvenirs[index];
+        final souvenir = souvenirs[i];
         final signal = _signaux[souvenir.id];
         return construirePublication(
           souvenir,
@@ -406,8 +472,12 @@ class _EcranFeedState extends State<EcranFeed>
                   // au premier chargement (ou après un rechargement
                   // volontaire).
                   final souvenirs = this.souvenirs ??= snapshot.data!;
+                  _deciderSuggestions(souvenirs);
                   if (souvenirs.isEmpty) {
-                    return _EtatVide(onAjouterAmis: _allerVersAbonnes);
+                    return _EtatVide(
+                      onAjouterAmis: _allerVersAbonnes,
+                      suggestions: carteSuggestions,
+                    );
                   }
                   _chargerSignaux(souvenirs);
 
@@ -571,36 +641,52 @@ class _IconeCirculaire extends StatelessWidget {
 }
 
 class _EtatVide extends StatelessWidget {
-  const _EtatVide({required this.onAjouterAmis});
+  const _EtatVide({required this.onAjouterAmis, this.suggestions});
 
   final VoidCallback onAjouterAmis;
 
+  /// Des gens à suivre, sous l'invitation ; `null` : personne à proposer.
+  final Widget? suggestions;
+
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(TablTokens.espaceXl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Votre feed est encore vide.',
-              textAlign: TextAlign.center,
-              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
-            ),
-            const SizedBox(height: TablTokens.espaceM),
-            Text(
-              "Les bonnes adresses prennent vie lorsqu'elles sont partagées "
-              'avec les personnes qui comptent vraiment.',
-              textAlign: TextAlign.center,
-              style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
-            ),
-            const SizedBox(height: TablTokens.espaceXl),
-            TablBouton(
-              libelle: 'Trouver des personnes',
-              onPresse: onAjouterAmis,
-            ),
-          ],
+    final invitation = Padding(
+      padding: const EdgeInsets.all(TablTokens.espaceXl),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Votre feed est encore vide.',
+            textAlign: TextAlign.center,
+            style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+          ),
+          const SizedBox(height: TablTokens.espaceM),
+          Text(
+            "Les bonnes adresses prennent vie lorsqu'elles sont partagées "
+            'avec les personnes qui comptent vraiment.',
+            textAlign: TextAlign.center,
+            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+          ),
+          const SizedBox(height: TablTokens.espaceXl),
+          TablBouton(libelle: 'Trouver des personnes', onPresse: onAjouterAmis),
+        ],
+      ),
+    );
+    final suggestions = this.suggestions;
+    if (suggestions == null) return Center(child: invitation);
+    // La barre de navigation flotte par-dessus : de la marge en bas.
+    return LayoutBuilder(
+      builder: (context, contraintes) => SingleChildScrollView(
+        padding: const EdgeInsets.only(
+          bottom: TablTokens.espaceXxl + TablTokens.espaceL,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: contraintes.maxHeight),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [invitation, suggestions],
+          ),
         ),
       ),
     );

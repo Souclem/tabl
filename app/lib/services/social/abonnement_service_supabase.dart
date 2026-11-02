@@ -6,6 +6,7 @@ import '../notifications/notifications_systeme.dart';
 import 'abonnement_service.dart';
 import 'photo_profil.dart';
 import 'profil_public.dart';
+import 'suggestion_ami.dart';
 
 /// Graphe social adossé à Supabase (table `abonnements`, voir migration
 /// `20260823000000_abonnements_restaurants_souvenirs.sql`).
@@ -377,5 +378,43 @@ class AbonnementServiceSupabase implements AbonnementService {
         })
         .eq('suivi_id', _monId)
         .eq('statut', 'en_attente');
+  }
+
+  @override
+  Future<List<SuggestionAmi>> suggestions() async {
+    // Fonction de la base : les liens des autres (« suivi par Emma »)
+    // ne sont pas lisibles directement (migration 20261102010000).
+    final lignes = await _client.rpc('suggestions_amis') as List;
+    return classerSuggestions([
+      for (final l in lignes.cast<Map<String, dynamic>>())
+        SuggestionAmi(
+          profil: ProfilPublic(
+            id: l['profil_id'] as String,
+            pseudo: l['pseudo'] as String,
+            statut: StatutAbonnement.aucun,
+            photoUrl: _miniature(l),
+            meSuit: l['me_suit'] as bool,
+          ),
+          momentsCommuns: l['moments_communs'] as int,
+          amisCommuns: l['amis_communs'] as int,
+          nomsAmisCommuns: [
+            for (final nom in (l['noms_amis_communs'] as List?) ?? const [])
+              nom as String,
+          ],
+        ),
+    ]);
+  }
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {
+    try {
+      await _client.from('suggestions_ecartees').insert({
+        'profil_id': _monId,
+        'ecarte_id': profilId,
+      });
+    } on PostgrestException catch (e) {
+      // Déjà écartée (double tap rapide) : l'état voulu est atteint.
+      if (e.code != '23505') rethrow;
+    }
   }
 }

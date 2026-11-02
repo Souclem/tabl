@@ -36,6 +36,12 @@ class _FauxSouvenirService implements SouvenirService {
 }
 
 class _FauxAbonnementService implements AbonnementService {
+  @override
+  Future<List<SuggestionAmi>> suggestions() async => const [];
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {}
+
   _FauxAbonnementService({
     required this.estPrive,
     required this.statut,

@@ -44,6 +44,8 @@ export 'social/abonnement_service.dart';
 export 'social/abonnement_service_supabase.dart';
 export 'social/photo_profil.dart';
 export 'social/profil_public.dart';
+export 'social/suggestion_ami.dart';
+export 'social/suggestions_feed.dart';
 export 'souvenirs/audience_souvenir.dart';
 export 'souvenirs/bilan_profil.dart';
 export 'souvenirs/commentaire.dart';

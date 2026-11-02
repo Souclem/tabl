@@ -48,7 +48,19 @@ class _FauxAbonnementService implements AbonnementService {
     this._resultatsRecherche = const [],
     List<DemandeAbonnement> demandes = const [],
     this.erreurRecherche = false,
+    this.suggestionsProposees = const [],
   }) : _demandes = List.of(demandes);
+
+  final List<SuggestionAmi> suggestionsProposees;
+  final List<String> ecartesAppeles = [];
+
+  @override
+  Future<List<SuggestionAmi>> suggestions() async => suggestionsProposees;
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {
+    ecartesAppeles.add(profilId);
+  }
 
   final List<ProfilPublic> _resultatsRecherche;
   List<DemandeAbonnement> _demandes;
@@ -462,5 +474,41 @@ void main() {
 
     expect(find.text('thomas'), findsOneWidget);
     expect(find.text('emma'), findsNothing);
+  });
+
+  testWidgets('des suggestions au-dessus des listes ; les suivre met la '
+      'vignette à jour', (tester) async {
+    final service = _FauxAbonnementService(
+      suggestionsProposees: const [
+        SuggestionAmi(
+          profil: ProfilPublic(
+            id: 'zoe-id',
+            pseudo: 'zoe',
+            statut: StatutAbonnement.aucun,
+          ),
+          amisCommuns: 2,
+          nomsAmisCommuns: ['emma', 'léo'],
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranAbonnes(
+          abonnementService: service,
+          souvenirService: _FauxSouvenirService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vous les connaissez peut-être'), findsOneWidget);
+    expect(find.text('Suivi par emma et léo'), findsOneWidget);
+
+    await tester.tap(find.text('Suivre'));
+    await tester.pumpAndSettle();
+
+    expect(service.suivisAppeles, ['zoe-id']);
+    // Profil privé : une demande part.
+    expect(find.text('Demande envoyée'), findsOneWidget);
   });
 }

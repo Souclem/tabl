@@ -100,6 +100,12 @@ class _FauxTableService implements TableService {
 
 class _FauxAbonnementService implements AbonnementService {
   @override
+  Future<List<SuggestionAmi>> suggestions() async => const [];
+
+  @override
+  Future<void> ecarterSuggestion(String profilId) async {}
+
+  @override
   Future<CompteursProfil> compteurs(String profilId) =>
       throw UnimplementedError();
 

@@ -5,13 +5,15 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'ecran_profil_autre.dart';
+import 'gestion_suggestions.dart';
 
 /// Écran "Abonnés" : répondre aux demandes reçues, voir ses abonnés et
 /// ses abonnements (suivi asymétrique type Instagram), et trouver des
 /// personnes par pseudo — la recherche remplace les listes tant qu'elle
-/// n'est pas vide. Toucher une personne ouvre son profil.
+/// n'est pas vide. Toucher une personne ouvre son profil. Des
+/// suggestions de gens à suivre passent au-dessus des listes.
 ///
-/// Pas encore de suggestions ni d'invitation par lien.
+/// Pas encore d'invitation par lien.
 class EcranAbonnes extends StatefulWidget {
   const EcranAbonnes({
     super.key,
@@ -32,7 +34,8 @@ class EcranAbonnes extends StatefulWidget {
   State<EcranAbonnes> createState() => _EcranAbonnesState();
 }
 
-class _EcranAbonnesState extends State<EcranAbonnes> {
+class _EcranAbonnesState extends State<EcranAbonnes>
+    with GestionSuggestions<EcranAbonnes> {
   final _recherche = TextEditingController();
 
   List<DemandeAbonnement> _demandes = [];
@@ -53,9 +56,23 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   Timer? _debounceRecherche;
 
   @override
+  AbonnementService get abonnementService => widget.abonnementService;
+
+  @override
+  Future<void> ouvrirProfilSuggere(String profilId, String pseudo) async {
+    await _ouvrirProfil(profilId, pseudo);
+    if (mounted) chargerSuggestions();
+  }
+
+  /// Suivi depuis une suggestion : les listes et leurs compteurs suivent.
+  @override
+  void apresSuiviSuggere(StatutAbonnement statut) => _chargerDemandes();
+
+  @override
   void initState() {
     super.initState();
     _chargerDemandes();
+    chargerSuggestions();
   }
 
   @override
@@ -138,6 +155,7 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
   Future<void> _suivre(ProfilPublic profil) => _agir(profil.id, () async {
     final statut = await widget.abonnementService.suivre(profil.id);
     _remplacerResultat(profil.id, statut);
+    actualiserSuggestion(profil.id, statut);
     await _chargerDemandes();
   });
 
@@ -145,6 +163,7 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
       _agir(profil.id, () async {
         await widget.abonnementService.arreterDeSuivre(profil.id);
         _remplacerResultat(profil.id, StatutAbonnement.aucun);
+        actualiserSuggestion(profil.id, StatutAbonnement.aucun);
         await _chargerDemandes();
       });
 
@@ -311,6 +330,11 @@ class _EcranAbonnesState extends State<EcranAbonnes> {
             ],
           ),
         const SizedBox(height: TablTokens.espaceM),
+      ],
+      if (carteSuggestions case final carte?) ...[
+        const SizedBox(height: TablTokens.espaceS),
+        carte,
+        const SizedBox(height: TablTokens.espaceL),
       ],
       TablOngletsTexte(
         libelles: [
