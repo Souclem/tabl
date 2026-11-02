@@ -1,40 +1,53 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
-/// Tous les filtres de l'Explorer dans une seule feuille, par sections :
-/// le moment du repas, la période, les personnes, la cuisine, une Table
-/// et le reste. Rien ne s'applique avant « Voir les adresses ». Renvoie
-/// les filtres choisis, `null` si la feuille est fermée sans valider.
+/// Tous les filtres de l'Explorer dans une feuille claire, une ligne par
+/// filtre (« A · Carnet », maquette de Martin) : une seule ligne ouverte
+/// à la fois, rien ne s'applique avant « Voir 12 adresses », et
+/// [compter] dit en direct combien d'adresses resteraient. Renvoie les
+/// filtres choisis, `null` si la feuille est fermée sans valider.
 Future<FiltresCarte?> ouvrirFiltresExplorer(
   BuildContext context, {
   required FiltresCarte filtres,
   required List<ProfilPublic> personnes,
   required List<ResumeTable> tables,
+  required Future<int> Function(FiltresCarte filtres) compter,
 }) {
   return showModalBottomSheet<FiltresCarte>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF111216),
-    showDragHandle: true,
+    useSafeArea: true,
+    backgroundColor: TablTokens.papier,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
-    builder: (_) =>
-        _FeuilleFiltres(filtres: filtres, personnes: personnes, tables: tables),
+    builder: (_) => _FeuilleFiltres(
+      filtres: filtres,
+      personnes: personnes,
+      tables: tables,
+      compter: compter,
+    ),
   );
 }
+
+/// Les lignes qui se déplient.
+enum _Ligne { moment, periode, cuisine, proche, table, histoire }
 
 class _FeuilleFiltres extends StatefulWidget {
   const _FeuilleFiltres({
     required this.filtres,
     required this.personnes,
     required this.tables,
+    required this.compter,
   });
 
   final FiltresCarte filtres;
   final List<ProfilPublic> personnes;
   final List<ResumeTable> tables;
+  final Future<int> Function(FiltresCarte filtres) compter;
 
   @override
   State<_FeuilleFiltres> createState() => _FeuilleFiltresState();
@@ -42,70 +55,214 @@ class _FeuilleFiltres extends StatefulWidget {
 
 class _FeuilleFiltresState extends State<_FeuilleFiltres> {
   late FiltresCarte _f = widget.filtres;
+  _Ligne? _ouverte;
+  final _recherche = TextEditingController();
 
-  void _changer(FiltresCarte f) => setState(() => _f = f);
+  /// Les adresses qui resteraient avec ces filtres ; `null` tant qu'on
+  /// ne le sait pas.
+  int? _compte;
+  Timer? _attente;
+  int _demande = 0;
 
-  Widget _section(String titre, List<Widget> puces) => Padding(
-    padding: const EdgeInsets.only(bottom: TablTokens.espaceL - 4),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          titre.toUpperCase(),
-          style: TablTokens.legende.copyWith(
-            fontSize: 11,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w700,
-            color: TablTokens.texte.withValues(alpha: 0.42),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 8, children: puces),
-      ],
-    ),
+  static const _moments = ['midi', 'soir'];
+
+  @override
+  void initState() {
+    super.initState();
+    _compter(toutDeSuite: true);
+  }
+
+  @override
+  void dispose() {
+    _attente?.cancel();
+    _recherche.dispose();
+    super.dispose();
+  }
+
+  void _changer(FiltresCarte f) {
+    setState(() => _f = f);
+    _compter();
+  }
+
+  /// Une courte pause après chaque choix : plusieurs touchers à la suite
+  /// ne demandent qu'un compte.
+  void _compter({bool toutDeSuite = false}) {
+    _attente?.cancel();
+    _attente = Timer(
+      toutDeSuite ? Duration.zero : const Duration(milliseconds: 250),
+      () async {
+        final numero = ++_demande;
+        try {
+          final compte = await widget.compter(_f);
+          if (mounted && numero == _demande) setState(() => _compte = compte);
+        } catch (e) {
+          debugPrint('Filtres : compte : $e');
+        }
+      },
+    );
+  }
+
+  void _ouvrir(_Ligne ligne) => setState(() {
+    _ouverte = _ouverte == ligne ? null : ligne;
+    _recherche.clear();
+  });
+
+  TablLigneCarnet _ligne(
+    _Ligne ligne,
+    String libelle,
+    String valeur, {
+    required bool actif,
+    required Widget Function() contenu,
+  }) => TablLigneCarnet(
+    libelle: libelle,
+    valeur: valeur,
+    actif: actif,
+    ouverte: _ouverte == ligne,
+    onPresse: () => _ouvrir(ligne),
+    contenu: _ouverte == ligne ? contenu() : const SizedBox.shrink(),
   );
 
-  Widget _puce(
-    String libelle,
-    bool choisie,
-    VoidCallback onPresse, {
-    Widget? avant,
-  }) {
-    return Semantics(
-      button: true,
-      selected: choisie,
-      label: libelle,
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onPresse,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          height: 36,
-          padding: EdgeInsets.only(left: avant == null ? 14 : 5, right: 14),
-          decoration: BoxDecoration(
-            color: choisie
-                ? TablTokens.primaire.withValues(alpha: 0.14)
-                : TablTokens.texte.withValues(alpha: 0.035),
-            borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-            border: Border.all(
-              color: choisie
-                  ? TablTokens.primaire.withValues(alpha: 0.6)
-                  : TablTokens.texte.withValues(alpha: 0.1),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (avant != null) ...[avant, const SizedBox(width: 7)],
-              Text(
-                libelle,
-                style: TablTokens.legende.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: choisie
-                      ? TablTokens.texte
-                      : TablTokens.texte.withValues(alpha: 0.78),
+  @override
+  Widget build(BuildContext context) {
+    final f = _f;
+    final familles = famillesCuisine.keys.toList();
+    final pseudo = widget.personnes
+        .where((p) => p.id == f.personneId)
+        .firstOrNull
+        ?.pseudo;
+    final indexTable = widget.tables.indexWhere((t) => t.id == f.tableId);
+    final compte = _compte;
+    return Padding(
+      // Le champ « Chercher un proche » reste au-dessus du clavier.
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+        ),
+        child: SafeArea(
+          top: false,
+          child: TablFeuilleCarnet(
+            compte: compte == null ? null : nombreAdresses(compte),
+            libelleVoir: compte == null
+                ? 'Voir les adresses'
+                : compte == 0
+                ? 'Aucune adresse'
+                : 'Voir ${nombreAdresses(compte)}',
+            onVoir: () => Navigator.of(context).pop(_f),
+            onFermer: () => Navigator.of(context).pop(),
+            onToutEffacer: f.nombreActifs == 0
+                ? null
+                : () => _changer(FiltresCarte.aucun),
+            lignes: [
+              _ligne(
+                _Ligne.moment,
+                'Moment',
+                valeurMoment(f.moment),
+                actif: f.moment != null,
+                contenu: () => TablTuilesCarnet(
+                  options: [
+                    for (final m in _moments)
+                      (
+                        libelle: valeurMoment(m),
+                        icone: m == 'midi'
+                            ? Icons.wb_sunny_outlined
+                            : Icons.nightlight_outlined,
+                      ),
+                  ],
+                  choisies: {
+                    for (var i = 0; i < _moments.length; i++)
+                      if (f.moment == _moments[i]) i,
+                  },
+                  onBasculer: (i) => _changer(
+                    f.copierAvec(
+                      moment: () =>
+                          f.moment == _moments[i] ? null : _moments[i],
+                    ),
+                  ),
                 ),
+              ),
+              _ligne(
+                _Ligne.periode,
+                'Période',
+                valeurPeriode(f.periode),
+                actif: f.periode != PeriodeCarte.tout,
+                contenu: () => TablSegmentsCarnet(
+                  options: [for (final p in PeriodeCarte.values) p.libelle],
+                  choisi: f.periode.index,
+                  onChoisir: (i) =>
+                      _changer(f.copierAvec(periode: PeriodeCarte.values[i])),
+                ),
+              ),
+              _ligne(
+                _Ligne.cuisine,
+                'Cuisine',
+                valeurCuisine(f.familles),
+                actif: f.familles.isNotEmpty,
+                contenu: () => TablPastillesCarnet(
+                  options: familles,
+                  choisies: {
+                    for (var i = 0; i < familles.length; i++)
+                      if (f.familles.contains(familles[i])) i,
+                  },
+                  onBasculer: (i) => _changer(
+                    f.copierAvec(
+                      familles: f.familles.contains(familles[i])
+                          ? ({...f.familles}..remove(familles[i]))
+                          : {...f.familles, familles[i]},
+                    ),
+                  ),
+                ),
+              ),
+              if (widget.personnes.isNotEmpty)
+                _ligne(
+                  _Ligne.proche,
+                  'Un proche',
+                  valeurProche(pseudo),
+                  actif: f.personneId != null,
+                  contenu: () => _rechercheProche(f),
+                ),
+              if (widget.tables.isNotEmpty)
+                _ligne(
+                  _Ligne.table,
+                  'Une Table',
+                  valeurTable(
+                    indexTable < 0 ? null : widget.tables[indexTable].nom,
+                  ),
+                  actif: f.tableId != null,
+                  contenu: () => TablPastillesCarnet(
+                    options: [for (final t in widget.tables) t.nom],
+                    choisies: {if (indexTable >= 0) indexTable},
+                    onBasculer: (i) => _changer(
+                      f.copierAvec(
+                        tableId: () =>
+                            i == indexTable ? null : widget.tables[i].id,
+                      ),
+                    ),
+                  ),
+                ),
+              _ligne(
+                _Ligne.histoire,
+                'Mon histoire',
+                valeurHistoire(f.jamaisEssaye),
+                actif: f.jamaisEssaye,
+                contenu: () => TablSegmentsCarnet(
+                  options: const ['Toutes', 'Pas encore essayées'],
+                  choisi: f.jamaisEssaye ? 1 : 0,
+                  onChoisir: (i) =>
+                      _changer(f.copierAvec(jamaisEssaye: i == 1)),
+                ),
+              ),
+              TablInterrupteurCarnet(
+                libelle: 'Coups de cœur',
+                actif: f.coupsDeCoeur,
+                onChanger: () =>
+                    _changer(f.copierAvec(coupsDeCoeur: !f.coupsDeCoeur)),
+              ),
+              TablInterrupteurCarnet(
+                libelle: 'Là où on revient',
+                actif: f.laOuOnRevient,
+                onChanger: () =>
+                    _changer(f.copierAvec(laOuOnRevient: !f.laOuOnRevient)),
               ),
             ],
           ),
@@ -114,157 +271,47 @@ class _FeuilleFiltresState extends State<_FeuilleFiltres> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final f = _f;
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                TablTokens.espaceL - 4,
-                0,
-                TablTokens.espaceL - 4,
-                TablTokens.espaceM,
-              ),
-              child: Text(
-                'Filtres',
-                style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-              ),
-            ),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL - 4,
+  /// « Un proche » : sans rien taper, les premiers proches (celui qu'on a
+  /// choisi d'abord) ; en tapant, ceux dont le prénom commence par la
+  /// saisie d'abord.
+  Widget _rechercheProche(FiltresCarte f) {
+    final requete = _recherche.text.trim();
+    final trouves = prochesCorrespondants(widget.personnes, requete);
+    var proches = trouves.proches;
+    final choisi = widget.personnes
+        .where((p) => p.id == f.personneId)
+        .firstOrNull;
+    if (requete.isEmpty && choisi != null && !proches.contains(choisi)) {
+      proches = [choisi, ...proches.take(proches.length - 1)];
+    }
+    final autres = trouves.autres;
+    return TablRechercheProche(
+      controleur: _recherche,
+      onChanged: (_) => setState(() {}),
+      aide: proches.isEmpty
+          ? 'Aucun proche ne s’appelle « $requete ».'
+          : autres == 0
+          ? null
+          : requete.isEmpty
+          ? 'Et $autres autres · tapez un prénom'
+          : 'Et $autres autres · précisez',
+      proches: [
+        for (final p in proches)
+          ProcheAffiche(
+            pseudo: p.pseudo,
+            photoUrl: p.photoUrl,
+            lettresSoulignees: debutCorrespondant(p.pseudo, requete),
+            choisi: p.id == f.personneId,
+            onPresse: () {
+              _recherche.clear();
+              _changer(
+                f.copierAvec(
+                  personneId: () => p.id == f.personneId ? null : p.id,
                 ),
-                children: [
-                  _section('Moment du repas', [
-                    _puce(
-                      'Tous',
-                      f.moment == null,
-                      () => _changer(f.copierAvec(moment: () => null)),
-                    ),
-                    for (final m in const ['midi', 'soir'])
-                      _puce(
-                        libelleMomentRepas(m)!,
-                        f.moment == m,
-                        () => _changer(f.copierAvec(moment: () => m)),
-                      ),
-                  ]),
-                  _section('Période', [
-                    for (final p in PeriodeCarte.values)
-                      _puce(
-                        p.libelle,
-                        f.periode == p,
-                        () => _changer(f.copierAvec(periode: p)),
-                      ),
-                  ]),
-                  if (widget.personnes.isNotEmpty)
-                    _section('Personnes', [
-                      _puce(
-                        'Tous',
-                        f.personneId == null,
-                        () => _changer(f.copierAvec(personneId: () => null)),
-                      ),
-                      for (final p in widget.personnes)
-                        _puce(
-                          p.pseudo,
-                          f.personneId == p.id,
-                          () => _changer(f.copierAvec(personneId: () => p.id)),
-                          avant: TablAvatar(
-                            pseudo: p.pseudo,
-                            photoUrl: p.photoUrl,
-                            rayon: 13,
-                          ),
-                        ),
-                    ]),
-                  _section('Cuisine', [
-                    for (final famille in famillesCuisine.keys)
-                      _puce(
-                        famille,
-                        f.familles.contains(famille),
-                        () => _changer(
-                          f.copierAvec(
-                            familles: f.familles.contains(famille)
-                                ? ({...f.familles}..remove(famille))
-                                : {...f.familles, famille},
-                          ),
-                        ),
-                      ),
-                  ]),
-                  if (widget.tables.isNotEmpty)
-                    _section('Une Table', [
-                      _puce(
-                        'Toutes',
-                        f.tableId == null,
-                        () => _changer(f.copierAvec(tableId: () => null)),
-                      ),
-                      for (final t in widget.tables)
-                        _puce(
-                          t.nom,
-                          f.tableId == t.id,
-                          () => _changer(f.copierAvec(tableId: () => t.id)),
-                        ),
-                    ]),
-                  _section('Autres', [
-                    _puce(
-                      'Jamais essayé',
-                      f.jamaisEssaye,
-                      () =>
-                          _changer(f.copierAvec(jamaisEssaye: !f.jamaisEssaye)),
-                    ),
-                    _puce(
-                      'Coups de cœur 😍',
-                      f.coupsDeCoeur,
-                      () =>
-                          _changer(f.copierAvec(coupsDeCoeur: !f.coupsDeCoeur)),
-                    ),
-                    _puce(
-                      'Là où on revient',
-                      f.laOuOnRevient,
-                      () => _changer(
-                        f.copierAvec(laOuOnRevient: !f.laOuOnRevient),
-                      ),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                TablTokens.espaceL - 4,
-                TablTokens.espaceS,
-                TablTokens.espaceL - 4,
-                TablTokens.espaceM,
-              ),
-              child: Row(
-                children: [
-                  TablBoutonTexte(
-                    libelle: 'Tout effacer',
-                    onPresse: f.nombreActifs == 0
-                        ? null
-                        : () => _changer(FiltresCarte.aucun),
-                  ),
-                  const SizedBox(width: TablTokens.espaceM),
-                  Expanded(
-                    child: TablBouton(
-                      libelle: 'Voir les adresses',
-                      onPresse: () => Navigator.of(context).pop(_f),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

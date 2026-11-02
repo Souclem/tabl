@@ -97,17 +97,19 @@ String distanceAPied(double metres) {
   return distanceLisible(metres);
 }
 
-/// Les façons de trier les adresses du cercle.
+/// Les façons de trier les adresses du cercle, chacune avec ce qu'elle
+/// fait (le menu « Trié par » le dit sous son nom).
 enum TriCercle {
-  recents('Récents'),
-  ilsYRetournent('Ils y retournent'),
-  mieuxNotes('Mieux notés'),
-  plusProches('Plus proches'),
-  plusConnus('Les plus connus');
+  recents('Récents', 'Les dernières visites de vos proches'),
+  ilsYRetournent('Ils y retournent', 'Là où le plus de proches retournent'),
+  mieuxNotes('Mieux notés', 'Les mieux notées par vos proches d’abord'),
+  plusProches('Plus proches', 'Du plus proche au plus loin de vous'),
+  plusConnus('Les plus connus', 'Là où le plus de proches sont allés');
 
-  const TriCercle(this.libelle);
+  const TriCercle(this.libelle, this.description);
 
   final String libelle;
+  final String description;
 }
 
 /// [lieux] dans l'ordre de [tri]. Sans [position], « Plus proches »

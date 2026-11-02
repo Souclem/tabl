@@ -139,9 +139,16 @@ Future<void> _ouvrirFiltres(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Le bouton du bas de la feuille : « Voir 2 adresses », « Aucune
+/// adresse »…
+final _boutonVoir = find.descendant(
+  of: find.byType(TablFeuilleCarnet),
+  matching: find.byType(FilledButton),
+);
+
 Future<void> _voirLesAdresses(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Voir les adresses'));
-  await tester.tap(find.text('Voir les adresses'));
+  await tester.ensureVisible(_boutonVoir);
+  await tester.tap(_boutonVoir);
   await tester.pumpAndSettle();
 }
 
@@ -210,9 +217,15 @@ void main() {
       'Bibo',
     );
 
+    // Le tri se choisit dans le menu « Trié par ».
+    expect(find.text('Ils y retournent'), findsNothing);
+    await tester.tap(find.text('Trié par '));
+    await tester.pumpAndSettle();
+    expect(find.text('Là où le plus de proches retournent'), findsOneWidget);
     await tester.tap(find.text('Ils y retournent'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Ils y retournent'), findsOneWidget);
     final vedette = tester.widget<TablCarteVedette>(
       find.byType(TablCarteVedette),
     );
@@ -252,10 +265,13 @@ void main() {
     await _enListe(tester);
 
     await _ouvrirFiltres(tester);
-    expect(find.text('Moment du repas'.toUpperCase()), findsOneWidget);
-    await tester.ensureVisible(find.text('Coups de cœur 😍'));
-    await tester.tap(find.text('Coups de cœur 😍'));
+    expect(find.text('Moment'), findsOneWidget);
+    expect(find.text('2 adresses'), findsOneWidget);
+    await tester.ensureVisible(find.text('Coups de cœur'));
+    await tester.tap(find.text('Coups de cœur'));
     await tester.pumpAndSettle();
+    // Le compte suit avant même d'appliquer.
+    expect(find.text('Voir 1 adresse'), findsOneWidget);
     await _voirLesAdresses(tester);
 
     expect(service.recherches.last.coupsDeCoeur, isTrue);
@@ -274,8 +290,19 @@ void main() {
   ) async {
     final service = await _ouvrir(tester, [_lieu('Bibo')]);
     await _ouvrirFiltres(tester);
-    await tester.tap(find.text('Emma').last);
+    await tester.tap(find.text('Un proche'));
     await tester.pumpAndSettle();
+    await tester.enterText(
+      find.descendant(
+        of: find.byType(TablRechercheProche),
+        matching: find.byType(TextField),
+      ),
+      'em',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Emma').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Emma'), findsWidgets);
     await _voirLesAdresses(tester);
 
     expect(service.recherches.last.personneId, 'emma');
@@ -286,9 +313,10 @@ void main() {
     await _ouvrir(tester, [_lieu('Bibo')]);
     await _enListe(tester);
     await _ouvrirFiltres(tester);
-    await tester.ensureVisible(find.text('Coups de cœur 😍'));
-    await tester.tap(find.text('Coups de cœur 😍'));
+    await tester.ensureVisible(find.text('Coups de cœur'));
+    await tester.tap(find.text('Coups de cœur'));
     await tester.pumpAndSettle();
+    expect(find.text('Aucune adresse'), findsWidgets);
     await _voirLesAdresses(tester);
 
     expect(
@@ -381,5 +409,37 @@ void main() {
 
     expect(find.text('Paris'), findsOneWidget);
     expect(find.text('1 adresse connue par vos proches'), findsOneWidget);
+  });
+
+  testWidgets('« Fermer » renonce : rien ne change', (tester) async {
+    final service = await _ouvrir(tester, [
+      _lieu('Le Campus', coupDeCoeur: true),
+      _lieu('Bibo'),
+    ]);
+    await _ouvrirFiltres(tester);
+    await tester.tap(find.text('Coups de cœur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fermer'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TablFeuilleCarnet), findsNothing);
+    // Rien n'est appliqué : le bouton ne compte aucun filtre, et l'écran
+    // n'a rechargé qu'une fois (au départ).
+    expect(find.bySemanticsLabel('Filtres'), findsOneWidget);
+    expect(service.recherches.where((f) => f.coupsDeCoeur), hasLength(1));
+  });
+
+  testWidgets('une seule ligne ouverte à la fois', (tester) async {
+    await _ouvrir(tester, [_lieu('Bibo')]);
+    await _ouvrirFiltres(tester);
+
+    await tester.tap(find.text('Période'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 derniers mois'), findsOneWidget);
+
+    await tester.tap(find.text('Moment'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 derniers mois'), findsNothing);
+    expect(find.text('Déjeuner'), findsOneWidget);
   });
 }

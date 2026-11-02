@@ -769,8 +769,20 @@ class _EcranCarteState extends State<EcranCarte> {
       filtres: _filtres,
       personnes: _personnes,
       tables: _tables,
+      compter: _compterAvec,
     );
     if (choisis != null && mounted) _appliquerFiltres(choisis);
+  }
+
+  /// Combien d'adresses l'en-tête compterait avec [filtres], dans la
+  /// zone regardée : « Voir 12 adresses » tient parole.
+  Future<int> _compterAvec(FiltresCarte filtres) async {
+    final lieux = await widget.carteService.lieuxReseau(
+      ZoneCarte.monde,
+      filtres,
+      mode: _mode,
+    );
+    return lieux.where((l) => _zone.contient(l.latitude, l.longitude)).length;
   }
 
   /// Les filtres actifs, chacun avec de quoi le retirer.
@@ -971,14 +983,25 @@ class _EcranCarteState extends State<EcranCarte> {
                 ),
                 // Ma carte se lit par ville : pas de tri.
                 if (_mode != ModeExplorer.maCarte) ...[
-                  const SizedBox(height: TablTokens.espaceS),
-                  TablOngletsDefilants(
-                    libelles: [for (final t in TriCercle.values) t.libelle],
-                    index: _tri.index,
-                    onChoisir: (i) {
-                      setState(() => _tri = TriCercle.values[i]);
-                      _demanderPhotos();
-                    },
+                  const SizedBox(height: TablTokens.espaceXs),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: TablTokens.espaceL - 4,
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TablMenuTri(
+                        options: [
+                          for (final t in TriCercle.values)
+                            (libelle: t.libelle, description: t.description),
+                        ],
+                        choisi: _tri.index,
+                        onChoisir: (i) {
+                          setState(() => _tri = TriCercle.values[i]);
+                          _demanderPhotos();
+                        },
+                      ),
+                    ),
                   ),
                 ],
               ],

@@ -46,6 +46,32 @@ class TablTokens {
   /// Erreurs de saisie.
   static const Color erreur = Color(0xFFE0685C);
 
+  // --- Feuille ivoire -------------------------------------------------
+  // Les filtres et le tri de l'Explorer, sur papier clair (direction
+  // « A · Carnet » de Martin, novembre 2026) : valeurs reprises de sa
+  // maquette.
+
+  /// Fond de la feuille et du menu de tri.
+  static const Color papier = Color(0xFFFBF8F2);
+
+  /// Fond des sélecteurs posés sur le papier.
+  static const Color lin = Color(0xFFEFE8DB);
+
+  /// Texte et éléments choisis, sur le papier.
+  static const Color encre = Color(0xFF07111F);
+
+  /// Texte secondaire sur le papier.
+  static const Color encreDouce = Color(0xFF4F5562);
+
+  /// Valeurs au repos, aides, chevrons.
+  static const Color encrePale = Color(0xFF6B707C);
+
+  /// Le point qui signale un filtre actif.
+  static const Color pointActif = Color(0xFFC9963F);
+
+  /// Interrupteur éteint.
+  static const Color interrupteurEteint = Color(0xFFDCD3C3);
+
   // --- Espacements ----------------------------------------------------
   // Une échelle, pas des nombres au hasard : tout est un multiple de 4.
   static const double espaceXs = 4;
