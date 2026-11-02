@@ -77,14 +77,8 @@ class _EcranAccueilState extends State<EcranAccueil>
     super.dispose();
   }
 
-  /// Sign in with Apple demande l'Apple Developer Program (payant) : pas
-  /// encore actif sur ce projet. Le bouton reste honnête plutôt que de
-  /// planter sur une capability absente — voir AuthServiceSupabase.
-  /// connexionApple, déjà implémentée, prête à être branchée le jour où
-  /// le compte payant est actif.
-  void _afficherAppleBientotDisponible() {
-    afficherMessage(context, 'Bientôt disponible.');
-  }
+  Future<void> _connexionApple() =>
+      _connexionOAuth(widget.authService.connexionApple);
 
   Future<void> _connexionGoogle() =>
       _connexionOAuth(widget.authService.connexionGoogle);
@@ -214,9 +208,8 @@ class _EcranAccueilState extends State<EcranAccueil>
                             pilule: true,
                             styleApple: TablBoutonSocialStyle.clair,
                             styleGoogle: TablBoutonSocialStyle.sombre,
-                            onPresseApple: _enCours
-                                ? null
-                                : _afficherAppleBientotDisponible,
+                            avecApple: connexionAppleProposee,
+                            onPresseApple: _enCours ? null : _connexionApple,
                             onPresseGoogle: _enCours ? null : _connexionGoogle,
                           ),
                           const SizedBox(height: TablTokens.espaceM),

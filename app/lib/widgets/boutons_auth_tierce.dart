@@ -11,6 +11,7 @@ class TablBoutonsAuthTierce extends StatelessWidget {
     super.key,
     this.onPresseApple,
     this.onPresseGoogle,
+    this.avecApple = true,
     this.pilule = false,
     this.styleApple = TablBoutonSocialStyle.contour,
     this.styleGoogle = TablBoutonSocialStyle.contour,
@@ -18,6 +19,9 @@ class TablBoutonsAuthTierce extends StatelessWidget {
 
   final VoidCallback? onPresseApple;
   final VoidCallback? onPresseGoogle;
+
+  /// `false` : Google seul (Apple n'est pas proposé sur cet appareil).
+  final bool avecApple;
   final bool pilule;
   final TablBoutonSocialStyle styleApple;
   final TablBoutonSocialStyle styleGoogle;
@@ -27,14 +31,16 @@ class TablBoutonsAuthTierce extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TablBoutonSocial(
-          libelle: 'Continuer avec Apple',
-          icone: Icons.apple,
-          style: styleApple,
-          pilule: pilule,
-          onPresse: onPresseApple,
-        ),
-        const SizedBox(height: TablTokens.espaceM),
+        if (avecApple) ...[
+          TablBoutonSocial(
+            libelle: 'Continuer avec Apple',
+            icone: Icons.apple,
+            style: styleApple,
+            pilule: pilule,
+            onPresse: onPresseApple,
+          ),
+          const SizedBox(height: TablTokens.espaceM),
+        ],
         TablBoutonSocial(
           libelle: 'Continuer avec Google',
           icone: Icons.g_mobiledata_rounded,

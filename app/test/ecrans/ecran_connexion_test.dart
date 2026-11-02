@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/services/services.dart';
@@ -8,6 +7,8 @@ import 'package:app/ecrans/ecran_accueil.dart';
 import 'package:app/ecrans/ecran_connexion.dart';
 
 class _FauxAuthService implements AuthService {
+  int appelsApple = 0;
+
   @override
   Future<Utilisateur> connexion({
     required String email,
@@ -25,8 +26,11 @@ class _FauxAuthService implements AuthService {
   Future<Utilisateur?> utilisateurConnecte() => throw UnimplementedError();
 
   @override
-  Future<ResultatConnexionOAuth?> connexionApple() =>
-      throw UnimplementedError();
+  Future<ResultatConnexionOAuth?> connexionApple() async {
+    appelsApple++;
+    // Comme une connexion annulée : l'écran ne fait rien de plus.
+    return null;
+  }
 
   @override
   Future<ResultatConnexionOAuth?> connexionGoogle() =>
@@ -216,5 +220,44 @@ void main() {
 
     // Le Navigator n'est pas vidé : on atterrit sur l'accueil.
     expect(find.byType(EcranAccueil), findsOneWidget);
+  });
+
+  group('Continuer avec Apple', () {
+    Future<_FauxAuthService> ouvrir(WidgetTester tester) async {
+      final authService = _FauxAuthService();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EcranConnexion(
+            authService: authService,
+            abonnementService: _FauxAbonnementService(),
+            souvenirService: _FauxSouvenirService(),
+          ),
+        ),
+      );
+      return authService;
+    }
+
+    testWidgets('sur iPhone, le bouton lance la connexion Apple', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final authService = await ouvrir(tester);
+
+      await tester.tap(find.text('Continuer avec Apple'));
+      await tester.pump();
+
+      expect(authService.appelsApple, 1);
+      expect(find.text('Bientôt disponible.'), findsNothing);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets("sur Android, il n'est pas proposé", (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await ouvrir(tester);
+
+      expect(find.text('Continuer avec Apple'), findsNothing);
+      expect(find.text('Continuer avec Google'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
+    });
   });
 }
