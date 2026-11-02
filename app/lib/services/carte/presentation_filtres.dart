@@ -1,3 +1,4 @@
+import '../restaurants/categories_lieu.dart';
 import '../social/profil_public.dart';
 import '../souvenirs/presentation_souvenir.dart';
 import 'filtres_carte.dart';
@@ -46,13 +47,13 @@ String valeurHistoire(bool jamaisEssaye) =>
   String requete, {
   int max = 5,
 }) {
-  final q = _sansAccents(requete.trim().toLowerCase());
+  final q = normaliserPourRecherche(requete);
   final trouves = [
     for (final p in proches)
-      if (_sansAccents(p.pseudo.toLowerCase()).contains(q)) p,
+      if (normaliserPourRecherche(p.pseudo).contains(q)) p,
   ];
   int rang(ProfilPublic p) =>
-      _sansAccents(p.pseudo.toLowerCase()).startsWith(q) ? 0 : 1;
+      normaliserPourRecherche(p.pseudo).startsWith(q) ? 0 : 1;
   trouves.sort((a, b) {
     final ecart = rang(a) - rang(b);
     return ecart != 0
@@ -68,18 +69,7 @@ String valeurHistoire(bool jamaisEssaye) =>
 /// Combien de lettres du début de [pseudo] correspondent à [requete]
 /// (pour les souligner) ; 0 si le pseudo ne commence pas par elle.
 int debutCorrespondant(String pseudo, String requete) {
-  final q = _sansAccents(requete.trim().toLowerCase());
+  final q = normaliserPourRecherche(requete);
   if (q.isEmpty) return 0;
-  return _sansAccents(pseudo.toLowerCase()).startsWith(q) ? q.length : 0;
+  return normaliserPourRecherche(pseudo).startsWith(q) ? q.length : 0;
 }
-
-const _avecAccents = 'àâäáãçéèêëîïíìôöóòõùûüúñÿ';
-const _lettresSansAccent = 'aaaaaceeeeiiiiooooouuuuny';
-
-String _sansAccents(String texte) => [
-  for (final c in texte.split(''))
-    switch (_avecAccents.indexOf(c)) {
-      -1 => c,
-      final i => _lettresSansAccent[i],
-    },
-].join();
