@@ -917,14 +917,13 @@ class _EcranCarteState extends State<EcranCarte> {
           : SystemUiOverlayStyle.light,
       child: ecran,
     );
-    return _mode == ModeExplorer.maCarte
-        ? TablApparence(reglage: _nuit, child: barreEtat)
-        : barreEtat;
+    // La Constellation reste dans la nuit, quelle que soit l'apparence :
+    // c'est un ciel d'étoiles.
+    return TablNuitForcee(
+      active: _mode == ModeExplorer.maCarte,
+      child: barreEtat,
+    );
   }
-
-  /// La Constellation reste dans la nuit, quelle que soit l'apparence :
-  /// c'est un ciel d'étoiles.
-  static final _nuit = ValueNotifier(Apparence.sombre);
 
   PaletteExplorer get _palette => _mode == ModeExplorer.maCarte
       ? PaletteExplorer.sombre
@@ -1082,6 +1081,8 @@ class _EcranCarteState extends State<EcranCarte> {
       longitudeInitiale: 4.6,
       zoomInitial: 6.5,
       margeBas: _margeBarre,
+      // La Constellation garde sa nuit (voir [_palette]).
+      clair: _palette == PaletteExplorer.clair,
       controleur: _controleur,
       onTapLieu: _tapLieu,
       onZoneVisible: _zoneVisible,
@@ -1180,7 +1181,7 @@ class _EcranCarteState extends State<EcranCarte> {
     final maintenant = DateTime.now();
     final detail = [
       cuisineEtQuartier(lieu),
-      if (distance != null) distanceLisible(distance),
+      ?distanceSurTuile(distance),
     ].where((m) => m.isNotEmpty).join(' · ');
     final moi = lieu.mesVisites;
     final derniere = lieu.maDerniereVisite;

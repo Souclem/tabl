@@ -46,6 +46,10 @@ Future<ChoixRecherche?> ouvrirRechercheExplorer(
 }) {
   return Navigator.of(context).push<ChoixRecherche>(
     PageRouteBuilder(
+      // L'Explorer reste dessiné dessous : la carte doit pouvoir se
+      // rendre à l'endroit choisi dès qu'on revient (une carte cachée
+      // ignore les déplacements qu'on lui demande).
+      opaque: false,
       transitionDuration: const Duration(milliseconds: 420),
       reverseTransitionDuration: const Duration(milliseconds: 320),
       pageBuilder: (_, _, _) => _RechercheExplorer(

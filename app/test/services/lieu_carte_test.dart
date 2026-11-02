@@ -91,12 +91,12 @@ void main() {
         'type': 'Point',
         'coordinates': [5.5802, 50.6471],
       });
-      // Un point clair, sans plus : personne n'y est retourné.
-      expect(point['properties'], {'cle': 'r1'});
+      // La couleur de mon cercle ; sans ressenti, pas de note.
+      expect(point['properties'], {'cle': 'r1', 'teinte': 'cercle'});
     },
   );
 
-  test('GeoJSON : une étincelle là où le cercle revient', () {
+  test('GeoJSON : la couleur de la tuile, et la note pour la pastille', () {
     const lieu = LieuCarte(
       restaurantId: 'r1',
       nom: 'Bibo',
@@ -105,10 +105,15 @@ void main() {
       longitude: 5.5802,
       amis: 2,
       amisQuiReviennent: 1,
+      ressentis: ['😍', '😍'],
     );
     final json = jsonDecode(geojsonLieux([lieu])) as Map<String, dynamic>;
     final point = (json['features'] as List).single as Map<String, dynamic>;
-    expect(point['properties'], {'cle': 'r1', 'revient': true});
+    expect(point['properties'], {
+      'cle': 'r1',
+      'teinte': 'retour',
+      'etiquette': '★ 5,0',
+    });
   });
 
   test('GeoJSON : le lieu dont la feuille est ouverte est marqué', () {

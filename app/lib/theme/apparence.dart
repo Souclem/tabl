@@ -20,11 +20,16 @@ class TablApparence extends InheritedNotifier<ValueNotifier<Apparence>> {
           ?.value ??
       Apparence.sombre;
 
-  /// Clair pour de bon, le réglage du téléphone pris en compte.
-  static bool claire(BuildContext context) => of(context).estClaire(
-    telephoneClair:
-        MediaQuery.platformBrightnessOf(context) == Brightness.light,
-  );
+  /// Clair pour de bon, le réglage du téléphone pris en compte — sauf
+  /// sous une [TablNuitForcee] active.
+  static bool claire(BuildContext context) {
+    final nuit = context.dependOnInheritedWidgetOfExactType<TablNuitForcee>();
+    if (nuit?.active ?? false) return false;
+    return of(context).estClaire(
+      telephoneClair:
+          MediaQuery.platformBrightnessOf(context) == Brightness.light,
+    );
+  }
 
   static void choisir(BuildContext context, Apparence apparence) {
     final reglage = context
@@ -32,6 +37,19 @@ class TablApparence extends InheritedNotifier<ValueNotifier<Apparence>> {
         ?.notifier;
     reglage?.value = apparence;
   }
+}
+
+/// Sous elle, tout est sombre quel que soit le réglage, tant qu'elle est
+/// [active] (la Constellation : un ciel de nuit). Posée en permanence et
+/// seulement allumée ou éteinte, pour que l'arbre garde sa forme (et la
+/// carte, son état).
+class TablNuitForcee extends InheritedWidget {
+  const TablNuitForcee({super.key, required this.active, required super.child});
+
+  final bool active;
+
+  @override
+  bool updateShouldNotify(TablNuitForcee ancien) => ancien.active != active;
 }
 
 /// Les couleurs de l'Explorer : en clair, celles de la maquette de Martin

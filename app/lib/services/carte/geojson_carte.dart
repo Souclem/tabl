@@ -3,10 +3,11 @@ import 'dart:convert';
 import '../position/position_service.dart';
 import '../restaurants/lieu_restaurant.dart';
 import 'lieu_carte.dart';
+import 'presentation_carte.dart';
 
 /// Les lieux au format GeoJSON, tel que Mapbox l'attend pour une source.
 /// Chaque point porte sa [LieuCarte.cle] (pour retrouver le lieu au tap)
-/// et ce qui sert à son apparence.
+/// et ce qui sert à son apparence : sa [TeinteLieu] et sa note.
 String geojsonLieux(Iterable<LieuCarte> lieux, {String? cleChoisie}) {
   return jsonEncode({
     'type': 'FeatureCollection',
@@ -20,8 +21,11 @@ String geojsonLieux(Iterable<LieuCarte> lieux, {String? cleChoisie}) {
           },
           'properties': {
             'cle': lieu.cle,
-            // Mon cercle y revient : une étincelle dorée.
-            if (lieu.leCercleRevient) 'revient': true,
+            // La couleur de sa tuile : cercle, retour ou vous.
+            'teinte': teinteLieu(lieu).name,
+            // « ★ 4,0 », dans une pastille de cette couleur, de près.
+            if (noteSurCinq(lieu.ressentis) case final note?)
+              'etiquette': '★ ${noteLisible(note)}',
             // Le lieu dont l'aperçu est ouvert : point agrandi.
             if (lieu.cle == cleChoisie) 'choisi': true,
           },

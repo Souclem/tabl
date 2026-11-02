@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
+import '../../theme/apparence.dart';
 import '../../theme/tokens.dart';
 
 /// Permet au parent de déplacer la carte (recentrer sur ma position,
@@ -131,13 +133,17 @@ const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 /// commerces de Mapbox (seuls nos lieux ressortent), ma position et une
 /// boussole.
 ///
-/// Les lieux proches à l'écran se regroupent en une bulle sombre qui dit
+/// En sombre, notre style de Mapbox Studio ; en clair ([clair]), le style
+/// « Standard » de Mapbox, de jour, sans ses commerces (maquette de
+/// Martin : terre beige, routes blanches, eau bleue).
+///
+/// Les lieux proches à l'écran se regroupent en une bulle qui dit
 /// combien ils sont : « 42 » sur une ville vue de loin, puis « 3 », « 2 »,
 /// « 5 » par quartier en zoomant ; un tap sur une bulle zoome juste
-/// assez pour l'ouvrir. De près, chaque lieu est un point clair ; une
-/// petite étincelle dorée le signale quand mon cercle y revient
-/// (propriété `revient` du GeoJSON), et le lieu choisi grossit, cerclé
-/// d'or (`choisi`). Le regroupement est celui de Mapbox : il suit la
+/// assez pour l'ouvrir. De près, chaque lieu est un point de la couleur
+/// de sa tuile (propriété `teinte` : nuit, braise ou ivoire), avec sa
+/// note dans une pastille de la même couleur (`etiquette`) ; le lieu
+/// choisi grossit, cerclé d'or (`choisi`). Le regroupement est celui de Mapbox : il suit la
 /// distance à l'écran, pas les frontières, et vaut partout dans le
 /// monde. Un point marqué `repere` (l'endroit d'une photo) est un rond
 /// blanc cerclé d'or, qu'on ne touche pas.
@@ -166,12 +172,16 @@ class TablCarteMapbox extends StatefulWidget {
     this.avecMaPosition = true,
     this.dansUneFeuille = false,
     this.geojsonConstellation = geojsonVide,
+    this.clair = false,
   });
 
   /// Aucun point.
   static const geojsonVide = '{"type":"FeatureCollection","features":[]}';
 
   final String geojsonConstellation;
+
+  /// Le style clair (voir plus haut) ; sinon, celui de nuit.
+  final bool clair;
 
   final String geojsonLieux;
   final double latitudeInitiale;
@@ -218,7 +228,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   static const _coucheLieux = 'tabl-lieux-points';
   static const _coucheToucher = 'tabl-lieux-toucher';
   static const _coucheHalo = 'tabl-lieux-halo';
-  static const _coucheEtincelles = 'tabl-lieux-etincelles';
+  static const _coucheNotes = 'tabl-lieux-notes';
   static const _coucheRepere = 'tabl-repere';
   static const _sourceConstellation = 'tabl-constellation';
   static const _coucheSillage = 'tabl-sillage';
@@ -244,8 +254,8 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   /// Les polices du style de Tabl (les seules que Mapbox lui sert).
   static const _police = ['DIN Pro Medium', 'Arial Unicode MS Regular'];
 
-  /// L'étincelle du cercle qui revient : en haut à droite du point.
-  static const _decalageEtincelle = [6.5, -6.5];
+  /// En deçà, pas de notes : des points seulement.
+  static const _zoomNotes = 13.5;
 
   static const List<Object> _estUnGroupe = ['has', 'point_count'];
   static const List<Object> _estUnLieu = [
@@ -264,10 +274,10 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     _estUnLieu,
     ['has', 'choisi'],
   ];
-  static const List<Object> _revient = [
+  static const List<Object> _aUneNote = [
     'all',
     _estUnLieu,
-    ['has', 'revient'],
+    ['has', 'etiquette'],
   ];
   static const List<Object> _estUnRepere = ['has', 'repere'];
 
@@ -337,9 +347,106 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     );
   }
 
+  PaletteExplorer get _palette =>
+      widget.clair ? PaletteExplorer.clair : PaletteExplorer.sombre;
+
+  /// La couleur d'un lieu, d'après sa `teinte`.
+  List<Object> get _couleurTeinte => [
+    'match',
+    ['get', 'teinte'],
+    'retour',
+    _rgba(_palette.tuileRetour),
+    'vous',
+    _rgba(_palette.tuileVous),
+    _rgba(_palette.tuileCercle),
+  ];
+
+  /// Le style « Standard », de jour et sans ses commerces.
+  Future<void> _reglerStyleClair(MapboxMap carte) async {
+    const reglages = {
+      'lightPreset': 'day',
+      'theme': 'faded',
+      'showPointOfInterestLabels': false,
+      'showTransitLabels': false,
+      'show3dObjects': false,
+    };
+    for (final MapEntry(:key, :value) in reglages.entries) {
+      try {
+        await carte.setStyleImportConfigProperty('basemap', key, value);
+      } catch (e) {
+        debugPrint('TablCarteMapbox: réglage $key : $e');
+      }
+    }
+  }
+
+  /// Les pastilles des notes, une par teinte : un rectangle arrondi
+  /// dessiné ici, étiré par Mapbox autour du texte.
+  Future<void> _ajouterPastilles(MapboxMap carte) async {
+    const echelle = 3.0;
+    const largeur = 40.0;
+    const hauteur = 26.0;
+    final teintes = {
+      'cercle': _palette.tuileCercle,
+      'retour': _palette.tuileRetour,
+      'vous': _palette.tuileVous,
+    };
+    for (final MapEntry(key: teinte, value: couleur) in teintes.entries) {
+      final enregistreur = ui.PictureRecorder();
+      final toile = Canvas(enregistreur)..scale(echelle);
+      final forme = RRect.fromRectAndRadius(
+        const Rect.fromLTWH(1, 1, largeur - 2, hauteur - 2),
+        const Radius.circular(12),
+      );
+      toile.drawRRect(forme, Paint()..color = couleur);
+      if (teinte == 'vous') {
+        toile.drawRRect(
+          forme,
+          Paint()
+            ..color = TablTokens.encre
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.4,
+        );
+      }
+      final image = await enregistreur.endRecording().toImage(
+        (largeur * echelle).round(),
+        (hauteur * echelle).round(),
+      );
+      try {
+        await carte.addImage(
+          'tabl-pastille-$teinte',
+          echelle,
+          await StyleImage.fromImage(image),
+          // En pixels de l'image (dessinée à l'échelle 3).
+          stretchX: [
+            ImageStretches(
+              first: 14 * echelle,
+              second: (largeur - 14) * echelle,
+            ),
+          ],
+          stretchY: [
+            ImageStretches(
+              first: 11 * echelle,
+              second: (hauteur - 11) * echelle,
+            ),
+          ],
+          content: ImageContent(
+            left: 10 * echelle,
+            top: 4 * echelle,
+            right: (largeur - 10) * echelle,
+            bottom: (hauteur - 4) * echelle,
+          ),
+        );
+      } catch (e) {
+        debugPrint('TablCarteMapbox: pastille $teinte : $e');
+      }
+    }
+  }
+
   Future<void> _styleChargeListener(StyleLoadedEventData _) async {
     final carte = _carte;
     if (carte == null) return;
+    if (widget.clair) await _reglerStyleClair(carte);
+    await _ajouterPastilles(carte);
     await carte.addSource(
       GeoJsonSource(
         id: _source,
@@ -349,14 +456,16 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
-    // Les groupes : une bulle sombre, plus grande quand ils sont
-    // nombreux, et leur nombre au centre.
+    // Les groupes : une bulle (sombre la nuit, blanche le jour), plus
+    // grande quand ils sont nombreux, et leur nombre au centre.
     await carte.addLayer(
       CircleLayer(
         id: _coucheGroupes,
         sourceId: _source,
         filter: _estUnGroupe,
-        circleColor: const Color(0xF21A1C21).toARGB32(),
+        circleColor: widget.clair
+            ? const Color(0xFFFFFFFF).toARGB32()
+            : const Color(0xF21A1C21).toARGB32(),
         circleRadiusExpression: [
           'step',
           ['get', 'point_count'],
@@ -368,7 +477,9 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
           200,
           26.0,
         ],
-        circleStrokeColor: const Color(0x52F5F0E8).toARGB32(),
+        circleStrokeColor: widget.clair
+            ? TablTokens.encre.withValues(alpha: 0.1).toARGB32()
+            : const Color(0x52F5F0E8).toARGB32(),
         circleStrokeWidth: 1.2,
       ),
     );
@@ -388,7 +499,9 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
           200,
           16.0,
         ],
-        textColor: TablTokens.texte.toARGB32(),
+        textColor: widget.clair
+            ? TablTokens.encre.toARGB32()
+            : TablTokens.texte.toARGB32(),
         textAllowOverlap: true,
         textIgnorePlacement: true,
       ),
@@ -419,37 +532,56 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
       ),
     );
 
-    // Un lieu seul : un point clair, plus gros et cerclé d'or s'il est
-    // choisi.
+    // Un lieu seul : un point de la couleur de sa tuile, plus gros et
+    // cerclé d'or s'il est choisi.
     await carte.addLayer(
       CircleLayer(
         id: _coucheLieux,
         sourceId: _source,
         filter: _estUnLieu,
-        circleColor: TablTokens.texte.toARGB32(),
+        circleColorExpression: _couleurTeinte,
         circleRadiusExpression: ['case', _choisiExpression, 7.5, 5.0],
         circleStrokeColorExpression: [
           'case',
           _choisiExpression,
           _rgba(TablTokens.primaire),
-          _rgba(const Color(0xE6101114)),
+          widget.clair
+              ? _rgba(const Color(0xFFFFFFFF))
+              : _rgba(const Color(0xE6101114)),
         ],
         circleStrokeWidthExpression: ['case', _choisiExpression, 3.0, 1.6],
       ),
     );
 
-    // Mon cercle y revient : une étincelle dorée au coin du point.
+    // De près, sa note dans une pastille de la même couleur, posée
+    // au-dessus du point.
     await carte.addLayer(
-      CircleLayer(
-        id: _coucheEtincelles,
+      SymbolLayer(
+        id: _coucheNotes,
         sourceId: _source,
-        filter: _revient,
-        circleColor: TablTokens.primaire.toARGB32(),
-        circleRadius: 2.4,
-        circleTranslate: _decalageEtincelle,
-        circleStrokeColor: const Color(0x99D9AC67).toARGB32(),
-        circleStrokeWidth: 1.6,
-        circleBlur: 0.15,
+        filter: _aUneNote,
+        minZoom: _zoomNotes,
+        textFieldExpression: ['get', 'etiquette'],
+        textFont: _police,
+        textSize: 13.0,
+        textColorExpression: [
+          'match',
+          ['get', 'teinte'],
+          'vous',
+          _rgba(TablTokens.encre),
+          _rgba(TablTokens.texte),
+        ],
+        textAnchor: TextAnchor.BOTTOM,
+        textOffset: [0, -0.9],
+        iconImageExpression: [
+          'concat',
+          'tabl-pastille-',
+          ['get', 'teinte'],
+        ],
+        iconTextFit: IconTextFit.BOTH,
+        iconTextFitPadding: [4, 9, 4, 9],
+        iconAnchor: IconAnchor.BOTTOM,
+        iconOffset: [0, -6],
       ),
     );
 
@@ -470,7 +602,11 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     carte.addInteraction(
       TapInteraction.onMap((_) => widget.onTapCarte?.call()),
     );
-    for (final couche in [_coucheVillesToucher, _coucheEtoilesToucher]) {
+    for (final couche in [
+      _coucheVillesToucher,
+      _coucheEtoilesToucher,
+      _coucheNotes,
+    ]) {
       carte.addInteraction(
         TapInteraction(FeaturesetDescriptor(layerId: couche), (lieu, _) {
           final cle = lieu.properties['cle'];
@@ -715,9 +851,16 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
     );
   }
 
+  String get _styleUri => widget.clair ? MapboxStyles.STANDARD : styleCarteTabl;
+
   @override
   void didUpdateWidget(TablCarteMapbox ancien) {
     super.didUpdateWidget(ancien);
+    if (ancien.clair != widget.clair) {
+      _styleCharge = false;
+      _carte?.loadStyleURI(_styleUri);
+      return;
+    }
     if (!_styleCharge) return;
     if (ancien.geojsonLieux != widget.geojsonLieux) {
       _mettreAJour(widget.geojsonLieux);
@@ -742,7 +885,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   Widget build(BuildContext context) {
     return MapWidget(
       key: const ValueKey('tabl-carte'),
-      styleUri: styleCarteTabl,
+      styleUri: _styleUri,
       viewport: _vueInitiale,
       onMapCreated: _creee,
       onStyleLoadedListener: _styleChargeListener,
