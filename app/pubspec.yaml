@@ -32,3 +32,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bricolage Grotesque (licence libre OFL, voir assets/polices/OFL.txt) :
+  # les noms et les titres de l'Explorer, serrés comme dans la maquette
+  # de Martin. Police variable : graisse et largeur se règlent à l'usage.
+  fonts:
+    - family: BricolageGrotesque
+      fonts:
+        - asset: assets/polices/BricolageGrotesque.ttf

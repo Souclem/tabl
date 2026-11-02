@@ -4,6 +4,7 @@ library;
 export 'aide/retour.dart';
 export 'aide/retour_service.dart';
 export 'aide/retour_service_supabase.dart';
+export 'apparence/apparence.dart';
 export 'auth/auth_service.dart';
 export 'auth/auth_service_supabase.dart';
 export 'auth/connexion_apple.dart';

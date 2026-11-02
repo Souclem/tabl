@@ -26,11 +26,20 @@ Future<void> main() async {
     clePubliable: ConfigSupabase.clePubliable,
   );
 
-  runApp(const TablApp());
+  // Lue avant le premier écran : l'Explorer s'ouvre directement dans la
+  // bonne apparence ; chaque changement est retenu sur l'appareil.
+  final preferenceApparence = PreferenceApparencePreferences();
+  final apparence = ValueNotifier(await preferenceApparence.lire());
+  apparence.addListener(() => preferenceApparence.ecrire(apparence.value));
+
+  runApp(TablApp(apparence: apparence));
 }
 
 class TablApp extends StatelessWidget {
-  const TablApp({super.key});
+  const TablApp({super.key, this.apparence});
+
+  /// Clair ou sombre (voir [TablApparence]) ; `null` : sombre.
+  final ValueNotifier<Apparence>? apparence;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +65,11 @@ class TablApp extends StatelessWidget {
       title: 'Tabl',
       debugShowCheckedModeBanner: false,
       theme: TablTheme.sombre(),
+      builder: (context, ecran) {
+        final reglage = apparence;
+        if (reglage == null || ecran == null) return ecran ?? const SizedBox();
+        return TablApparence(reglage: reglage, child: ecran);
+      },
       home: EcranDemarrage(
         authService: authService,
         abonnementService: abonnementService,

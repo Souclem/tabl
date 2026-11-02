@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -9,19 +10,22 @@ import 'package:app/widgets/widgets.dart';
 import 'feuille_demander_avis.dart';
 import 'feuille_filtres_explorer.dart';
 import 'feuille_restaurant.dart';
+import 'recherche_explorer.dart';
 
-/// L'onglet Explorer, d'après le prototype : « où manger, d'après les
-/// gens en qui j'ai confiance ? ».
+/// L'onglet Explorer, d'après la maquette de Martin (novembre 2026) :
+/// « où manger, d'après les gens en qui j'ai confiance ? ».
 ///
-/// La carte prend tout l'écran ; en haut, posé dessus avec un fondu :
-/// la ville qu'on regarde (un tap pour en changer), Carte | Liste, les
-/// trois modes (Ma carte · Envies · Le cercle) et les filtres. Un tap
-/// sur un lieu ouvre son aperçu en bas, qu'on balaie pour passer au
-/// voisin. La liste montre les mêmes lieux — ceux de la zone regardée —
-/// triés au choix, le premier en grand.
+/// En haut, la ville qu'on regarde (un tap pour en changer), le nombre
+/// d'adresses et « Constellation » (ma carte à moi, ville par ville) ;
+/// en bas, une barre flottante : Rechercher, les filtres, Carte |
+/// Grille. La grille montre les lieux de la zone regardée en tuiles
+/// colorées (nuit : mon cercle ; braise : ils y retournent ; ivoire :
+/// j'y suis allé), triées au choix. Sur la carte, un tap sur un lieu
+/// ouvre son aperçu en bas, qu'on balaie pour passer au voisin.
 ///
-/// S'ouvre sur « Le cercle », puis sur le dernier mode utilisé
-/// (décision du 2026-10-27).
+/// En clair ou en sombre selon le réglage « Apparence » ; la
+/// Constellation reste de nuit. S'ouvre sur « Le cercle », ou sur la
+/// Constellation si c'est là qu'on était.
 class EcranCarte extends StatefulWidget {
   const EcranCarte({
     super.key,
@@ -87,11 +91,12 @@ class _EcranCarteState extends State<EcranCarte> {
   final _cleEnTete = GlobalKey();
   double _hauteurEnTete = 190;
 
+  /// « Le cercle », ou la Constellation (« Ma carte ») ; les envies
+  /// passent par le marque-page des tuiles.
   ModeExplorer _mode = ModeExplorer.cercle;
-  bool _enListe = false;
+  bool _enGrille = true;
   late FiltresCarte _filtres = widget.filtresInitiaux;
   TriCercle _tri = TriCercle.recents;
-  final _recherche = TextEditingController();
 
   /// Zone visible ; la Belgique tant que la carte ne l'a pas encore dite.
   ZoneCarte _zone = const ZoneCarte(
@@ -136,7 +141,6 @@ class _EcranCarteState extends State<EcranCarte> {
 
   @override
   void dispose() {
-    _recherche.dispose();
     _fermetureEnAttente?.cancel();
     super.dispose();
   }
@@ -160,10 +164,10 @@ class _EcranCarteState extends State<EcranCarte> {
       try {
         final prefs = await SharedPreferences.getInstance();
         final valeur = prefs.getString(_cleMode);
-        final mode = ModeExplorer.values
-            .where((m) => m.name == valeur)
-            .firstOrNull;
-        if (mode != null && mounted) setState(() => _mode = mode);
+        // Les envies ne sont plus un mode : « Le cercle ».
+        if (valeur == ModeExplorer.maCarte.name && mounted) {
+          setState(() => _mode = ModeExplorer.maCarte);
+        }
       } catch (_) {
         // Pas de préférence lisible : « Le cercle ».
       }
@@ -268,7 +272,7 @@ class _EcranCarteState extends State<EcranCarte> {
     final aAfficher = [
       ?_selection,
       for (final l in _voisins.take(3)) l,
-      if (_enListe) ..._lieuxListe.take(24),
+      if (_enGrille) ..._lieuxListe.take(24),
     ];
     final chemins = {
       for (final l in aAfficher)
@@ -375,19 +379,34 @@ class _EcranCarteState extends State<EcranCarte> {
     },
   };
 
-  /// La liste : les lieux de la zone regardée — ou, pendant une
-  /// recherche, tous ceux du mode dont le nom correspond ; pour « Ma
-  /// carte », tous —, dans l'ordre du tri.
-  List<LieuCarte> get _lieuxListe {
-    final texte = normaliserPourRecherche(_recherche.text.trim());
-    // « Ma carte » en liste raconte toute mon histoire, ville par ville.
-    final base = texte.isEmpty
-        ? (_mode == ModeExplorer.maCarte ? _lieux : _lieuxVisibles)
-        : [
-            for (final l in _lieux)
-              if (normaliserPourRecherche(l.nom).contains(texte)) l,
-          ];
-    return trierLieux(base, _tri, position: _position);
+  /// La grille : les lieux de la zone regardée, dans l'ordre du tri ;
+  /// pour « Ma carte », tous (elle raconte toute mon histoire, ville par
+  /// ville).
+  List<LieuCarte> get _lieuxListe => trierLieux(
+    _mode == ModeExplorer.maCarte ? _lieux : _lieuxVisibles,
+    _tri,
+    position: _position,
+  );
+
+  /// « Rechercher » : les adresses d'ici, puis d'ailleurs, puis les
+  /// proches. Une adresse ouvre sa fiche ; un proche filtre la grille.
+  Future<void> _ouvrirRecherche() async {
+    final choix = await ouvrirRechercheExplorer(
+      context,
+      ici: _lieuxVisibles,
+      ailleurs: [
+        for (final l in _lieux)
+          if (!_zone.contient(l.latitude, l.longitude)) l,
+      ],
+      proches: _personnes,
+    );
+    if (!mounted || choix == null) return;
+    switch (choix) {
+      case AdresseChoisie(:final lieu):
+        _ouvrirFiche(lieu);
+      case ProcheChoisi(:final proche):
+        _appliquerFiltres(_filtres.copierAvec(personneId: () => proche.id));
+    }
   }
 
   Future<void> _ouvrirOuChercher() async {
@@ -754,7 +773,7 @@ class _EcranCarteState extends State<EcranCarte> {
 
   /// Sur la carte, de près, l'aperçu du lieu ouvert.
   Future<void> _montrerSurLaCarte(LieuCarte lieu) async {
-    setState(() => _enListe = false);
+    setState(() => _enGrille = false);
     await _controleur.centrerSur(lieu.latitude, lieu.longitude, zoom: 15.5);
     if (mounted) _choisir(lieu, voisinsDepuis: lieu);
   }
@@ -837,53 +856,94 @@ class _EcranCarteState extends State<EcranCarte> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) => _mesurerEnTete());
-    final nombre = _enListe && _recherche.text.trim().isNotEmpty
-        ? _lieuxListe.length
-        : _lieuxVisibles.length;
-    return Scaffold(
-      backgroundColor: TablTokens.fond,
+    final nombre = _lieuxVisibles.length;
+    final ecran = Scaffold(
+      backgroundColor: _palette.fond,
       body: Stack(
         children: [
           Positioned.fill(child: _carte()),
-          if (_enListe) Positioned.fill(child: _liste()),
+          if (_enGrille) Positioned.fill(child: _grille()),
           Positioned(left: 0, right: 0, top: 0, child: _enTete(nombre)),
-          if (!_enListe) ..._surLaCarte(),
+          if (!_enGrille) ..._surLaCarte(),
+          // Cachée tant que l'aperçu d'un lieu est ouvert.
+          if (_selection == null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: _margeBarre + 12,
+              child: TablBarreExplorer(
+                onRechercher: _ouvrirRecherche,
+                onFiltres: _ouvrirFiltres,
+                filtresActifs: _filtres.nombreActifs,
+                enGrille: _enGrille,
+                onChoisirVue: (grille) {
+                  setState(() {
+                    _enGrille = grille;
+                    _selection = null;
+                  });
+                  if (grille) _demanderPhotos();
+                },
+              ),
+            ),
         ],
       ),
     );
+    // L'heure et la batterie, lisibles sur le fond de l'écran.
+    final barreEtat = AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _palette == PaletteExplorer.clair
+          ? SystemUiOverlayStyle.dark
+          : SystemUiOverlayStyle.light,
+      child: ecran,
+    );
+    return _mode == ModeExplorer.maCarte
+        ? TablApparence(reglage: _nuit, child: barreEtat)
+        : barreEtat;
   }
+
+  /// La Constellation reste dans la nuit, quelle que soit l'apparence :
+  /// c'est un ciel d'étoiles.
+  static final _nuit = ValueNotifier(Apparence.sombre);
+
+  PaletteExplorer get _palette => _mode == ModeExplorer.maCarte
+      ? PaletteExplorer.sombre
+      : PaletteExplorer.of(context);
+
+  /// La hauteur de la barre flottante et de sa marge : ce qui doit rester
+  /// visible se pose au-dessus.
+  double get _margeBarreFlottante => _margeBarre + 12 + 60 + 12;
 
   Widget _enTete(int nombre) {
     final actifs = _filtresActifs;
+    final palette = _palette;
     return DecoratedBox(
       key: _cleEnTete,
       decoration: BoxDecoration(
-        gradient: _enListe
+        gradient: _enGrille
             ? null
             : LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0, 0.72, 1],
+                stops: const [0, 0.6, 1],
                 colors: [
-                  TablTokens.fond.withValues(alpha: 0.97),
-                  TablTokens.fond.withValues(alpha: 0.82),
-                  TablTokens.fond.withValues(alpha: 0),
+                  palette.fond.withValues(alpha: 0.97),
+                  palette.fond.withValues(alpha: 0.9),
+                  palette.fond.withValues(alpha: 0),
                 ],
               ),
-        color: _enListe ? TablTokens.fond : null,
+        color: _enGrille ? palette.fond : null,
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
           padding: EdgeInsets.only(
-            bottom: _enListe ? TablTokens.espaceS : TablTokens.espaceL,
+            bottom: _enGrille ? TablTokens.espaceXs : TablTokens.espaceL,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL - 4,
+                  TablTokens.espaceM,
                   TablTokens.espaceS,
                   TablTokens.espaceM,
                   0,
@@ -910,38 +970,15 @@ class _EcranCarteState extends State<EcranCarte> {
                     ),
                     const SizedBox(width: TablTokens.espaceS),
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: TablSegmentModeCarte(
-                        options: const ['Carte', 'Liste'],
-                        selectionne: _enListe ? 1 : 0,
-                        onSelection: (i) {
-                          setState(() {
-                            _enListe = i == 1;
-                            _selection = null;
-                          });
-                          if (_enListe) _demanderPhotos();
-                        },
+                      padding: const EdgeInsets.only(top: 2),
+                      child: TablBoutonConstellation(
+                        actif: _mode == ModeExplorer.maCarte,
+                        onPresse: () => _choisirMode(
+                          _mode == ModeExplorer.maCarte
+                              ? ModeExplorer.cercle
+                              : ModeExplorer.maCarte,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: TablTokens.espaceM - 2),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL - 4,
-                ),
-                child: Row(
-                  children: [
-                    TablSegmentModeCarte(
-                      options: [for (final m in ModeExplorer.values) m.libelle],
-                      selectionne: _mode.index,
-                      onSelection: (i) => _choisirMode(ModeExplorer.values[i]),
-                    ),
-                    const Spacer(),
-                    TablBoutonFiltres(
-                      actifs: _filtres.nombreActifs,
-                      onPresse: _ouvrirFiltres,
                     ),
                   ],
                 ),
@@ -953,7 +990,7 @@ class _EcranCarteState extends State<EcranCarte> {
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: TablTokens.espaceL - 4,
+                      horizontal: TablTokens.espaceM,
                     ),
                     itemCount: actifs.length,
                     separatorBuilder: (_, _) => const SizedBox(width: 8),
@@ -964,47 +1001,30 @@ class _EcranCarteState extends State<EcranCarte> {
                   ),
                 ),
               ],
-              if (_enListe) ...[
-                const SizedBox(height: TablTokens.espaceM),
+              // Ma carte se lit par ville : pas de tri.
+              if (_enGrille && _mode != ModeExplorer.maCarte)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: TablTokens.espaceL - 4,
+                  padding: const EdgeInsets.fromLTRB(
+                    TablTokens.espaceM + 2,
+                    TablTokens.espaceS,
+                    TablTokens.espaceM,
+                    0,
                   ),
-                  child: TablChampTexte(
-                    libelle: '',
-                    controleur: _recherche,
-                    indication: 'Chercher dans ces adresses',
-                    iconePrefixe: Icons.search_rounded,
-                    onChanged: (_) {
-                      setState(() {});
-                      _demanderPhotos();
-                    },
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TablMenuTri(
+                      options: [
+                        for (final t in TriCercle.values)
+                          (libelle: t.libelle, description: t.description),
+                      ],
+                      choisi: _tri.index,
+                      onChoisir: (i) {
+                        setState(() => _tri = TriCercle.values[i]);
+                        _demanderPhotos();
+                      },
+                    ),
                   ),
                 ),
-                // Ma carte se lit par ville : pas de tri.
-                if (_mode != ModeExplorer.maCarte) ...[
-                  const SizedBox(height: TablTokens.espaceXs),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TablTokens.espaceL - 4,
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: TablMenuTri(
-                        options: [
-                          for (final t in TriCercle.values)
-                            (libelle: t.libelle, description: t.description),
-                        ],
-                        choisi: _tri.index,
-                        onChoisir: (i) {
-                          setState(() => _tri = TriCercle.values[i]);
-                          _demanderPhotos();
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ],
               SizedBox(
                 height: 2,
                 child: _chargement
@@ -1053,7 +1073,7 @@ class _EcranCarteState extends State<EcranCarte> {
       if (selection == null && widget.positionService != null)
         Positioned(
           right: TablTokens.espaceM,
-          bottom: _margeBarre + TablTokens.espaceM,
+          bottom: _margeBarreFlottante,
           child: TablBoutonVerre(
             icone: Icons.near_me_rounded,
             libelle: 'Me recentrer',
@@ -1072,8 +1092,7 @@ class _EcranCarteState extends State<EcranCarte> {
           _lieux.isNotEmpty)
         Positioned(
           left: TablTokens.espaceL - 4,
-          // Au-dessus du logo de Mapbox.
-          bottom: _margeBarre + 44,
+          bottom: _margeBarreFlottante + 8,
           child: Builder(
             builder: (_) {
               final c = compteursConstellation(_lieux);
@@ -1093,7 +1112,7 @@ class _EcranCarteState extends State<EcranCarte> {
         Positioned(
           left: TablTokens.espaceL,
           right: TablTokens.espaceL,
-          bottom: _margeBarre + 76,
+          bottom: _margeBarreFlottante + 8,
           child: _MessageCarte(texte: _rienDuTout),
         ),
       if (selection == null &&
@@ -1104,7 +1123,7 @@ class _EcranCarteState extends State<EcranCarte> {
         Positioned(
           left: TablTokens.espaceL,
           right: TablTokens.espaceL,
-          bottom: _margeBarre + 76,
+          bottom: _margeBarreFlottante + 8,
           child: _MessageCarte(
             texte: _compte(0),
             action: 'Voir mes villes',
@@ -1258,14 +1277,13 @@ class _EcranCarteState extends State<EcranCarte> {
     );
   }
 
-  Widget _liste() {
+  Widget _grille() {
     final lieux = _lieuxListe;
-    final maintenant = DateTime.now();
-    final texte = _recherche.text.trim();
+    final palette = _palette;
     final haut = _hauteurEnTete;
     if (lieux.isEmpty) {
       return ColoredBox(
-        color: TablTokens.fond,
+        color: palette.fond,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             TablTokens.espaceXl,
@@ -1278,8 +1296,6 @@ class _EcranCarteState extends State<EcranCarte> {
               Text(
                 !_chargeUneFois
                     ? 'Chargement…'
-                    : texte.isNotEmpty
-                    ? 'Aucune adresse ne correspond à « $texte ».'
                     : _lieux.isEmpty
                     ? _rienDuTout
                     : _compte(0),
@@ -1287,9 +1303,10 @@ class _EcranCarteState extends State<EcranCarte> {
                 style: TablTokens.titreAffichage.copyWith(
                   fontSize: 20,
                   height: 1.3,
+                  color: palette.texte,
                 ),
               ),
-              if (_chargeUneFois && texte.isEmpty && _lieux.isNotEmpty) ...[
+              if (_chargeUneFois && _lieux.isNotEmpty) ...[
                 const SizedBox(height: TablTokens.espaceM),
                 TablBoutonTexte(
                   libelle: 'Voir mes villes',
@@ -1302,63 +1319,67 @@ class _EcranCarteState extends State<EcranCarte> {
       );
     }
     if (_mode == ModeExplorer.maCarte) return _listeParVille(lieux, haut);
-    final vedette = lieux.first;
-    final suite = lieux.skip(1).toList();
-    String? raison(LieuCarte l) =>
-        ligneSelonTri(
-          l,
-          _tri,
-          maintenant: maintenant,
-          distanceM: _distance(l),
-        ) ??
-        signalLieu(l, maintenant);
-    String qui(LieuCarte l) => l.amis > 0
-        ? quiLaConnait(l)
-        : l.estEnvie
-        ? 'Dans vos envies'
-        : 'Vous y êtes allé';
+    // Deux par rangée, de la même hauteur.
+    final rangees = [
+      for (var i = 0; i < lieux.length; i += 2)
+        lieux.sublist(i, i + 2 > lieux.length ? lieux.length : i + 2),
+    ];
     return ColoredBox(
-      color: TablTokens.fond,
-      child: ListView(
+      color: palette.fond,
+      child: ListView.builder(
         padding: EdgeInsets.fromLTRB(
-          TablTokens.espaceL - 4,
-          haut + TablTokens.espaceS,
-          TablTokens.espaceL - 4,
-          _margeBarre + TablTokens.espaceL,
+          12,
+          haut + TablTokens.espaceXs,
+          12,
+          _margeBarreFlottante + TablTokens.espaceM,
         ),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        children: [
-          TablCarteVedette(
-            key: ValueKey('vedette-${vedette.cle}'),
-            nom: vedette.nom,
-            photoUrl: _photo(vedette),
-            quiLaConnait: qui(vedette),
-            raison: raison(vedette),
-            enregistre: vedette.estEnvie,
-            onPresse: () => _ouvrirFiche(vedette),
-            onEnregistrer: () => _basculerEnvie(vedette),
-            onOptions: () => _options(vedette),
-          ),
-          if (suite.isNotEmpty) ...[
-            const SizedBox(height: TablTokens.espaceL),
-            Text(
-              'La suite',
-              style: TablTokens.titreAffichage.copyWith(fontSize: 22),
+        itemCount: rangees.length,
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _tuile(rangees[i][0])),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: rangees[i].length > 1
+                      ? _tuile(rangees[i][1])
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-            const SizedBox(height: TablTokens.espaceXs),
-            for (final l in suite)
-              TablLigneCercle(
-                key: ValueKey('ligne-${l.cle}'),
-                nom: l.nom,
-                photoUrl: _photo(l),
-                raison: [qui(l), ?raison(l)].join(' · '),
-                detail: cuisineEtQuartier(l),
-                onPresse: () => _ouvrirFiche(l),
-                onOptions: () => _options(l),
-              ),
-          ],
-        ],
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _tuile(LieuCarte lieu) {
+    final autres = autresQueLesVisages(lieu);
+    final distance = _distance(lieu);
+    final note = noteSurCinq(lieu.ressentis);
+    return TablTuileLieu(
+      key: ValueKey('tuile-${lieu.cle}'),
+      nom: lieu.nom,
+      genre: switch (teinteLieu(lieu)) {
+        TeinteLieu.cercle => GenreTuile.cercle,
+        TeinteLieu.retour => GenreTuile.retour,
+        TeinteLieu.vous => GenreTuile.vous,
+      },
+      visages: [
+        for (final v in lieu.visages) (pseudo: v.pseudo, photoUrl: v.photoUrl),
+      ],
+      autres: autres?.texte,
+      autresNombreux: autres?.nombreux ?? false,
+      etVous: lieu.visiteParMoi && lieu.amis > 0,
+      enGras: distanceSurTuile(distance),
+      detail: cuisineOuLieu(lieu),
+      note: note == null ? null : noteLisible(note),
+      envie: lieu.estEnvie,
+      onPresse: () => _ouvrirFiche(lieu),
+      onVisages: () => _ouvrirFiche(lieu),
+      onEnvie: () => _basculerEnvie(lieu),
     );
   }
 }

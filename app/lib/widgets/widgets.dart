@@ -1,6 +1,7 @@
 /// Design system de Tabl : thème, tokens et composants visuels.
 library;
 
+export '../theme/apparence.dart';
 export '../theme/tabl_theme.dart';
 export '../theme/tokens.dart';
 export 'aide/formulaire_aide.dart';
@@ -15,6 +16,7 @@ export 'bouton_verre.dart';
 export 'boutons.dart';
 export 'boutons_auth_tierce.dart';
 export 'bulles_personnes.dart';
+export 'carte/barre_explorer.dart';
 export 'carte/carnet_filtres.dart';
 export 'carte/carte_mapbox.dart';
 export 'carte/explorer.dart';
@@ -22,7 +24,9 @@ export 'carte/fiche.dart';
 export 'carte/ligne_lieu.dart';
 export 'carte/menu_tri.dart';
 export 'carte/puce_filtre.dart';
+export 'carte/recherche_explorer.dart';
 export 'carte/segment_mode_carte.dart';
+export 'carte/tuile_lieu.dart';
 export 'champ_mot_de_passe.dart';
 export 'champ_texte.dart';
 export 'commentaires/commentaires_moment.dart';

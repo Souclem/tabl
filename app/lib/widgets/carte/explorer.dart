@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../theme/apparence.dart';
 import '../../theme/tokens.dart';
 import '../bulles_personnes.dart';
 
@@ -24,6 +25,7 @@ class TablTitreExplorer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = PaletteExplorer.of(context);
     return Semantics(
       button: true,
       label: '$titre. $sousTitre. Changer de ville',
@@ -42,112 +44,32 @@ class TablTitreExplorer extends StatelessWidget {
                     titre,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.titreAffichage.copyWith(
-                      fontSize: 34,
-                      height: 1.05,
-                      letterSpacing: -0.8,
+                    style: TablTokens.titreSerre.copyWith(
+                      fontSize: 30,
+                      letterSpacing: -1.3,
+                      color: palette.texte,
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    size: 22,
-                    color: TablTokens.texteDoux,
-                  ),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 22,
+                  color: palette.texteDoux,
                 ),
               ],
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 6),
             Text(
               sousTitre,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TablTokens.legende.copyWith(
                 fontSize: 13.5,
-                color: TablTokens.texte.withValues(alpha: 0.7),
+                color: palette.texteDoux,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Le bouton rond des filtres, avec le nombre de filtres actifs dans
-/// une pastille dorée.
-class TablBoutonFiltres extends StatelessWidget {
-  const TablBoutonFiltres({
-    super.key,
-    required this.actifs,
-    required this.onPresse,
-  });
-
-  final int actifs;
-  final VoidCallback onPresse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: actifs == 0 ? 'Filtres' : 'Filtres, $actifs actifs',
-      excludeSemantics: true,
-      child: GestureDetector(
-        onTap: onPresse,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: actifs > 0
-                      ? TablTokens.primaire.withValues(alpha: 0.14)
-                      : const Color(0xCC161A22),
-                  border: Border.all(
-                    color: actifs > 0
-                        ? TablTokens.primaire.withValues(alpha: 0.55)
-                        : TablTokens.texte.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Icon(
-                  Icons.tune_rounded,
-                  size: 18,
-                  color: actifs > 0 ? TablTokens.primaire : TablTokens.texte,
-                ),
-              ),
-              if (actifs > 0)
-                Positioned(
-                  top: -3,
-                  right: -3,
-                  child: Container(
-                    width: 17,
-                    height: 17,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: TablTokens.primaire,
-                      border: Border.all(color: TablTokens.fond, width: 1.5),
-                    ),
-                    child: Text(
-                      '$actifs',
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color: TablTokens.texteSurPrimaire,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
         ),
       ),
     );
@@ -191,7 +113,7 @@ class TablPuceRetirable extends StatelessWidget {
                 style: TablTokens.legende.copyWith(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: TablTokens.texte,
+                  color: PaletteExplorer.of(context).texte,
                 ),
               ),
               const SizedBox(width: 4),
@@ -652,169 +574,6 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Le premier lieu de la liste, en grand : sa photo, son nom, et sous
-/// une vitre qui le connaît et pourquoi il est là.
-class TablCarteVedette extends StatelessWidget {
-  const TablCarteVedette({
-    super.key,
-    required this.nom,
-    required this.photoUrl,
-    required this.quiLaConnait,
-    required this.raison,
-    required this.enregistre,
-    required this.onPresse,
-    required this.onEnregistrer,
-    required this.onOptions,
-  });
-
-  final String nom;
-  final String? photoUrl;
-  final String quiLaConnait;
-
-  /// Selon le tri : "Dernière visite il y a 3 jours", "4 proches y
-  /// retournent"…
-  final String? raison;
-  final bool enregistre;
-  final VoidCallback onPresse;
-  final VoidCallback onEnregistrer;
-  final VoidCallback onOptions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$nom. $quiLaConnait',
-      child: GestureDetector(
-        onTap: onPresse,
-        child: AspectRatio(
-          aspectRatio: 1.25,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              TablPhotoLieu(
-                nom: nom,
-                url: photoUrl,
-                taille: null,
-                rayon: TablTokens.arrondiL + 2,
-                tailleLettre: 96,
-              ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(TablTokens.arrondiL + 2),
-                child: const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: [0.35, 1],
-                      colors: [Color(0x00000000), Color(0xD9000000)],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6, bottom: 10),
-                        child: Text(
-                          nom,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TablTokens.titreAffichage.copyWith(
-                            fontSize: 30,
-                            height: 1.08,
-                            shadows: const [
-                              Shadow(color: Colors.black54, blurRadius: 12),
-                            ],
-                          ),
-                        ),
-                      ),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          TablTokens.arrondiM,
-                        ),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                          child: Container(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-                            color: const Color(0xB3121318),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        quiLaConnait,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TablTokens.corps.copyWith(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: TablTokens.texte,
-                                        ),
-                                      ),
-                                      if (raison != null)
-                                        Text(
-                                          raison!,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TablTokens.legende.copyWith(
-                                            fontSize: 13,
-                                            color: TablTokens.primaire,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: onEnregistrer,
-                                  tooltip: enregistre
-                                      ? 'Retirer de mes envies'
-                                      : 'Enregistrer',
-                                  icon: Icon(
-                                    enregistre
-                                        ? Icons.bookmark_rounded
-                                        : Icons.bookmark_border_rounded,
-                                    size: 20,
-                                    color: enregistre
-                                        ? TablTokens.primaire
-                                        : TablTokens.texte,
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: onOptions,
-                                  tooltip: 'Plus',
-                                  icon: const Icon(
-                                    Icons.more_vert_rounded,
-                                    size: 20,
-                                    color: TablTokens.texteDoux,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),

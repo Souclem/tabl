@@ -233,6 +233,51 @@ class _EcranProfilState extends State<EcranProfil>
   // clignoter le badge à 0 le temps qu'elle reparte.
   late Future<int> _nombreDemandes = widget.abonnementService
       .nombreDemandesEnAttente();
+  /// Clair, sombre, ou comme le téléphone. Pour l'instant, seul
+  /// l'Explorer en tient compte.
+  void _choisirApparence() {
+    final actuelle = TablApparence.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: TablTokens.surface,
+      showDragHandle: true,
+      builder: (contexteFeuille) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: TablTokens.espaceL,
+              ),
+              child: Text('Apparence', style: TablTokens.titre),
+            ),
+            const SizedBox(height: TablTokens.espaceS),
+            for (final apparence in Apparence.values)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceL,
+                ),
+                title: Text(apparence.libelle, style: TablTokens.corps),
+                subtitle: Text(apparence.detail, style: TablTokens.legende),
+                trailing: apparence == actuelle
+                    ? const Icon(
+                        Icons.check_rounded,
+                        color: TablTokens.primaire,
+                      )
+                    : null,
+                onTap: () {
+                  TablApparence.choisir(context, apparence);
+                  Navigator.of(contexteFeuille).pop();
+                },
+              ),
+            const SizedBox(height: TablTokens.espaceS),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   Future<void> _allerVersAbonnes({required bool ongletAbonnes}) async {
     await Navigator.of(context).push(
@@ -279,6 +324,28 @@ class _EcranProfilState extends State<EcranProfil>
                     },
                   ),
                 ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: TablTokens.espaceL,
+                ),
+                leading: const Icon(
+                  Icons.contrast_rounded,
+                  color: TablTokens.primaire,
+                ),
+                title: Text('Apparence', style: TablTokens.corps),
+                subtitle: Text(
+                  '${TablApparence.of(context).libelle} · pour l’Explorer',
+                  style: TablTokens.legende,
+                ),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: TablTokens.texteDoux,
+                ),
+                onTap: () {
+                  Navigator.of(contexteFeuille).pop();
+                  _choisirApparence();
+                },
+              ),
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: TablTokens.espaceL,

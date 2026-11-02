@@ -76,6 +76,69 @@ String? signalLieu(LieuCarte lieu, DateTime maintenant) {
   return null;
 }
 
+/// Ce que dit la couleur d'une tuile de l'Explorer.
+enum TeinteLieu {
+  /// Mon cercle y est allé.
+  cercle,
+
+  /// Mes proches y retournent.
+  retour,
+
+  /// J'y suis allé moi aussi : ça prime.
+  vous,
+}
+
+TeinteLieu teinteLieu(LieuCarte lieu) => lieu.visiteParMoi
+    ? TeinteLieu.vous
+    : lieu.leCercleRevient
+    ? TeinteLieu.retour
+    : TeinteLieu.cercle;
+
+/// Le nombre de proches au-delà des visages montrés : "+4", jamais plus
+/// de "+10" ([nombreux] : au-delà, la pastille se dore). `null` : tous
+/// les visages sont là.
+({String texte, bool nombreux})? autresQueLesVisages(LieuCarte lieu) {
+  final autres = lieu.amis - lieu.visages.length;
+  if (autres <= 0) return null;
+  return (texte: '+${math.min(autres, 10)}', nombreux: autres > 10);
+}
+
+/// La cuisine d'une adresse ("Japonais"), à défaut son quartier ou sa
+/// ville.
+String? cuisineOuLieu(LieuCarte lieu) {
+  if (lieu.categories.isNotEmpty) return libelleCategorie(lieu.categories.first);
+  final quartier = lieu.quartier?.trim();
+  if (quartier != null && quartier.isNotEmpty) return quartier;
+  return lieu.ville.isEmpty ? null : lieu.ville;
+}
+
+/// Au-delà, la distance ne dit plus rien d'utile sur une tuile
+/// (« 8 955 km ») : on la tait.
+const double distanceMaxSurTuile = 50000;
+
+/// "50 m", "1,4 km" ; `null` si on ne sait pas ou si c'est trop loin.
+String? distanceSurTuile(double? metres) =>
+    metres == null || metres > distanceMaxSurTuile
+    ? null
+    : distanceLisible(metres);
+
+/// Une adresse dans la recherche de l'Explorer : "4 proches y
+/// retournent · Italien · Liège", "1 proche · Japonais · Namur".
+String resumeRecherche(LieuCarte lieu) {
+  final qui = switch ((lieu.amisQuiReviennent, lieu.amis)) {
+    (1, _) => '1 proche y retourne',
+    (final n, _) when n > 1 => '$n proches y retournent',
+    (_, 1) => '1 proche',
+    (_, final n) when n > 1 => '$n proches',
+    _ => lieu.visiteParMoi ? 'Vous y êtes allé' : null,
+  };
+  return [
+    ?qui,
+    if (lieu.categories.isNotEmpty) libelleCategorie(lieu.categories.first),
+    if (lieu.ville.isNotEmpty) lieu.ville,
+  ].join(' · ');
+}
+
 /// "Italien · Hors-Château" : la cuisine et le quartier (ou la ville).
 String cuisineEtQuartier(LieuCarte lieu) {
   final quartier = lieu.quartier?.trim();
@@ -86,15 +149,6 @@ String cuisineEtQuartier(LieuCarte lieu) {
     else if (lieu.ville.isNotEmpty)
       lieu.ville,
   ].join(' · ');
-}
-
-/// "9 min à pied" jusqu'à 2 km, puis "3,4 km".
-String distanceAPied(double metres) {
-  if (metres < 2000) {
-    final minutes = math.max(1, (metres / 80).round());
-    return '$minutes min à pied';
-  }
-  return distanceLisible(metres);
 }
 
 /// Les façons de trier les adresses du cercle, chacune avec ce qu'elle
@@ -172,37 +226,6 @@ List<LieuCarte> trierLieux(
       );
   }
   return copie;
-}
-
-/// La seconde ligne d'un lieu dans la liste, selon le tri choisi :
-/// ce qui explique sa place.
-String? ligneSelonTri(
-  LieuCarte lieu,
-  TriCercle tri, {
-  required DateTime maintenant,
-  double? distanceM,
-}) {
-  switch (tri) {
-    case TriCercle.recents:
-      final d = lieu.derniereVisite;
-      return d == null ? null : 'Dernière visite ${ilYA(d, maintenant)}';
-    case TriCercle.ilsYRetournent:
-      final n = lieu.amisQuiReviennent;
-      if (n == 0) return null;
-      return n == 1 ? '1 proche y retourne' : '$n proches y retournent';
-    case TriCercle.mieuxNotes:
-      final note = noteSurCinq(lieu.ressentis);
-      if (note == null) return null;
-      final n = lieu.ressentis.length;
-      return '${noteLisible(note)} · ${n == 1 ? '1 avis' : '$n avis'}';
-    case TriCercle.plusProches:
-      return distanceM == null ? null : distanceAPied(distanceM);
-    case TriCercle.plusConnus:
-      final n = lieu.amis;
-      return n == 1
-          ? '1 proche connaît cette adresse'
-          : '$n proches connaissent cette adresse';
-  }
 }
 
 /// Une ville où mon cercle a des adresses : son centre, sa zone, et

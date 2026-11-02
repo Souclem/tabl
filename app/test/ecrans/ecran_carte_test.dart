@@ -129,10 +129,11 @@ Future<_FauxCarteService> _ouvrir(
   return service;
 }
 
-Future<void> _enListe(WidgetTester tester) async {
-  await tester.tap(find.text('Liste'));
-  await tester.pumpAndSettle();
-}
+/// Les noms des tuiles de la grille, dans l'ordre.
+List<String> _tuiles(WidgetTester tester) => [
+  for (final t in tester.widgetList<TablTuileLieu>(find.byType(TablTuileLieu)))
+    t.nom,
+];
 
 Future<void> _ouvrirFiltres(WidgetTester tester) async {
   await tester.tap(find.bySemanticsLabel(RegExp('^Filtres')));
@@ -155,20 +156,20 @@ Future<void> _voirLesAdresses(WidgetTester tester) async {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('en-tête : la ville regardée, les modes et les filtres', (
-    tester,
-  ) async {
+  testWidgets('en-tête et barre du bas : la ville, la Constellation, '
+      'rechercher, filtrer, carte ou grille', (tester) async {
     await _ouvrir(tester, [_lieu('Bibo'), _lieu('Le Campus')]);
 
     // Trop loin pour une ville : tout le cercle.
     expect(find.text('Votre cercle'), findsOneWidget);
     expect(find.text('2 adresses connues par vos proches'), findsOneWidget);
-    for (final mode in ['Ma carte', 'Envies', 'Le cercle']) {
-      expect(find.text(mode), findsOneWidget);
+    expect(find.bySemanticsLabel('Constellation'), findsOneWidget);
+    for (final libelle in ['Rechercher', 'Filtres', 'Carte', 'Grille']) {
+      expect(find.bySemanticsLabel(libelle), findsOneWidget);
     }
-    expect(find.text('Carte'), findsOneWidget);
-    expect(find.text('Liste'), findsOneWidget);
-    expect(find.bySemanticsLabel('Filtres'), findsOneWidget);
+    // Plus de modes « Envies » ni « Le cercle » : le marque-page et les
+    // filtres s'en chargent.
+    expect(find.text('Envies'), findsNothing);
   });
 
   testWidgets('tout est chargé d\'un coup, en mode « Le cercle »', (
@@ -181,27 +182,21 @@ void main() {
     expect(service.modes.single, ModeExplorer.cercle);
   });
 
-  testWidgets('la liste : le premier en grand, puis « La suite »', (
-    tester,
-  ) async {
+  testWidgets('la grille : des tuiles de la zone regardée, les plus '
+      'récentes d\'abord', (tester) async {
     await _ouvrir(tester, [
       _lieu('Bibo', derniere: DateTime(2026, 8, 1)),
       _lieu('Le Campus', derniere: DateTime(2026, 10, 1), amis: 2),
       _lieu('Le Comptoir Paris', latitude: 48.86, longitude: 2.35),
     ]);
-    await _enListe(tester);
 
-    // « Récents » : la visite la plus récente d'abord.
-    expect(find.byType(TablCarteVedette), findsOneWidget);
-    final vedette = tester.widget<TablCarteVedette>(
-      find.byType(TablCarteVedette),
+    // « Récents » ; la zone regardée est la Belgique au départ.
+    expect(_tuiles(tester), ['Le Campus', 'Bibo']);
+    final campus = tester.widget<TablTuileLieu>(
+      find.byKey(const ValueKey('tuile-Le Campus')),
     );
-    expect(vedette.nom, 'Le Campus');
-    expect(vedette.quiLaConnait, 'Emma et Martin la connaissent');
-    expect(find.text('La suite'), findsOneWidget);
-    expect(find.text('Bibo'), findsOneWidget);
-    // La liste s'en tient à la zone regardée (la Belgique au départ).
-    expect(find.text('Le Comptoir Paris'), findsNothing);
+    expect(campus.visages.map((v) => v.pseudo), ['Emma', 'Martin']);
+    expect(campus.genre, GenreTuile.cercle);
   });
 
   testWidgets('les tris : « Ils y retournent » d\'abord ceux qui reviennent', (
@@ -211,11 +206,7 @@ void main() {
       _lieu('Bibo', derniere: DateTime(2026, 10, 1)),
       _lieu('Le Campus', revenants: 2, derniere: DateTime(2026, 1, 1)),
     ]);
-    await _enListe(tester);
-    expect(
-      tester.widget<TablCarteVedette>(find.byType(TablCarteVedette)).nom,
-      'Bibo',
-    );
+    expect(_tuiles(tester).first, 'Bibo');
 
     // Le tri se choisit dans le menu « Trié par ».
     expect(find.text('Ils y retournent'), findsNothing);
@@ -226,33 +217,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ils y retournent'), findsOneWidget);
-    final vedette = tester.widget<TablCarteVedette>(
-      find.byType(TablCarteVedette),
+    expect(_tuiles(tester).first, 'Le Campus');
+    // Ils y retournent : la tuile est braise.
+    expect(
+      tester
+          .widget<TablTuileLieu>(find.byKey(const ValueKey('tuile-Le Campus')))
+          .genre,
+      GenreTuile.retour,
     );
-    expect(vedette.nom, 'Le Campus');
-    expect(vedette.raison, '2 proches y retournent');
   });
 
-  testWidgets('chercher trouve aussi hors de la zone regardée', (tester) async {
-    await _ouvrir(tester, [
+  testWidgets('« Rechercher » : ici, ailleurs, et les proches', (
+    tester,
+  ) async {
+    final service = await _ouvrir(tester, [
       _lieu('Bibo'),
       _lieu('Le Comptoir Paris', latitude: 48.86, longitude: 2.35),
     ]);
-    await _enListe(tester);
 
+    await tester.tap(find.bySemanticsLabel('Rechercher'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'comptoir');
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<TablCarteVedette>(find.byType(TablCarteVedette)).nom,
-      'Le Comptoir Paris',
-    );
+    expect(find.text('Ailleurs'), findsOneWidget);
+    expect(find.text('Le Comptoir Paris'), findsOneWidget);
+    expect(find.text('Restaurants de votre cercle'), findsNothing);
 
     await tester.enterText(find.byType(TextField), 'zzz');
     await tester.pumpAndSettle();
-    expect(
-      find.text('Aucune adresse ne correspond à « zzz ».'),
-      findsOneWidget,
-    );
+    expect(find.text('Rien ne correspond à « zzz ».'), findsOneWidget);
+
+    // Un proche : la grille ne garde que ses adresses.
+    await tester.enterText(find.byType(TextField), 'em');
+    await tester.pumpAndSettle();
+    expect(find.text('Vos proches'), findsOneWidget);
+    await tester.tap(find.text('Emma'));
+    await tester.pumpAndSettle();
+    expect(service.recherches.last.personneId, 'emma');
+    expect(find.bySemanticsLabel('Retirer le filtre Emma'), findsOneWidget);
   });
 
   testWidgets('les filtres : une feuille, puis des puces à retirer', (
@@ -262,7 +264,6 @@ void main() {
       _lieu('Le Campus', coupDeCoeur: true),
       _lieu('Bibo'),
     ]);
-    await _enListe(tester);
 
     await _ouvrirFiltres(tester);
     expect(find.text('Moment'), findsOneWidget);
@@ -311,7 +312,6 @@ void main() {
 
   testWidgets('aucune adresse pour ces filtres : on le dit', (tester) async {
     await _ouvrir(tester, [_lieu('Bibo')]);
-    await _enListe(tester);
     await _ouvrirFiltres(tester);
     await tester.ensureVisible(find.text('Coups de cœur'));
     await tester.tap(find.text('Coups de cœur'));
@@ -325,21 +325,15 @@ void main() {
     );
   });
 
-  testWidgets('« Envies » : un autre mode, retenu pour la prochaine fois', (
+  testWidgets('le marque-page d\'une tuile garde l\'adresse pour plus tard', (
     tester,
   ) async {
-    final service = await _ouvrir(tester, [
-      _lieu('Bibo'),
-      _lieu('Como en Casa', envie: true, amis: 0),
-    ]);
+    final service = await _ouvrir(tester, [_lieu('Bibo')]);
 
-    await tester.tap(find.text('Envies'));
+    await tester.tap(find.byTooltip('Garder pour plus tard'));
     await tester.pumpAndSettle();
 
-    expect(service.modes.last, ModeExplorer.envies);
-    expect(find.text('Les adresses que vous gardez pour plus tard.'), findsOneWidget);
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('explorer_mode'), 'envies');
+    expect(service.envies.single.envie, isTrue);
   });
 
   testWidgets('« Ma carte » : ma Constellation, et mes adresses par ville', (
@@ -370,13 +364,14 @@ void main() {
       ),
     ]);
 
-    await tester.tap(find.text('Ma carte'));
+    await tester.tap(find.bySemanticsLabel('Constellation'));
     await tester.pumpAndSettle();
     expect(service.modes.last, ModeExplorer.maCarte);
-    expect(find.text('Constellation'), findsOneWidget);
     expect(find.text('Votre histoire, table par table.'), findsOneWidget);
+    // Retenue pour la prochaine ouverture.
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('explorer_mode'), 'maCarte');
 
-    await _enListe(tester);
     // Par ville, la plus fréquentée d'abord ; pas de tri à choisir.
     expect(find.text('Ils y retournent'), findsNothing);
     expect(find.text('1 table · 6 repas'), findsOneWidget);
@@ -441,5 +436,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('3 derniers mois'), findsNothing);
     expect(find.text('Déjeuner'), findsOneWidget);
+  });
+
+  testWidgets('en clair : le fond de lin ; la Constellation reste de nuit', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      TablApparence(
+        reglage: ValueNotifier(Apparence.clair),
+        child: MaterialApp(
+          theme: TablTheme.sombre(),
+          home: EcranCarte(
+            carteService: _FauxCarteService([_lieu('Bibo')]),
+            abonnementService: _FauxAbonnementService(),
+            afficherCarte: false,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    Color fond() =>
+        tester.widget<Scaffold>(find.byType(Scaffold).first).backgroundColor!;
+    expect(fond(), PaletteExplorer.clair.fond);
+
+    await tester.tap(find.bySemanticsLabel('Constellation'));
+    await tester.pumpAndSettle();
+    expect(fond(), PaletteExplorer.sombre.fond);
   });
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/apparence.dart';
 import '../../theme/tokens.dart';
 
 /// « Trié par Récents ⌄ » : un toucher ouvre un petit menu sur papier
@@ -21,6 +22,7 @@ class TablMenuTri extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = PaletteExplorer.of(context);
     return PopupMenuButton<int>(
       tooltip: 'Changer le tri',
       onSelected: onChoisir,
@@ -87,19 +89,26 @@ class TablMenuTri extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Trié par ', style: TablTokens.legende.copyWith(fontSize: 14)),
+            Text(
+              'Trié par ',
+              style: TablTokens.legende.copyWith(
+                fontSize: 14,
+                color: palette.texteDoux,
+              ),
+            ),
             Text(
               options[choisi].libelle,
               style: TablTokens.corps.copyWith(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
+                color: palette.texte,
               ),
             ),
             const SizedBox(width: 2),
-            const Icon(
+            Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 18,
-              color: TablTokens.texteDoux,
+              color: palette.texteDoux,
             ),
           ],
         ),

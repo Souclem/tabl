@@ -113,6 +113,18 @@ class TablTokens {
     fontWeight: FontWeight.w500,
   );
 
+  /// Les noms et les titres de l'Explorer : une grotesque très grasse et
+  /// serrée (Bricolage Grotesque, maquette de Martin), embarquée dans
+  /// l'app (`assets/polices`).
+  static const TextStyle titreSerre = TextStyle(
+    fontFamily: 'BricolageGrotesque',
+    fontWeight: FontWeight.w800,
+    fontVariations: [FontVariation('wght', 790), FontVariation('wdth', 76)],
+    letterSpacing: -0.7,
+    height: 1,
+    color: texte,
+  );
+
   static const TextStyle grandTitre = TextStyle(
     fontFamily: police,
     fontSize: 32,

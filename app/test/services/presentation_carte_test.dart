@@ -102,41 +102,6 @@ void main() {
     expect(premier(TriCercle.plusConnus), 'Ancien');
   });
 
-  test('la raison d\'une place dans la liste, selon le tri', () {
-    final lieu = _lieu(
-      'A',
-      amis: 4,
-      revenants: 2,
-      ressentis: ['😍', '🙂'],
-      derniere: DateTime(2026, 10, 26),
-    );
-    expect(
-      ligneSelonTri(lieu, TriCercle.recents, maintenant: maintenant),
-      'Dernière visite hier',
-    );
-    expect(
-      ligneSelonTri(lieu, TriCercle.ilsYRetournent, maintenant: maintenant),
-      '2 proches y retournent',
-    );
-    expect(
-      ligneSelonTri(lieu, TriCercle.mieuxNotes, maintenant: maintenant),
-      '4,3 · 2 avis',
-    );
-    expect(
-      ligneSelonTri(
-        lieu,
-        TriCercle.plusProches,
-        maintenant: maintenant,
-        distanceM: 720,
-      ),
-      '9 min à pied',
-    );
-    expect(
-      ligneSelonTri(lieu, TriCercle.plusConnus, maintenant: maintenant),
-      '4 proches connaissent cette adresse',
-    );
-  });
-
   test('les villes du cercle, et celle qu\'on regarde', () {
     final villes = villesDuCercle([
       _lieu('A'),
@@ -153,15 +118,50 @@ void main() {
     expect(villeRegardee(villes, 45.0, 10.0), isNull);
   });
 
-  test('à pied jusqu\'à 2 km, en kilomètres ensuite', () {
-    expect(distanceAPied(60), '1 min à pied');
-    expect(distanceAPied(1500), '19 min à pied');
-    expect(distanceAPied(3400), '3,4 km');
-  });
-
   test('la période : jusqu\'où remonter', () {
     expect(PeriodeCarte.troisMois.depuis(maintenant), DateTime(2026, 7, 27));
     expect(PeriodeCarte.unAn.depuis(maintenant), DateTime(2025, 10, 27));
     expect(PeriodeCarte.tout.depuis(maintenant), isNull);
+  });
+
+  group('les tuiles de l\'Explorer', () {
+    test('leur couleur : vous d\'abord, puis ceux qui y retournent', () {
+      expect(teinteLieu(_lieu('A')), TeinteLieu.cercle);
+      expect(teinteLieu(_lieu('A', revenants: 1)), TeinteLieu.retour);
+      final aussiMoi = LieuCarte(
+        nom: 'A',
+        ville: 'Liège',
+        latitude: 50.6,
+        longitude: 5.5,
+        amis: 3,
+        amisQuiReviennent: 2,
+        visiteParMoi: true,
+      );
+      expect(teinteLieu(aussiMoi), TeinteLieu.vous);
+    });
+
+    test('« +N » au-delà des visages, jamais plus de « +10 »', () {
+      expect(autresQueLesVisages(_lieu('A', amis: 1)), isNull);
+      expect(
+        autresQueLesVisages(_lieu('A', amis: 7, visages: ['E', 'M', 'L'])),
+        (texte: '+4', nombreux: false),
+      );
+      expect(
+        autresQueLesVisages(_lieu('A', amis: 25, visages: ['E', 'M', 'L'])),
+        (texte: '+10', nombreux: true),
+      );
+    });
+
+    test('dans la recherche : qui y va, la cuisine, la ville', () {
+      expect(
+        resumeRecherche(_lieu('A', amis: 4, revenants: 2)),
+        '2 proches y retournent · Liège',
+      );
+      expect(resumeRecherche(_lieu('A', amis: 1)), '1 proche · Liège');
+      expect(cuisineOuLieu(_lieu('A')), 'Liège');
+      expect(distanceSurTuile(null), isNull);
+      expect(distanceSurTuile(80000), isNull);
+      expect(distanceSurTuile(50), isNotNull);
+    });
   });
 }
