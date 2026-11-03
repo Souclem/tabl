@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../stockage/liens_signes.dart';
+import '../stockage/sans_metadonnees.dart';
 import 'instant_affichable.dart';
 import 'instant_service.dart';
 import 'instants_config.dart';
@@ -201,7 +202,7 @@ class InstantServiceSupabase implements InstantService {
         .from('instants')
         .uploadBinary(
           chemin,
-          media,
+          type == TypeMediaInstant.photo ? sansMetadonnees(media) : media,
           fileOptions: FileOptions(contentType: contentType),
         );
     return chemin;

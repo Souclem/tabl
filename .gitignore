@@ -68,3 +68,4 @@ instruction/
 # Environnement Python des scripts (annuaire)
 scripts/.venv/
 scripts/.cache_photos/
+scripts/.cache_nettoyage/

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../stockage/sans_metadonnees.dart';
 import 'retour.dart';
 import 'retour_service.dart';
 
@@ -61,7 +62,7 @@ class RetourServiceSupabase implements RetourService {
         .from('retours')
         .uploadBinary(
           chemin,
-          octets,
+          sansMetadonnees(octets),
           fileOptions: FileOptions(contentType: format.typeMime),
         );
     return chemin;

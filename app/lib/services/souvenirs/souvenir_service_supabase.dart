@@ -9,6 +9,7 @@ import 'audience_souvenir.dart';
 import 'commentaire.dart';
 import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
+import '../stockage/sans_metadonnees.dart';
 import 'emotion.dart';
 import 'filtre_reseau.dart';
 import 'moment_modifiable.dart';
@@ -866,7 +867,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         .from('souvenirs')
         .uploadBinary(
           chemin,
-          photo,
+          sansMetadonnees(photo),
           fileOptions: const FileOptions(contentType: 'image/jpeg'),
         );
     return chemin;

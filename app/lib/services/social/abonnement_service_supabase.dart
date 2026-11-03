@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../notifications/notifications_systeme.dart';
+import '../stockage/sans_metadonnees.dart';
 import 'abonnement_service.dart';
 import 'photo_profil.dart';
 import 'profil_public.dart';
@@ -351,13 +352,15 @@ class AbonnementServiceSupabase implements AbonnementService {
     // image, déjà petite (l'app la réduit avant l'envoi).
     final chemin = '$_monId/photo-${DateTime.now().millisecondsSinceEpoch}.jpg';
     const options = FileOptions(contentType: 'image/jpeg');
+    // Le bucket est public : surtout pas la position de la photo.
+    final image = sansMetadonnees(photo);
     await Future.wait([
       _client.storage
           .from('avatars')
-          .uploadBinary(chemin, photo, fileOptions: options),
+          .uploadBinary(chemin, image, fileOptions: options),
       _client.storage
           .from('avatars')
-          .uploadBinary(cheminMiniature(chemin), photo, fileOptions: options),
+          .uploadBinary(cheminMiniature(chemin), image, fileOptions: options),
     ]);
     await _client
         .from('profils')

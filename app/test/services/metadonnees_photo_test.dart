@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:exif/exif.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/services/services.dart';
 
@@ -28,6 +30,37 @@ final _photoExif = base64Decode(
   'VPkWp+54rB0+d6H//Z',
 );
 
+/// Une image PNG de 1 × 1 pixel, sans métadonnées.
+final _png = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+);
+
+/// Un segment EXIF petit-boutiste : l'orientation [orientation] et une
+/// position (hémisphère nord).
+List<int> _exifOrientationEtPosition(int orientation) {
+  final tiff = [
+    0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, // II, 42, IFD0 en 8
+    0x02, 0x00, // IFD0 : 2 entrées
+    0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, orientation, 0, 0, 0,
+    0x25, 0x88, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 38, 0, 0, 0, // GPS en 38
+    0x00, 0x00, 0x00, 0x00,
+    0x01, 0x00, // GPS : 1 entrée, GPSLatitudeRef = « N »
+    0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x4E, 0, 0, 0,
+    0x00, 0x00, 0x00, 0x00,
+  ];
+  final contenu = [...'Exif'.codeUnits, 0, 0, ...tiff];
+  final longueur = contenu.length + 2;
+  return [0xFF, 0xE1, longueur >> 8, longueur & 0xFF, ...contenu];
+}
+
+/// La position du premier [marqueur] JPEG (0xFF, marqueur).
+int _marqueur(Uint8List jpeg, int marqueur) {
+  for (var i = 0; i + 1 < jpeg.length; i++) {
+    if (jpeg[i] == 0xFF && jpeg[i + 1] == marqueur) return i;
+  }
+  return -1;
+}
+
 void main() {
   test('la date et la position d\'une vraie photo', () async {
     final m = await lireMetadonnees(_photoExif);
@@ -42,11 +75,7 @@ void main() {
   });
 
   test('une image sans métadonnées n\'en a simplement pas', () async {
-    final m = await lireMetadonnees(
-      base64Decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-      ),
-    );
+    final m = await lireMetadonnees(_png);
 
     expect(m.prisLe, isNull);
     expect(m.aUnePosition, isFalse);
@@ -64,5 +93,76 @@ void main() {
     expect(coordonneeExif([5, 34, 49.62], 'W'), closeTo(-5.58045, 1e-6));
     expect(coordonneeExif([33, 52, 0], 'S'), closeTo(-33.866667, 1e-6));
     expect(coordonneeExif([], 'N'), isNull);
+  });
+
+  test('envoyée, la photo ne dit plus ni quand ni où', () async {
+    final envoyee = sansMetadonnees(_photoExif);
+
+    final m = await lireMetadonnees(envoyee);
+    expect(m.prisLe, isNull);
+    expect(m.aUnePosition, isFalse);
+    expect(await readExifFromBytes(envoyee), isEmpty);
+    // La même image, sans réencodage : de ses dimensions à la fin,
+    // octet pour octet.
+    final image = _marqueur(_photoExif, 0xC0);
+    expect(
+      envoyee.sublist(_marqueur(envoyee, 0xC0)),
+      _photoExif.sublist(image),
+    );
+    expect(envoyee.length, lessThan(_photoExif.length));
+  });
+
+  test('envoyée, la photo garde son orientation', () async {
+    final propre = sansMetadonnees(_photoExif);
+    final tournee = Uint8List.fromList([
+      0xFF,
+      0xD8,
+      ..._exifOrientationEtPosition(6),
+      ...propre.sublist(2),
+    ]);
+    final avant = await readExifFromBytes(tournee);
+    expect(avant.keys, contains('GPS GPSLatitudeRef'));
+
+    final apres = await readExifFromBytes(sansMetadonnees(tournee));
+    expect(apres['Image Orientation']?.values.firstAsInt(), 6);
+    expect(apres.keys.where((cle) => cle.startsWith('GPS')), isEmpty);
+    // Droite, l'orientation n'a pas besoin d'être dite.
+    final droite = Uint8List.fromList([
+      0xFF,
+      0xD8,
+      ..._exifOrientationEtPosition(1),
+      ...propre.sublist(2),
+    ]);
+    expect(sansMetadonnees(droite), propre);
+  });
+
+  test('envoyée, une image PNG perd ses textes', () {
+    // Un morceau tEXt (« Location » : …) juste avant la fin.
+    final fin = _png.length - 12;
+    final texte = [...'Location'.codeUnits, 0, ...'50.64,5.58'.codeUnits];
+    final avecTexte = Uint8List.fromList([
+      ..._png.sublist(0, fin),
+      0,
+      0,
+      0,
+      texte.length,
+      ...'tEXt'.codeUnits,
+      ...texte,
+      0,
+      0,
+      0,
+      0,
+      ..._png.sublist(fin),
+    ]);
+
+    expect(sansMetadonnees(avecTexte), _png);
+  });
+
+  test('un fichier inconnu ou abîmé part tel quel', () {
+    final inconnu = Uint8List.fromList([1, 2, 3]);
+    final abime = Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0xFF]);
+
+    expect(sansMetadonnees(inconnu), same(inconnu));
+    expect(sansMetadonnees(abime), same(abime));
   });
 }
