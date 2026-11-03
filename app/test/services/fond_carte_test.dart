@@ -36,18 +36,24 @@ void main() {
     expect(fond.terres.single.points[2], closeTo(181, 1e-9));
   });
 
-  test('le pays d\'un point : dedans, tout près d\'une côte, ou aucun', () {
-    // La Belgique en rectangle (lon 2,5 à 6,4 ; lat 49,5 à 51,5).
+  test('le pays et la région d\'un point : dedans, tout près d\'un bord, '
+      'ou aucun', () {
+    // La province de Liège en rectangle (lon 2,5 à 6,4 ; lat 49,5 à 51,5).
     final fond = fondCarteDepuisJson(
-      terres: '[[250,4950,640,4950,640,5150,250,5150]]',
+      terres: '[]',
       frontieres: '[]',
       routes: '[]',
-      nomsTerres: '["Belgique"]',
+      regions:
+          '{"noms": [["Belgique", "Liège", "Province"]], '
+          '"traces": [[0, 250, 4950, 390, 0, 0, 200, -390, 0]]}',
     );
 
-    expect(paysDuPoint(fond, 5.57, mercY(50.64)), 'Belgique');
-    // En mer, à deux pas de la côte.
-    expect(paysDuPoint(fond, 2.4, mercY(51.2)), 'Belgique');
-    expect(paysDuPoint(fond, 12.5, mercY(41.9)), isNull);
+    final ici = endroitDuPoint(fond, 5.57, mercY(50.64));
+    expect(ici?.pays, 'Belgique');
+    expect(ici?.region, 'Liège');
+    expect(ici?.sorte, 'Province');
+    // En mer, à deux pas du bord.
+    expect(endroitDuPoint(fond, 2.4, mercY(51.2))?.region, 'Liège');
+    expect(endroitDuPoint(fond, 12.5, mercY(41.9)), isNull);
   });
 }

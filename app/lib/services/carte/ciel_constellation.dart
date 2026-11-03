@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../restaurants/categories_lieu.dart';
 import '../souvenirs/presentation_souvenir.dart';
 import 'lieu_carte.dart';
+import 'noms_villes.dart';
 
 /// Mercator, en degrés : x = longitude, y = cette valeur, croissante vers
 /// le sud comme l'écran.
@@ -80,17 +81,24 @@ class VilleCiel {
 /// Un lien entre deux étoiles (indices), orienté de la plus ancienne
 /// ([de]) vers l'autre : ce qui y circule va dans ce sens.
 class LienCiel {
-  const LienCiel(this.de, this.vers);
+  const LienCiel(this.de, this.vers, {this.groupe = -1});
 
   final int de;
   final int vers;
 
-  @override
-  bool operator ==(Object other) =>
-      other is LienCiel && other.de == de && other.vers == vers;
+  /// Entre deux villes : le groupe (indice dans [HierarchieCiel.groupes])
+  /// dont il relie deux parties, -1 entre ce qui n'a pas de groupe.
+  final int groupe;
 
   @override
-  int get hashCode => Object.hash(de, vers);
+  bool operator ==(Object other) =>
+      other is LienCiel &&
+      other.de == de &&
+      other.vers == vers &&
+      other.groupe == groupe;
+
+  @override
+  int get hashCode => Object.hash(de, vers, groupe);
 
   @override
   String toString() => '$de→$vers';
@@ -101,25 +109,21 @@ class CielConstellation {
   const CielConstellation({
     required this.villes,
     required this.liensDansVilles,
-    required this.liensEntreVilles,
     required this.compteurs,
   });
 
   static const vide = CielConstellation(
     villes: [],
     liensDansVilles: [],
-    liensEntreVilles: [],
     compteurs: '',
   );
 
   /// Dans l'ordre où je les ai découvertes.
   final List<VilleCiel> villes;
 
-  /// Pour chaque ville, ses liens (indices dans [VilleCiel.etoiles]).
+  /// Pour chaque ville, ses liens (indices dans [VilleCiel.etoiles]). Entre
+  /// les villes : voir [hierarchieDuCiel].
   final List<List<LienCiel>> liensDansVilles;
-
-  /// Entre les villes (indices dans [villes]).
-  final List<LienCiel> liensEntreVilles;
 
   /// « 298 tables · 971 repas · 55 villes ».
   final String compteurs;
@@ -138,15 +142,16 @@ double distanceCielKm(double x1, double y1, double x2, double y2) {
   return 12742 * math.asin(math.sqrt(h));
 }
 
-/// Ma Constellation : mes restaurants, regroupés par ville, et ses liens :
-/// le maillage « Dense » (voir [liensDenses]), entre les villes comme dans
-/// chacune. Chaque lien va du lieu découvert en premier vers l'autre.
+/// Ma Constellation : mes restaurants, regroupés par ville (en français,
+/// une commune toute proche avec sa grande ville), et les liens de chaque
+/// ville : le maillage « Dense » (voir [liensDenses]), chaque lien du lieu
+/// découvert en premier vers l'autre.
 CielConstellation cielConstellation(Iterable<LieuCarte> miens) {
   final parVille = <String, List<LieuCarte>>{};
   final noms = <String, String>{};
   final sansVille = <LieuCarte>[];
   for (final l in miens) {
-    final nom = l.ville.trim();
+    final nom = nomFrancaisVille(l.ville.trim());
     if (nom.isEmpty) {
       sansVille.add(l);
       continue;
@@ -155,6 +160,7 @@ CielConstellation cielConstellation(Iterable<LieuCarte> miens) {
     parVille.putIfAbsent(cle, () => []).add(l);
     noms.putIfAbsent(cle, () => nom);
   }
+  _fusionnerCommunes(parVille);
   _rattacherSansVille(sansVille, parVille, noms);
   if (parVille.isEmpty) return CielConstellation.vide;
 
@@ -174,14 +180,50 @@ CielConstellation cielConstellation(Iterable<LieuCarte> miens) {
           (i) => v.etoiles[i].premiere,
         ),
     ],
-    liensEntreVilles: _orienter(
-      liensDenses([for (final v in villes) (v.cx, v.cy)]),
-      (i) => villes[i].debut,
-    ),
     compteurs:
         '${pluriel(tables, 'table')} · $repas repas · '
         '${pluriel(villes.length, 'ville')}',
   );
+}
+
+/// Plus près que ça d'une ville qui a plus de restaurants, une commune la
+/// rejoint : Kessel-Lo est à Louvain, Ixelles à Bruxelles.
+const _communeKm = 6.0;
+
+({double x, double y}) _centre(List<LieuCarte> lieux) => (
+  x: lieux.fold(0.0, (n, l) => n + l.longitude) / lieux.length,
+  y: lieux.fold(0.0, (n, l) => n + mercY(l.latitude)) / lieux.length,
+);
+
+void _fusionnerCommunes(Map<String, List<LieuCarte>> parVille) {
+  int repas(String cle) =>
+      parVille[cle]!.fold(0, (n, l) => n + math.max(1, l.mesVisites));
+  // Les plus grandes d'abord : ce sont elles qui accueillent.
+  final cles = parVille.keys.toList()
+    ..sort((a, b) {
+      final parTaille = parVille[b]!.length.compareTo(parVille[a]!.length);
+      if (parTaille != 0) return parTaille;
+      final parRepas = repas(b).compareTo(repas(a));
+      return parRepas != 0 ? parRepas : a.compareTo(b);
+    });
+  final gardees = <(String, ({double x, double y}))>[];
+  for (final cle in cles) {
+    final c = _centre(parVille[cle]!);
+    String? proche;
+    var dmin = _communeKm;
+    for (final (autre, ca) in gardees) {
+      final d = distanceCielKm(c.x, c.y, ca.x, ca.y);
+      if (d < dmin) {
+        dmin = d;
+        proche = autre;
+      }
+    }
+    if (proche == null) {
+      gardees.add((cle, c));
+    } else {
+      parVille[proche]!.addAll(parVille.remove(cle)!);
+    }
+  }
 }
 
 /// Plus loin que ça de toute ville, une adresse sans nom de ville est
@@ -198,10 +240,7 @@ void _rattacherSansVille(
   if (sansVille.isEmpty) return;
   final centres = {
     for (final MapEntry(key: cle, value: lieux) in parVille.entries)
-      cle: (
-        x: lieux.fold(0.0, (n, l) => n + l.longitude) / lieux.length,
-        y: lieux.fold(0.0, (n, l) => n + mercY(l.latitude)) / lieux.length,
-      ),
+      cle: _centre(lieux),
   };
   for (final l in sansVille) {
     String? proche;
@@ -414,49 +453,254 @@ class _Triangle {
       (x - ux) * (x - ux) + (y - uy) * (y - uy) < r2;
 }
 
-/// Un pays de ma Constellation : de loin, ses villes n'y font qu'une étoile.
-class PaysCiel {
-  const PaysCiel({
-    required this.nom,
-    required this.etiquette,
-    required this.villes,
+/// Où tombe un point du ciel : son pays et sa région (« Belgique »,
+/// « Liège », « Province »).
+class EndroitCiel {
+  const EndroitCiel({
+    required this.pays,
+    required this.region,
+    required this.sorte,
   });
 
-  /// « Belgique ».
+  final String pays;
+  final String region;
+
+  /// « Province », « Région », « État »… : pour nommer une région qui porte
+  /// le nom d'une de ses villes (« Province de Liège »).
+  final String sorte;
+}
+
+/// Un groupe de mes villes : un pays, ou une région d'un pays. De loin une
+/// seule étoile, qui s'ouvre sur ce qu'il contient.
+class GroupeCiel {
+  const GroupeCiel({
+    required this.nom,
+    required this.etiquette,
+    required this.parent,
+    required this.villes,
+    required this.cx,
+    required this.cy,
+    required this.ecart,
+    required this.tables,
+  });
+
   final String nom;
 
   /// « 137 tables ».
   final String etiquette;
 
-  /// Indices dans [CielConstellation.villes].
+  /// Le groupe qui le contient (indice dans [HierarchieCiel.groupes],
+  /// toujours avant lui), -1 pour un pays.
+  final int parent;
+
+  /// Ses villes à lui, hors de ses sous-groupes (indices dans
+  /// [CielConstellation.villes]).
   final List<int> villes;
+
+  /// Le centre de toutes ses villes.
+  final double cx;
+  final double cy;
+
+  /// L'écart habituel entre ce qu'il contient (la médiane des distances au
+  /// plus proche voisin) : il ne s'ouvre que quand cet écart a la place de
+  /// se voir à l'écran.
+  final double ecart;
+  final int tables;
 }
 
-/// Les pays qui regroupent au moins deux de mes villes ([paysDe] : le pays
-/// d'un point du ciel, `null` en mer).
-List<PaysCiel> paysDuCiel(
-  CielConstellation ciel,
-  String? Function(double x, double y) paysDe,
-) {
-  final parPays = <String, List<int>>{};
-  for (var i = 0; i < ciel.villes.length; i++) {
-    final v = ciel.villes[i];
-    final e = v.etoiles[v.entree];
-    final pays = paysDe(v.cx, v.cy) ?? paysDe(e.x, e.y);
-    if (pays != null) parPays.putIfAbsent(pays, () => []).add(i);
+/// Mes villes regroupées en pays et en régions, et leurs liens.
+class HierarchieCiel {
+  const HierarchieCiel({required this.groupes, required this.liens});
+
+  /// Les parents avant leurs enfants.
+  final List<GroupeCiel> groupes;
+
+  /// Entre les villes : le maillage « Dense » entre les parties de chaque
+  /// groupe (et entre ce qui n'a pas de groupe), chaque lien posé entre les
+  /// deux villes les plus proches de ses deux parties. De loin, un lien
+  /// part donc de l'étoile du pays ; de près, de la ville la plus proche.
+  final List<LienCiel> liens;
+}
+
+/// Mes villes en pays, puis en régions ([endroitDe] : où tombe un point du
+/// ciel ; sans lui, aucun groupe). Seuls les pays et régions d'au moins
+/// deux villes font un groupe ; un pays dont toutes les villes sont dans
+/// la même région n'en garde que le pays.
+HierarchieCiel hierarchieDuCiel(
+  CielConstellation ciel, [
+  EndroitCiel? Function(double x, double y)? endroitDe,
+]) {
+  final villes = ciel.villes;
+  final parPays = <String, Map<String, List<int>>>{};
+  final sortes = <(String, String), String>{};
+  final racine = <_Partie>[];
+  for (var i = 0; i < villes.length; i++) {
+    final v = villes[i];
+    final entree = v.etoiles[v.entree];
+    final e = endroitDe == null
+        ? null
+        : endroitDe(v.cx, v.cy) ?? endroitDe(entree.x, entree.y);
+    if (e == null) {
+      racine.add((groupe: false, i: i));
+      continue;
+    }
+    parPays
+        .putIfAbsent(e.pays, () => {})
+        .putIfAbsent(e.region, () => [])
+        .add(i);
+    sortes[(e.pays, e.region)] = e.sorte;
   }
-  return [
-    for (final MapEntry(key: nom, value: villes) in parPays.entries)
-      if (villes.length >= 2)
-        PaysCiel(
-          nom: nom,
+
+  final noms = <String>[];
+  final parents = <int>[];
+  final parties = <List<_Partie>>[];
+  int nouveau(String nom, int parent) {
+    noms.add(nom);
+    parents.add(parent);
+    parties.add([]);
+    return noms.length - 1;
+  }
+
+  for (final MapEntry(key: pays, value: regions) in parPays.entries) {
+    final toutes = [for (final r in regions.values) ...r];
+    if (toutes.length < 2) {
+      racine.add((groupe: false, i: toutes.single));
+      continue;
+    }
+    final pleines = [
+      for (final r in regions.values)
+        if (r.length >= 2) r,
+    ];
+    final avecRegions =
+        !(pleines.length == 1 && pleines.single.length == toutes.length);
+    final g = nouveau(pays, -1);
+    racine.add((groupe: true, i: g));
+    for (final MapEntry(key: region, value: lesVilles) in regions.entries) {
+      if (avecRegions && lesVilles.length >= 2) {
+        final nom = _nomRegion(region, sortes[(pays, region)]!, [
+          for (final i in lesVilles) villes[i].nom,
+        ]);
+        final r = nouveau(nom, g);
+        parties[r].addAll([for (final i in lesVilles) (groupe: false, i: i)]);
+        parties[g].add((groupe: true, i: r));
+      } else {
+        parties[g].addAll([for (final i in lesVilles) (groupe: false, i: i)]);
+      }
+    }
+  }
+
+  List<int> feuilles(_Partie p) =>
+      p.groupe ? [for (final q in parties[p.i]) ...feuilles(q)] : [p.i];
+  final centres = [
+    for (var g = 0; g < noms.length; g++)
+      _centreDesVilles(feuilles((groupe: true, i: g)), villes),
+  ];
+  (double, double) centre(_Partie p) =>
+      p.groupe ? centres[p.i] : (villes[p.i].cx, villes[p.i].cy);
+
+  final liens = <LienCiel>[];
+  void relier(List<_Partie> lesParties, int groupe) {
+    for (final (a, b) in liensDenses([for (final p in lesParties) centre(p)])) {
+      final (va, vb) = _plusProches(
+        feuilles(lesParties[a]),
+        feuilles(lesParties[b]),
+        villes,
+      );
+      liens.add(
+        villes[vb].debut.isBefore(villes[va].debut)
+            ? LienCiel(vb, va, groupe: groupe)
+            : LienCiel(va, vb, groupe: groupe),
+      );
+    }
+  }
+
+  relier(racine, -1);
+  for (var g = 0; g < noms.length; g++) {
+    relier(parties[g], g);
+  }
+
+  return HierarchieCiel(
+    groupes: [
+      for (var g = 0; g < noms.length; g++)
+        GroupeCiel(
+          nom: noms[g],
           etiquette: pluriel(
-            villes.fold(0, (n, i) => n + ciel.villes[i].etoiles.length),
+            feuilles((
+              groupe: true,
+              i: g,
+            )).fold(0, (n, i) => n + villes[i].etoiles.length),
             'table',
           ),
-          villes: villes,
+          parent: parents[g],
+          villes: [
+            for (final p in parties[g])
+              if (!p.groupe) p.i,
+          ],
+          cx: centres[g].$1,
+          cy: centres[g].$2,
+          ecart: _ecart([for (final p in parties[g]) centre(p)]),
+          tables: feuilles((
+            groupe: true,
+            i: g,
+          )).fold(0, (n, i) => n + villes[i].etoiles.length),
         ),
-  ];
+    ],
+    liens: liens,
+  );
+}
+
+/// Une partie d'un groupe : une ville, ou un sous-groupe.
+typedef _Partie = ({bool groupe, int i});
+
+/// Une région qui porte le nom d'une de ses villes : « Province de Liège ».
+String _nomRegion(String region, String sorte, List<String> villes) {
+  final cle = normaliserPourRecherche(region);
+  if (!villes.any((v) => normaliserPourRecherche(v) == cle)) return region;
+  final voyelle = 'aeiouyhàâäéèêëîïôöûüœ'.contains(region[0].toLowerCase());
+  return voyelle ? "$sorte d'$region" : '$sorte de $region';
+}
+
+(double, double) _centreDesVilles(
+  List<int> lesVilles,
+  List<VilleCiel> villes,
+) => (
+  lesVilles.fold(0.0, (n, i) => n + villes[i].cx) / lesVilles.length,
+  lesVilles.fold(0.0, (n, i) => n + villes[i].cy) / lesVilles.length,
+);
+
+/// Les deux villes les plus proches, l'une de [a], l'autre de [b].
+(int, int) _plusProches(List<int> a, List<int> b, List<VilleCiel> villes) {
+  var meilleur = (a.first, b.first);
+  var dmin = double.infinity;
+  for (final i in a) {
+    for (final j in b) {
+      final d =
+          math.pow(villes[i].cx - villes[j].cx, 2) +
+          math.pow(villes[i].cy - villes[j].cy, 2);
+      if (d < dmin) {
+        dmin = d.toDouble();
+        meilleur = (i, j);
+      }
+    }
+  }
+  return meilleur;
+}
+
+/// La médiane des distances de chaque point à son plus proche voisin.
+double _ecart(List<(double, double)> points) {
+  final distances = [
+    for (var i = 0; i < points.length; i++)
+      [
+        for (var j = 0; j < points.length; j++)
+          if (j != i)
+            math.sqrt(
+              math.pow(points[i].$1 - points[j].$1, 2) +
+                  math.pow(points[i].$2 - points[j].$2, 2),
+            ),
+      ].fold(double.infinity, math.min),
+  ]..sort();
+  if (distances.isEmpty || distances.first.isInfinite) return 0.05;
+  return math.max(0.01, distances[distances.length ~/ 2]);
 }
 
 /// Ce que dit la fiche d'une étoile qu'on touche.

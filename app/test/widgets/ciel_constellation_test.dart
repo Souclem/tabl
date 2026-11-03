@@ -64,4 +64,61 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('un ciel en pays et régions se dessine', (tester) async {
+    const namur = VilleDuCiel(
+      nom: 'Namur',
+      etiquette: '1 table',
+      cx: 4.87,
+      cy: -65.4,
+      rayon: 0.004,
+      repas: 1,
+      entree: 0,
+      etoiles: [
+        EtoileDuCiel(cle: 'r2', nom: 'Bistro', x: 4.87, y: -65.4, repas: 1),
+      ],
+      liens: [],
+    );
+    const tokyo = VilleDuCiel(
+      nom: 'Tokyo',
+      etiquette: '1 table',
+      cx: 139.7,
+      cy: -40.6,
+      rayon: 0.004,
+      repas: 1,
+      entree: 0,
+      etoiles: [
+        EtoileDuCiel(cle: 'r3', nom: 'Sushi', x: 139.7, y: -40.6, repas: 1),
+      ],
+      liens: [],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TablCielConstellation(
+          villes: const [_liege, namur, tokyo],
+          liensEntreVilles: const [
+            (de: 0, vers: 1, groupe: 0),
+            (de: 0, vers: 2, groupe: -1),
+          ],
+          groupes: const [
+            GroupeDuCiel(
+              nom: 'Belgique',
+              etiquette: '2 tables',
+              parent: -1,
+              villes: [0, 1],
+              cx: 5.2,
+              cy: -65.5,
+              ecart: 0.7,
+              tables: 2,
+            ),
+          ],
+          anime: false,
+          onTapEtoile: (_) {},
+          onTapVide: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
 }

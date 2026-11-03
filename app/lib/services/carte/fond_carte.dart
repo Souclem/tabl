@@ -52,32 +52,39 @@ class NiveauRoutes {
   final List<TraceCarte> traces;
 }
 
+/// Le contour d'une province ou d'une région, et ce qu'elle est.
+class ContourRegion {
+  const ContourRegion(this.endroit, this.trace);
+
+  final EndroitCiel endroit;
+  final TraceCarte trace;
+}
+
 /// Le fond de la Constellation : les terres, les frontières entre pays et
-/// les grandes routes (Natural Earth, domaine public).
+/// les grandes routes (Natural Earth, domaine public) ; et, pour savoir où
+/// tombe chaque ville, les provinces et régions du monde.
 class FondCarte {
   const FondCarte({
     required this.terres,
     required this.frontieres,
     required this.routes,
-    this.nomsTerres = const [],
+    this.regions = const [],
   });
 
   final List<TraceCarte> terres;
-
-  /// Le pays de chaque tracé de [terres], en français (« Belgique »).
-  final List<String> nomsTerres;
   final List<TraceCarte> frontieres;
   final List<NiveauRoutes> routes;
+  final List<ContourRegion> regions;
 }
 
-/// Lit les trois fichiers de `assets/carte/`, hors du fil de l'interface.
+/// Lit les fichiers de `assets/carte/`, hors du fil de l'interface.
 Future<FondCarte> chargerFondCarte([AssetBundle? bundle]) async {
   final b = bundle ?? rootBundle;
   final textes = await Future.wait([
     b.loadString('assets/carte/terres.json'),
     b.loadString('assets/carte/frontieres.json'),
     b.loadString('assets/carte/routes.json'),
-    b.loadString('assets/carte/noms_terres.json'),
+    b.loadString('assets/carte/regions.json'),
   ]);
   return compute(_decoder, textes);
 }
@@ -86,24 +93,40 @@ FondCarte _decoder(List<String> textes) => fondCarteDepuisJson(
   terres: textes[0],
   frontieres: textes[1],
   routes: textes[2],
-  nomsTerres: textes[3],
+  regions: textes[3],
 );
 
 /// Terres et frontières : [lon×100, lat×100, …] par tracé. Routes :
 /// [[zoom, autoroute (0/1), [tracé…]], …], chaque tracé en lon×1000,
-/// lat×1000 puis en écarts successifs.
+/// lat×1000 puis en écarts successifs. Régions : {"noms": [[pays, région,
+/// sorte], …], "traces": [[nom, lon×100, lat×100, écarts…], …]}.
 FondCarte fondCarteDepuisJson({
   required String terres,
   required String frontieres,
   required String routes,
-  String nomsTerres = '[]',
+  String regions = '{"noms": [], "traces": []}',
 }) {
   List<TraceCarte> traces(String json) => [
     for (final t in (jsonDecode(json) as List).cast<List>())
       TraceCarte(_versCiel([for (final v in t) (v as num) / 100])),
   ];
+  final lesRegions = jsonDecode(regions) as Map<String, dynamic>;
+  final endroits = [
+    for (final n in (lesRegions['noms'] as List).cast<List>())
+      EndroitCiel(
+        pays: n[0] as String,
+        region: n[1] as String,
+        sorte: n[2] as String,
+      ),
+  ];
   return FondCarte(
-    nomsTerres: (jsonDecode(nomsTerres) as List).cast<String>(),
+    regions: [
+      for (final t in (lesRegions['traces'] as List).cast<List>())
+        ContourRegion(
+          endroits[t[0] as int],
+          TraceCarte(_versCiel(_cumuler(t.sublist(1), 100))),
+        ),
+    ],
     terres: traces(terres),
     frontieres: traces(frontieres),
     routes: [
@@ -156,27 +179,48 @@ Float64List _versCiel(List<double> lonLat) {
   return p;
 }
 
-/// Le pays où tombe ce point du ciel ; près d'une côte (une ville dont le
-/// centre tombe en mer, à cause des contours simplifiés), celui dont
-/// l'emprise est la plus proche, à moins de [marge] degrés.
-String? paysDuPoint(FondCarte fond, double x, double y, {double marge = 0.3}) {
-  if (fond.nomsTerres.length != fond.terres.length) return null;
-  String? proche;
+/// Le pays et la région où tombe ce point du ciel ; tout près d'un bord
+/// (une ville au bord de la mer, ou entre deux contours simplifiés), ceux
+/// du contour le plus proche, à moins de [marge] degrés.
+EndroitCiel? endroitDuPoint(
+  FondCarte fond,
+  double x,
+  double y, {
+  double marge = 0.3,
+}) {
+  EndroitCiel? proche;
   var dmin = marge;
-  for (var i = 0; i < fond.terres.length; i++) {
-    final t = fond.terres[i];
-    final dx = math.max(0.0, math.max(t.xmin - x, x - t.xmax));
-    final dy = math.max(0.0, math.max(t.ymin - y, y - t.ymax));
-    if (dx == 0 && dy == 0 && _dedans(t.points, x, y)) {
-      return fond.nomsTerres[i];
+  for (final r in fond.regions) {
+    final t = r.trace;
+    if (x < t.xmin - dmin ||
+        x > t.xmax + dmin ||
+        y < t.ymin - dmin ||
+        y > t.ymax + dmin) {
+      continue;
     }
-    final d = math.max(dx, dy);
-    if (d > 0 && d < dmin) {
+    if (_dedans(t.points, x, y)) return r.endroit;
+    final d = _distanceAuBord(t.points, x, y);
+    if (d < dmin) {
       dmin = d;
-      proche = fond.nomsTerres[i];
+      proche = r.endroit;
     }
   }
   return proche;
+}
+
+/// La distance du point au bord de ce contour fermé.
+double _distanceAuBord(Float64List p, double x, double y) {
+  var d2 = double.infinity;
+  for (var i = 0, j = p.length - 2; i < p.length; j = i, i += 2) {
+    final ax = p[j], ay = p[j + 1], dx = p[i] - ax, dy = p[i + 1] - ay;
+    final l2 = dx * dx + dy * dy;
+    final u = l2 == 0
+        ? 0.0
+        : (((x - ax) * dx + (y - ay) * dy) / l2).clamp(0.0, 1.0);
+    final ex = ax + u * dx - x, ey = ay + u * dy - y;
+    d2 = math.min(d2, ex * ex + ey * ey);
+  }
+  return math.sqrt(d2);
 }
 
 /// Le point est-il dans ce contour fermé (règle du rayon) ?

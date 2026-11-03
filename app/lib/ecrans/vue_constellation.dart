@@ -42,12 +42,13 @@ class _VueConstellationState extends State<VueConstellation>
 
   CielConstellation _ciel = CielConstellation.vide;
   List<VilleDuCiel> _villes = const [];
-  List<(int, int)> _liens = const [];
+  List<({int de, int vers, int groupe})> _liens = const [];
   FondDuCiel? _fond;
 
-  /// Les pays des villes, lus sur la carte (il faut qu'elle soit chargée).
+  /// Les pays et régions des villes, lus sur la carte (il faut qu'elle soit
+  /// chargée) ; avant, les villes ne sont pas regroupées.
   FondCarte? _fondCarte;
-  List<PaysDuCiel> _pays = const [];
+  List<GroupeDuCiel> _groupes = const [];
   String? _choisie;
   bool _aide = true;
 
@@ -114,8 +115,7 @@ class _VueConstellationState extends State<VueConstellation>
           liens: [for (final l in ciel.liensDansVilles[i]) (l.de, l.vers)],
         ),
     ];
-    _liens = [for (final l in ciel.liensEntreVilles) (l.de, l.vers)];
-    _calculerPays();
+    _calculerGroupes();
     if (_choisie != null && _etoile(_choisie!) == null) _choisie = null;
   }
 
@@ -128,7 +128,7 @@ class _VueConstellationState extends State<VueConstellation>
       setState(() {
         _fondCarte = carte;
         _fond = fond;
-        _calculerPays();
+        _calculerGroupes();
       });
     } catch (e) {
       // Sans carte, le ciel reste un ciel.
@@ -137,17 +137,28 @@ class _VueConstellationState extends State<VueConstellation>
     }
   }
 
-  void _calculerPays() {
+  void _calculerGroupes() {
     final carte = _fondCarte;
-    _pays = carte == null
-        ? const []
-        : [
-            for (final p in paysDuCiel(
-              _ciel,
-              (x, y) => paysDuPoint(carte, x, y),
-            ))
-              PaysDuCiel(nom: p.nom, etiquette: p.etiquette, villes: p.villes),
-          ];
+    final h = hierarchieDuCiel(
+      _ciel,
+      carte == null ? null : (x, y) => endroitDuPoint(carte, x, y),
+    );
+    _groupes = [
+      for (final g in h.groupes)
+        GroupeDuCiel(
+          nom: g.nom,
+          etiquette: g.etiquette,
+          parent: g.parent,
+          villes: g.villes,
+          cx: g.cx,
+          cy: g.cy,
+          ecart: g.ecart,
+          tables: g.tables,
+        ),
+    ];
+    _liens = [
+      for (final l in h.liens) (de: l.de, vers: l.vers, groupe: l.groupe),
+    ];
   }
 
   static FondDuCiel _versCiel(FondCarte fond) {
@@ -200,7 +211,7 @@ class _VueConstellationState extends State<VueConstellation>
                 widget.carte?.placer(c.latitude, c.longitude, c.zoom),
             villes: _villes,
             liensEntreVilles: _liens,
-            pays: _pays,
+            groupes: _groupes,
             fond: _fond,
             cleChoisie: _choisie,
             anime: widget.anime,
