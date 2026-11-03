@@ -162,12 +162,13 @@ void main() {
             );
       final h = hierarchieDuCiel(ciel, endroit);
 
-      // Tout en haut, la Belgique et Paris réunies ; Paris, seule en France,
+      // Tout en haut, la Belgique et Paris réunies (sous le nom de la plus
+      // grande) ; Paris, seule en France,
       // et Namur, seule dans sa province, n'ont pas de groupe à elles.
       expect(
         [for (final g in h.groupes) g.nom],
         [
-          'Belgique +1',
+          'Belgique',
           'Belgique',
           'Province de Liège',
           'Liège',
@@ -208,7 +209,7 @@ void main() {
     ]);
     final h = hierarchieDuCiel(ciel);
 
-    expect([for (final g in h.groupes) g.nom], ['Liège', 'Bibo +1']);
+    expect([for (final g in h.groupes) g.nom], ['Liège', 'Bibo']);
     expect(h.groupes[1].parent, 0);
     expect(h.groupes[1].etiquette, '2 tables');
     expect(h.groupes[1].ecart, lessThan(h.groupes[0].ecart / 10));

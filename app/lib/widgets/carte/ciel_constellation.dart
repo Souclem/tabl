@@ -124,8 +124,8 @@ class FondDuCiel {
 /// l'écran, des étoiles n'en font qu'une (une ville, une région, un pays,
 /// ou simplement voisines), qui se dédouble quand on s'en approche. Entre
 /// elles, un courant de lumière dorée. Les étoiles flottent, suivent le
-/// doigt avec un peu de souplesse ; au repos, la carte (terres, frontières,
-/// routes) apparaît, et s'efface dès qu'on bouge.
+/// doigt avec un peu de souplesse, sur la carte (terres, frontières,
+/// routes).
 class TablCielConstellation extends StatefulWidget {
   const TablCielConstellation({
     super.key,
@@ -196,7 +196,7 @@ const _vitesseCourant = 26.0; // pixels par seconde
 /// quelques pixels plus quelques fois la taille moyenne de leurs étoiles.
 double _debutOuverture(double rayon) => 8 + 3 * rayon;
 double _finOuverture(double rayon) => 14 + 4.5 * rayon;
-const _nomsMax = 8;
+const _nomsMax = 5;
 
 /// La taille d'une étoile : un groupe d'après ses tables ; un restaurant,
 /// plus petit, d'après ses repas.
@@ -400,6 +400,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   ui.Image? _imageCarte;
   _Camera? _camCarte;
   Size? _tailleCarte;
+  double _finesseCarte = 0;
+  double _dernierRenduCarte = -1e9;
   bool _carteEnCours = false;
 
   double _derniereEchelleGeste = 1;
@@ -780,7 +782,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     }
     _fondX += (avant.cx - _vue.cx) * _vue.s;
     _fondY += (avant.cy - _vue.cy) * _vue.s;
-    // La carte s'efface vite au premier geste, et revient doucement.
+    // En mouvement ou au repos : le plan de la ville (de près) n'apparaît
+    // qu'au repos, vite effacé au premier geste, revenu doucement.
     final bouge =
         _temps - _dernierMouvement < 0.35 ||
         _trajet != null ||
@@ -797,8 +800,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       final t = cible > _mouvement ? 0.12 : 0.55;
       _mouvement += (cible - _mouvement) * (1 - math.exp(-dt / t));
     }
+    _rafraichirCarte(net: !bouge);
     if (!bouge) {
-      _rafraichirCarte();
       if (!_memeCamera(_camRepos, _vue)) {
         _camRepos = _vue.copie();
         widget.onRepos?.call((
@@ -954,19 +957,32 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       (math.log(a.s / b.s)).abs() < 0.002 &&
       ((a.cx - b.cx).abs() + (a.cy - b.cy).abs()) * b.s < 0.5;
 
-  void _rafraichirCarte() {
+  /// La carte reste toujours là. Pendant qu'on bouge, on la redessine
+  /// souvent, un peu plus grande que l'écran (les bords ne se vident pas
+  /// quand on glisse) et moins fine ; au repos, une fois, à la taille et à
+  /// la finesse de l'écran.
+  void _rafraichirCarte({required bool net}) {
     final fond = widget.fond;
     if (fond == null || _carteEnCours || _l <= 0) return;
-    if (_memeCamera(_camCarte, _vue) && _tailleCarte == Size(_l, _h)) return;
+    final taille = net ? Size(_l, _h) : Size(_l * 1.4, _h * 1.4);
+    final finesse = net ? _dpr : math.min(_dpr, 1.5);
+    if (_memeCamera(_camCarte, _vue) &&
+        (!net || (_tailleCarte == taille && _finesseCarte == finesse))) {
+      return;
+    }
+    if (!net && _temps - _dernierRenduCarte < 0.1) return;
+    _dernierRenduCarte = _temps;
     final camera = _vue.copie();
-    final taille = Size(_l, _h);
     final enregistreur = ui.PictureRecorder();
-    final c = Canvas(enregistreur)..scale(_dpr);
+    final c = Canvas(enregistreur)..scale(finesse);
     _dessinerCarte(c, fond, camera, taille);
     final image = enregistreur.endRecording();
     _carteEnCours = true;
     image
-        .toImage((taille.width * _dpr).ceil(), (taille.height * _dpr).ceil())
+        .toImage(
+          (taille.width * finesse).ceil(),
+          (taille.height * finesse).ceil(),
+        )
         .then((rendu) {
           image.dispose();
           _carteEnCours = false;
@@ -978,6 +994,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
           _imageCarte = rendu;
           _camCarte = camera;
           _tailleCarte = taille;
+          _finesseCarte = finesse;
           _battement.value++;
         });
   }
@@ -985,7 +1002,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   void _dessinerImageCarte(Canvas c) {
     final image = _imageCarte, camera = _camCarte, taille = _tailleCarte;
     if (image == null || camera == null || taille == null) return;
-    final alpha = (1 - _mouvement) * (1 - _revelation);
+    // De près, au repos, elle laisse la place au plan de la ville.
+    final alpha = 1 - _revelation;
     if (alpha < 0.01) return;
     // Posée là où la vue est maintenant, même si elle a un peu bougé.
     final k = _vue.s / camera.s;

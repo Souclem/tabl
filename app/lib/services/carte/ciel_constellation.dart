@@ -464,7 +464,8 @@ class EndroitCiel {
 
 /// Un groupe de mes restaurants, une étoile qui en contient d'autres : un
 /// pays, une région, une ville, ou quelques étoiles trop proches pour se
-/// voir séparément (« Bruxelles +2 »). De loin une seule étoile, qui se
+/// voir séparément (elles prennent le nom de la plus grande). De loin une
+/// seule étoile, qui se
 /// dédouble quand on s'en approche.
 class GroupeCiel {
   const GroupeCiel({
@@ -722,9 +723,7 @@ HierarchieCiel hierarchieDuCiel(
         }
       }
       final g = ajouter(
-        nom == null
-            ? '${nomDe(lesParties[principale])} +${a.membres.length - 1}'
-            : nomDe(nom),
+        nom == null ? nomDe(lesParties[principale]) : nomDe(nom),
         nom?.sorte == _sorteVille
             ? villes[nom!.i].etiquette
             : pluriel(tables, 'table'),
