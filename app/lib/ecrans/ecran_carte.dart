@@ -774,43 +774,64 @@ class _EcranCarteState extends State<EcranCarte> {
       body: Stack(
         children: [
           Positioned.fill(child: _carte()),
+          // L'Explorer s'efface en fondu derrière la Constellation, et
+          // revient de même.
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: constellation,
+              child: AnimatedOpacity(
+                opacity: constellation ? 0 : 1,
+                duration: const Duration(milliseconds: 300),
+                child: Stack(
+                  children: [
+                    if (_enGrille) Positioned.fill(child: _grille()),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      child: _enTete(nombre),
+                    ),
+                    if (!_enGrille) ..._surLaCarte(),
+                    // Cachée tant que l'aperçu d'un lieu est ouvert.
+                    if (_selection == null)
+                      Positioned(
+                        left: 12,
+                        right: 12,
+                        bottom: _margeBarre + 12,
+                        child: TablBarreExplorer(
+                          onRechercher: _ouvrirRecherche,
+                          onFiltres: _ouvrirFiltres,
+                          filtresActifs: _filtres.nombreActifs,
+                          enGrille: _enGrille,
+                          onChoisirVue: (grille) {
+                            setState(() {
+                              _enGrille = grille;
+                              _selection = null;
+                            });
+                            if (grille) _demanderPhotos();
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           if (constellation)
             Positioned.fill(
               child: VueConstellation(
                 lieux: _lieux,
                 chargement: _chargement || !_chargeUneFois,
                 anime: widget.afficherCarte,
+                carte: widget.afficherCarte ? _controleur : null,
                 onQuitter: () => _choisirMode(ModeExplorer.cercle),
                 onOuvrirLieu: _ouvrirFiche,
-              ),
-            ),
-          if (_enGrille && !constellation) Positioned.fill(child: _grille()),
-          if (!constellation)
-            Positioned(left: 0, right: 0, top: 0, child: _enTete(nombre)),
-          if (!_enGrille && !constellation) ..._surLaCarte(),
-          // Cachée tant que l'aperçu d'un lieu est ouvert.
-          if (_selection == null && !constellation)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: _margeBarre + 12,
-              child: TablBarreExplorer(
-                onRechercher: _ouvrirRecherche,
-                onFiltres: _ouvrirFiltres,
-                filtresActifs: _filtres.nombreActifs,
-                enGrille: _enGrille,
-                onChoisirVue: (grille) {
-                  setState(() {
-                    _enGrille = grille;
-                    _selection = null;
-                  });
-                  if (grille) _demanderPhotos();
-                },
               ),
             ),
         ],
       ),
     );
+
     // L'heure et la batterie, lisibles sur le fond de l'écran.
     final barreEtat = AnnotatedRegion<SystemUiOverlayStyle>(
       value: _palette == PaletteExplorer.clair

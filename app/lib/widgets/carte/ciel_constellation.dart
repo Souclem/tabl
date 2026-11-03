@@ -133,6 +133,8 @@ class TablCielConstellation extends StatefulWidget {
     this.margeHaut = 130,
     this.margeBas = 90,
     this.anime = true,
+    this.reveler = false,
+    this.onRepos,
   });
 
   final List<VilleDuCiel> villes;
@@ -158,6 +160,15 @@ class TablCielConstellation extends StatefulWidget {
   /// `false` dans les tests : une seule image, sans animation.
   final bool anime;
 
+  /// Une carte est posée sous le ciel : de près, au repos, le ciel
+  /// s'éclaircit pour laisser voir son plan (rues, eau, parcs).
+  final bool reveler;
+
+  /// Au repos, là où regarde le ciel (zoom à l'échelle de Mapbox) : pour
+  /// y poser la carte de dessous.
+  final ValueChanged<({double latitude, double longitude, double zoom})>?
+  onRepos;
+
   @override
   State<TablCielConstellation> createState() => _TablCielConstellationState();
 }
@@ -175,6 +186,13 @@ double _lisse(double a, double b, double x) {
 }
 
 double _sortie(double t) => 1 - math.pow(1 - t, 3).toDouble();
+
+/// La latitude d'une position du ciel (Mercator en degrés).
+double _latitude(double y) =>
+    (2 * math.atan(math.exp(-y * math.pi / 180)) - math.pi / 2) * 180 / math.pi;
+
+/// Le zoom de Mapbox (tuiles de 512 points) qui montre [s] points par degré.
+double _zoomMapbox(double s) => math.log(s * 360 / 512) / math.ln2;
 double _entreDeux(double t) =>
     t < 0.5 ? 4 * t * t * t : 1 - math.pow(-2 * t + 2, 3).toDouble() / 2;
 
@@ -318,7 +336,10 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   double _fondX = 0;
   double _fondY = 0;
 
-  ({_Camera de, _Camera vers, double debut, double duree})? _trajet;
+  ({_Camera de, _Camera vers, double debut, double duree, bool ralentir})?
+  _trajet;
+  _Camera? _camRepos;
+  double _revelation = 0;
   Offset _elan = Offset.zero;
 
   double _temps = 0;
@@ -495,7 +516,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       ..cy = wy - (p.dy - _h / 2) / s2;
   }
 
-  void _allerVers(_Camera cible, [double duree = 0.75]) {
+  void _allerVers(_Camera cible, [double duree = 0.75, bool ralentir = false]) {
     if (!widget.anime) {
       // Sans animation, on y est tout de suite.
       for (final c in [_cam, _vue]) {
@@ -507,7 +528,13 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       _battement.value++;
       return;
     }
-    _trajet = (de: _cam.copie(), vers: cible, debut: _temps, duree: duree);
+    _trajet = (
+      de: _cam.copie(),
+      vers: cible,
+      debut: _temps,
+      duree: duree,
+      ralentir: ralentir,
+    );
   }
 
   void _signalerMouvement() {
@@ -621,7 +648,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     final trajet = _trajet;
     if (trajet != null) {
       final t = ((_temps - trajet.debut) / trajet.duree).clamp(0.0, 1.0);
-      final e = _entreDeux(t);
+      final e = trajet.ralentir ? _sortie(t) : _entreDeux(t);
       final de = trajet.de, vers = trajet.vers;
       _cam
         ..s = math.exp(math.log(de.s) + (math.log(vers.s) - math.log(de.s)) * e)
@@ -671,7 +698,20 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       final t = cible > _mouvement ? 0.12 : 0.55;
       _mouvement += (cible - _mouvement) * (1 - math.exp(-dt / t));
     }
-    if (!bouge) _rafraichirCarte();
+    if (!bouge) {
+      _rafraichirCarte();
+      if (!_memeCamera(_camRepos, _vue)) {
+        _camRepos = _vue.copie();
+        widget.onRepos?.call((
+          latitude: _latitude(_vue.cy),
+          longitude: _vue.cx,
+          zoom: _zoomMapbox(_vue.s),
+        ));
+      }
+    }
+    _revelation = widget.reveler
+        ? _lisse(11.5, 12.5, _zoomMapbox(_vue.s)) * (1 - _mouvement)
+        : 0;
     _placer(dt);
   }
 
@@ -748,15 +788,16 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     if (_l <= 0 || _h <= 0) return;
     if (!_cadre && widget.villes.isNotEmpty) {
       final tout = _cadrageTout();
-      _echelleMin = tout.s * 0.55;
-      _cam
-        ..cx = tout.cx
-        ..cy = tout.cy
-        ..s = tout.s;
-      _vue
-        ..cx = tout.cx
-        ..cy = tout.cy
-        ..s = tout.s;
+      // Jusqu'au monde entier, même avec une seule adresse.
+      _echelleMin = math.min(tout.s * 0.55, (_l - 56) / 360);
+      final depart = widget.anime ? 1.6 : 1.0;
+      for (final c in [_cam, _vue]) {
+        c
+          ..cx = tout.cx
+          ..cy = tout.cy
+          ..s = math.min(_echelleMax, tout.s * depart);
+      }
+      if (widget.anime) _allerVers(tout, 1.9, true);
       _cadre = true;
     }
     final dt = _dtEnAttente;
@@ -781,7 +822,11 @@ class _TablCielConstellationState extends State<TablCielConstellation>
         ..shader = ui.Gradient.linear(
           Offset.zero,
           Offset(0, _h),
-          const [Color(0xFF0B1324), Color(0xFF070B16), Color(0xFF05070D)],
+          [
+            const Color(0xFF0B1324),
+            const Color(0xFF070B16),
+            const Color(0xFF05070D),
+          ].map((c) => c.withValues(alpha: 1 - 0.72 * _revelation)).toList(),
           const [0, 0.55, 1],
         ),
     );
@@ -789,7 +834,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     for (final f in _fond) {
       final x = ((f.x * _l + _fondX * f.prof) % _l + _l) % _l;
       final y = ((f.y * _h + _fondY * f.prof) % _h + _h) % _h;
-      final a = f.a * (0.6 + 0.4 * math.sin(_temps * f.f + f.ph));
+      final a =
+          f.a * (0.6 + 0.4 * math.sin(_temps * f.f + f.ph)) * (1 - _revelation);
       pinceau.color = Color.fromRGBO(220, 228, 245, a.clamp(0.0, 1.0));
       c.drawCircle(Offset(x, y), f.r, pinceau);
     }
@@ -833,7 +879,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   void _dessinerImageCarte(Canvas c) {
     final image = _imageCarte, camera = _camCarte, taille = _tailleCarte;
     if (image == null || camera == null || taille == null) return;
-    final alpha = 1 - _mouvement;
+    final alpha = (1 - _mouvement) * (1 - _revelation);
     if (alpha < 0.01) return;
     // Posée là où la vue est maintenant, même si elle a un peu bougé.
     final k = _vue.s / camera.s;

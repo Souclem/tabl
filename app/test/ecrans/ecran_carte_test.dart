@@ -155,6 +155,15 @@ Future<_FauxCarteService> _ouvrir(
   return service;
 }
 
+/// L'en-tête et la barre de l'Explorer se voient (et se touchent).
+bool _explorerVisible(WidgetTester tester) {
+  final fondu = find.ancestor(
+    of: find.byType(TablBarreExplorer),
+    matching: find.byType(AnimatedOpacity),
+  );
+  return tester.widget<AnimatedOpacity>(fondu.first).opacity == 1;
+}
+
 /// Les noms des tuiles de la grille, dans l'ordre.
 List<String> _tuiles(WidgetTester tester) => [
   for (final t in tester.widgetList<TablTuileLieu>(find.byType(TablTuileLieu)))
@@ -433,17 +442,19 @@ void main() {
     expect(immersions, [true]);
     expect(find.byType(TablCielConstellation), findsOneWidget);
     expect(find.text('2 tables · 8 repas · 2 villes'), findsOneWidget);
-    // Plus de recherche, de filtres ni de vue à choisir.
-    expect(find.byType(TablBarreExplorer), findsNothing);
+    // Plus de recherche, de filtres ni de vue à choisir : l'Explorer s'est
+    // effacé derrière le ciel.
+    expect(_explorerVisible(tester), isFalse);
     // Retenue pour la prochaine ouverture.
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('explorer_mode'), 'maCarte');
 
-    await tester.tap(find.byType(TablBoutonConstellation));
+    // Celui du ciel (celui de l'Explorer, effacé, est derrière).
+    await tester.tap(find.byType(TablBoutonConstellation).last);
     await tester.pumpAndSettle();
     expect(immersions, [true, false]);
     expect(find.byType(TablCielConstellation), findsNothing);
-    expect(find.byType(TablBarreExplorer), findsOneWidget);
+    expect(_explorerVisible(tester), isTrue);
   });
 
   testWidgets('« Où cherchez-vous ? » : les villes du cercle', (tester) async {

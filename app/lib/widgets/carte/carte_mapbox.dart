@@ -20,11 +20,60 @@ class ControleurCarte {
   /// initiale) : appliqué dès qu'elle l'est.
   CameraOptions? _enAttente;
 
+  /// Sous la Constellation, la carte ne montre que son plan : aucun nom.
+  bool _sansNoms = false;
+
   void _carteChargee(MapboxMap carte) {
     _carte = carte;
     final camera = _enAttente;
     _enAttente = null;
     if (camera != null) carte.setCamera(camera);
+    // Un style rechargé remet ses noms : on les recache.
+    if (_sansNoms) _montrerNoms(carte, false);
+  }
+
+  /// Pose la carte exactement là, sans animation (la Constellation y
+  /// aligne son ciel) : [zoom] à l'échelle de Mapbox, rien autour.
+  void placer(double latitude, double longitude, double zoom) {
+    final camera = CameraOptions(
+      center: Point(coordinates: Position(longitude, latitude)),
+      zoom: zoom,
+      bearing: 0,
+      pitch: 0,
+      padding: MbxEdgeInsets(top: 0, left: 0, bottom: 0, right: 0),
+    );
+    final carte = _carte;
+    if (carte == null) {
+      _enAttente = camera;
+      return;
+    }
+    carte.setCamera(camera);
+  }
+
+  /// Cache (ou remontre) tous les noms du style : rues, villes, commerces.
+  /// Nos propres couches (« tabl-… ») ne sont pas touchées.
+  void montrerNoms(bool visibles) {
+    _sansNoms = !visibles;
+    final carte = _carte;
+    if (carte != null) _montrerNoms(carte, visibles);
+  }
+
+  static Future<void> _montrerNoms(MapboxMap carte, bool visibles) async {
+    try {
+      final couches = await carte.getStyleLayers();
+      for (final c in couches) {
+        if (c == null || c.type != 'symbol' || c.id.startsWith('tabl-')) {
+          continue;
+        }
+        await carte.setStyleLayerProperty(
+          c.id,
+          'visibility',
+          visibles ? 'visible' : 'none',
+        );
+      }
+    } catch (e) {
+      debugPrint('ControleurCarte : noms : $e');
+    }
   }
 
   /// Déplace la carte (sans changer le zoom) pour amener ce point à
