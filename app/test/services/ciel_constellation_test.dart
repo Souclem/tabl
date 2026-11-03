@@ -23,10 +23,11 @@ LieuCarte _lieu(
   maPremiereVisite: premiere,
 );
 
-/// Le nom des villes d'un lien, de la plus ancienne vers l'autre, et son
-/// groupe.
-String _nommer(CielConstellation c, LienCiel l) =>
-    '${c.villes[l.de].nom} → ${c.villes[l.vers].nom} @${l.groupe}';
+/// Les villes des deux étoiles d'un lien, de la plus ancienne vers
+/// l'autre, et son groupe.
+String _nommer(CielConstellation c, HierarchieCiel h, LienCiel l) =>
+    '${c.villes[h.etoiles[l.de].ville].nom} → '
+    '${c.villes[h.etoiles[l.vers].ville].nom} @${l.groupe}';
 
 void main() {
   test('les villes, dans l\'ordre de découverte', () {
@@ -41,6 +42,7 @@ void main() {
     expect(ciel.villes[1].etiquette, '2 tables');
     expect(ciel.compteurs, '3 tables · 11 repas · 2 villes');
     expect(cielConstellation(const []).estVide, isTrue);
+    expect(hierarchieDuCiel(CielConstellation.vide).groupes, isEmpty);
   });
 
   test('une adresse sans nom de ville rejoint la ville la plus proche ; '
@@ -92,10 +94,8 @@ void main() {
       _lieu('Liège', 50.64, 5.57, DateTime(2019, 9), repas: 9),
     ]);
 
-    expect(
-      _nommer(ciel, hierarchieDuCiel(ciel).liens.single),
-      'Paris → Liège @-1',
-    );
+    final h = hierarchieDuCiel(ciel);
+    expect(_nommer(ciel, h, h.liens.single), 'Paris → Liège @0');
   });
 
   test('distances et projection', () {
@@ -139,52 +139,80 @@ void main() {
     expect(ciel.villes.first.etoiles, hasLength(3));
   });
 
-  test('les villes en pays, puis en régions ; les liens de chaque niveau, '
-      'entre leurs villes les plus proches', () {
+  test(
+    'les restaurants en villes, régions et pays, réunis deux à deux ; '
+    'les liens de chaque niveau, entre leurs restaurants les plus proches',
+    () {
+      final ciel = cielConstellation([
+        _lieu('Liège', 50.64, 5.57, DateTime(2020, 1)),
+        _lieu('Huy', 50.52, 5.24, DateTime(2020, 6)),
+        _lieu('Namur', 50.47, 4.87, DateTime(2021, 1)),
+        _lieu('Paris', 48.86, 2.35, DateTime(2022, 1)),
+      ]);
+      EndroitCiel? endroit(double x, double y) => x < 2.5
+          ? const EndroitCiel(
+              pays: 'France',
+              region: 'Île-de-France',
+              sorte: 'Région',
+            )
+          : EndroitCiel(
+              pays: 'Belgique',
+              region: x > 5 ? 'Liège' : 'Namur',
+              sorte: 'Province',
+            );
+      final h = hierarchieDuCiel(ciel, endroit);
+
+      // Tout en haut, la Belgique et Paris réunies ; Paris, seule en France,
+      // et Namur, seule dans sa province, n'ont pas de groupe à elles.
+      expect(
+        [for (final g in h.groupes) g.nom],
+        [
+          'Belgique +1',
+          'Belgique',
+          'Province de Liège',
+          'Liège',
+          'Huy',
+          'Namur',
+          'Paris',
+        ],
+      );
+      expect([for (final g in h.groupes) g.parent], [-1, 0, 1, 2, 2, 1, 0]);
+      expect(h.groupes[0].etiquette, '4 tables');
+      expect(h.groupes[1].etiquette, '3 tables');
+      expect(h.groupes[3].ville, 0);
+      // Chaque restaurant dans sa ville.
+      expect(
+        [for (final e in h.etoiles) h.groupes[e.groupe].nom],
+        ['Liège', 'Huy', 'Namur', 'Paris'],
+      );
+      expect(
+        {for (final l in h.liens) _nommer(ciel, h, l)},
+        {'Namur → Paris @0', 'Huy → Namur @1', 'Liège → Huy @2'},
+      );
+
+      // Sans la carte : rien que des villes, réunies entre elles.
+      final aPlat = hierarchieDuCiel(ciel);
+      expect(aPlat.groupes.where((g) => g.ville >= 0), hasLength(4));
+      expect(aPlat.groupes.map((g) => g.nom), isNot(contains('Belgique')));
+    },
+  );
+
+  test('deux restaurants trop proches ne font qu\'une étoile, qui se '
+      'dédouble plus tard que la ville', () {
     final ciel = cielConstellation([
-      _lieu('Liège', 50.64, 5.57, DateTime(2020, 1)),
-      _lieu('Huy', 50.52, 5.24, DateTime(2020, 6)),
-      _lieu('Namur', 50.47, 4.87, DateTime(2021, 1)),
-      _lieu('Paris', 48.86, 2.35, DateTime(2022, 1)),
+      _lieu('Liège', 50.6400, 5.5700, DateTime(2020, 1), nom: 'Bibo', repas: 5),
+      // À 40 mètres.
+      _lieu('Liège', 50.6403, 5.5704, DateTime(2020, 2), nom: 'Vin sur vin'),
+      // À un kilomètre.
+      _lieu('Liège', 50.6490, 5.5700, DateTime(2020, 3), nom: 'Le Phare'),
     ]);
-    EndroitCiel? endroit(double x, double y) => x < 2.5
-        ? const EndroitCiel(
-            pays: 'France',
-            region: 'Île-de-France',
-            sorte: 'Région',
-          )
-        : EndroitCiel(
-            pays: 'Belgique',
-            region: x > 5 ? 'Liège' : 'Namur',
-            sorte: 'Province',
-          );
-    final h = hierarchieDuCiel(ciel, endroit);
+    final h = hierarchieDuCiel(ciel);
 
-    // Paris, seule en France, n'a pas de groupe ; Namur, seule dans sa
-    // province, est directement en Belgique.
-    expect(
-      [for (final g in h.groupes) g.nom],
-      ['Belgique', 'Province de Liège'],
-    );
-    expect(h.groupes[0].parent, -1);
-    expect(h.groupes[0].etiquette, '3 tables');
-    expect(
-      [for (final i in h.groupes[0].villes) ciel.villes[i].nom],
-      ['Namur'],
-    );
+    expect([for (final g in h.groupes) g.nom], ['Liège', 'Bibo +1']);
     expect(h.groupes[1].parent, 0);
-    expect(
-      [for (final i in h.groupes[1].villes) ciel.villes[i].nom],
-      ['Liège', 'Huy'],
-    );
-    expect(
-      {for (final l in h.liens) _nommer(ciel, l)},
-      {'Namur → Paris @-1', 'Huy → Namur @0', 'Liège → Huy @1'},
-    );
-
-    // Sans la carte : aucun groupe, toutes les villes maillées ensemble.
-    final aPlat = hierarchieDuCiel(ciel);
-    expect(aPlat.groupes, isEmpty);
-    expect(aPlat.liens.every((l) => l.groupe == -1), isTrue);
+    expect(h.groupes[1].etiquette, '2 tables');
+    expect(h.groupes[1].ecart, lessThan(h.groupes[0].ecart / 10));
+    // Le lien des deux voisins se voit quand ils se séparent.
+    expect(h.liens.where((l) => l.groupe == 1), hasLength(1));
   });
 }

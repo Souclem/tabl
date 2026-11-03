@@ -41,7 +41,7 @@ class _VueConstellationState extends State<VueConstellation>
   static Future<(FondCarte, FondDuCiel)>? _fondEnCours;
 
   CielConstellation _ciel = CielConstellation.vide;
-  List<VilleDuCiel> _villes = const [];
+  List<EtoileDuCiel> _etoiles = const [];
   List<({int de, int vers, int groupe})> _liens = const [];
   FondDuCiel? _fond;
 
@@ -92,29 +92,6 @@ class _VueConstellationState extends State<VueConstellation>
   void _calculer() {
     final ciel = cielConstellation(widget.lieux);
     _ciel = ciel;
-    _villes = [
-      for (var i = 0; i < ciel.villes.length; i++)
-        VilleDuCiel(
-          nom: ciel.villes[i].nom,
-          etiquette: ciel.villes[i].etiquette,
-          cx: ciel.villes[i].cx,
-          cy: ciel.villes[i].cy,
-          rayon: ciel.villes[i].rayon,
-          repas: ciel.villes[i].repas,
-          entree: ciel.villes[i].entree,
-          etoiles: [
-            for (final e in ciel.villes[i].etoiles)
-              EtoileDuCiel(
-                cle: e.cle,
-                nom: e.nom,
-                x: e.x,
-                y: e.y,
-                repas: e.repas,
-              ),
-          ],
-          liens: [for (final l in ciel.liensDansVilles[i]) (l.de, l.vers)],
-        ),
-    ];
     _calculerGroupes();
     if (_choisie != null && _etoile(_choisie!) == null) _choisie = null;
   }
@@ -137,6 +114,8 @@ class _VueConstellationState extends State<VueConstellation>
     }
   }
 
+  /// Les étoiles et leurs groupes : villes, et, une fois la carte chargée,
+  /// régions et pays.
   void _calculerGroupes() {
     final carte = _fondCarte;
     final h = hierarchieDuCiel(
@@ -149,12 +128,24 @@ class _VueConstellationState extends State<VueConstellation>
           nom: g.nom,
           etiquette: g.etiquette,
           parent: g.parent,
-          villes: g.villes,
           cx: g.cx,
           cy: g.cy,
           ecart: g.ecart,
-          tables: g.tables,
+          poids: g.tables,
         ),
+    ];
+    _etoiles = [
+      for (final p in h.etoiles)
+        if (_ciel.villes[p.ville].etoiles[p.etoile] case final e)
+          EtoileDuCiel(
+            cle: e.cle,
+            nom: e.nom,
+            detail: '${e.repas} repas',
+            x: e.x,
+            y: e.y,
+            poids: e.repas,
+            groupe: p.groupe,
+          ),
     ];
     _liens = [
       for (final l in h.liens) (de: l.de, vers: l.vers, groupe: l.groupe),
@@ -209,9 +200,9 @@ class _VueConstellationState extends State<VueConstellation>
             reveler: widget.anime && widget.carte != null,
             onRepos: (c) =>
                 widget.carte?.placer(c.latitude, c.longitude, c.zoom),
-            villes: _villes,
-            liensEntreVilles: _liens,
+            etoiles: _etoiles,
             groupes: _groupes,
+            liens: _liens,
             fond: _fond,
             cleChoisie: _choisie,
             anime: widget.anime,

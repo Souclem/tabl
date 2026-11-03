@@ -10,73 +10,48 @@ import 'package:flutter/scheduler.dart';
 //  Ce que le ciel reçoit, prêt à dessiner
 // ---------------------------------------------------------------
 
-/// Un restaurant : une étoile, à sa place dans le ciel (x = longitude,
-/// y = Mercator en degrés, croissant vers le sud).
+/// Une étoile, à sa place dans le ciel (x = longitude, y = Mercator en
+/// degrés, croissant vers le sud) : un restaurant.
 class EtoileDuCiel {
   const EtoileDuCiel({
     required this.cle,
     required this.nom,
+    required this.detail,
     required this.x,
     required this.y,
-    required this.repas,
+    required this.poids,
+    this.groupe = -1,
   });
 
   final String cle;
   final String nom;
+
+  /// « 4 repas », sous son nom.
+  final String detail;
   final double x;
   final double y;
 
-  /// Plus il y en a, plus l'étoile brille ; dorée à partir de trois.
-  final int repas;
+  /// Plus il est grand (ses repas), plus l'étoile est grosse.
+  final int poids;
+
+  /// Le groupe qui la contient (indice dans [TablCielConstellation.groupes]),
+  /// -1 s'il n'y en a pas.
+  final int groupe;
 }
 
-/// Une ville : de loin une étoile, de près ses restaurants reliés.
-class VilleDuCiel {
-  const VilleDuCiel({
-    required this.nom,
-    required this.etiquette,
-    required this.cx,
-    required this.cy,
-    required this.rayon,
-    required this.repas,
-    required this.entree,
-    required this.etoiles,
-    required this.liens,
-  });
-
-  final String nom;
-
-  /// « 24 tables », sous son nom.
-  final String etiquette;
-  final double cx;
-  final double cy;
-
-  /// Ce qui contient presque tous ses restaurants : la ville s'ouvre quand
-  /// ce rayon devient assez grand à l'écran.
-  final double rayon;
-  final int repas;
-
-  /// L'étoile par laquelle les liens entre villes arrivent.
-  final int entree;
-  final List<EtoileDuCiel> etoiles;
-
-  /// (de, vers) dans [etoiles] : ce qui circule va de l'une à l'autre.
-  final List<(int, int)> liens;
-}
-
-/// Un groupe de villes, un pays ou une région : de loin une seule étoile,
-/// qui ne s'ouvre sur ce qu'il contient que quand il y a la place de le
-/// montrer.
+/// Un groupe d'étoiles, une étoile qui en contient d'autres : une ville,
+/// une région, un pays, ou quelques étoiles trop proches pour se voir
+/// séparément. De loin une seule étoile, qui se dédouble quand ce qu'elle
+/// réunit a la place de se montrer.
 class GroupeDuCiel {
   const GroupeDuCiel({
     required this.nom,
     required this.etiquette,
     required this.parent,
-    required this.villes,
     required this.cx,
     required this.cy,
     required this.ecart,
-    required this.tables,
+    required this.poids,
   });
 
   final String nom;
@@ -87,19 +62,15 @@ class GroupeDuCiel {
   /// Le groupe qui le contient (indice dans [TablCielConstellation.groupes],
   /// toujours avant lui), -1 s'il n'y en a pas.
   final int parent;
-
-  /// Ses villes à lui, hors de ses sous-groupes (indices dans
-  /// [TablCielConstellation.villes]).
-  final List<int> villes;
   final double cx;
   final double cy;
 
-  /// L'écart habituel entre ce qu'il contient : il s'ouvre quand cet écart
-  /// fait une cinquantaine de pixels à l'écran.
+  /// La distance entre ce qu'il réunit : il se dédouble quand elle laisse,
+  /// à l'écran, la place à leurs étoiles.
   final double ecart;
 
-  /// Plus il en a, plus son étoile est grosse.
-  final int tables;
+  /// Plus il est grand (ses tables), plus son étoile est grosse.
+  final int poids;
 }
 
 /// Un tracé de la carte, en coordonnées du ciel, et son emprise.
@@ -149,23 +120,20 @@ class FondDuCiel {
 //  Le ciel
 // ---------------------------------------------------------------
 
-/// La Constellation : chaque restaurant est une étoile, chaque ville une
-/// constellation qui s'ouvre quand on s'en approche. Entre les villes, un
-/// courant de lumière dorée ; dans une ville, une poussière d'argent. Les
-/// étoiles flottent, suivent le doigt avec un peu de souplesse ; au repos,
-/// la carte (terres, frontières, routes) apparaît, et s'efface dès qu'on
-/// bouge.
-///
-/// [villes] dans l'ordre où on les a découvertes : elles s'allument dans
-/// cet ordre, et les liens les plus anciens sont les plus pâles.
+/// La Constellation : chaque restaurant est une étoile. Trop proches pour
+/// l'écran, des étoiles n'en font qu'une (une ville, une région, un pays,
+/// ou simplement voisines), qui se dédouble quand on s'en approche. Entre
+/// elles, un courant de lumière dorée. Les étoiles flottent, suivent le
+/// doigt avec un peu de souplesse ; au repos, la carte (terres, frontières,
+/// routes) apparaît, et s'efface dès qu'on bouge.
 class TablCielConstellation extends StatefulWidget {
   const TablCielConstellation({
     super.key,
-    required this.villes,
-    required this.liensEntreVilles,
+    required this.etoiles,
     required this.onTapEtoile,
     required this.onTapVide,
     this.groupes = const [],
+    this.liens = const [],
     this.fond,
     this.cleChoisie,
     this.onGeste,
@@ -176,15 +144,16 @@ class TablCielConstellation extends StatefulWidget {
     this.onRepos,
   });
 
-  final List<VilleDuCiel> villes;
+  /// De la plus ancienne à la plus récente : elles s'allument dans cet
+  /// ordre, et les liens les plus anciens sont les plus pâles.
+  final List<EtoileDuCiel> etoiles;
 
-  /// De, vers : dans [villes] ; groupe : dans [groupes], celui dont le lien
-  /// relie deux parties (-1 entre ce qui n'a pas de groupe). Il ne se voit
-  /// que quand ce groupe est ouvert.
-  final List<({int de, int vers, int groupe})> liensEntreVilles;
-
-  /// Les pays et régions : leurs villes s'y regroupent de loin.
+  /// Les groupes d'étoiles, les parents avant leurs enfants.
   final List<GroupeDuCiel> groupes;
+
+  /// De, vers : dans [etoiles] ; groupe : dans [groupes], le plus petit qui
+  /// contient les deux étoiles. Le lien se voit quand il s'ouvre.
+  final List<({int de, int vers, int groupe})> liens;
   final FondDuCiel? fond;
 
   /// L'étoile entourée (celle dont la fiche est ouverte).
@@ -222,11 +191,17 @@ const _flottement = 2.5; // pixels
 const _elasticite = 0.10;
 const _rythmeFlottement = 0.55;
 const _vitesseCourant = 26.0; // pixels par seconde
-const _vitessePoussiere = 11.0; // pixels par seconde
 
-/// Un groupe s'ouvre quand ce qu'il contient s'écarte d'autant à l'écran.
-const _ouvertureGroupe = (40.0, 62.0); // pixels
+/// Ce que réunit un groupe se sépare quand l'écart, à l'écran, atteint
+/// quelques pixels plus quelques fois la taille moyenne de leurs étoiles.
+double _debutOuverture(double rayon) => 8 + 3 * rayon;
+double _finOuverture(double rayon) => 14 + 4.5 * rayon;
 const _nomsMax = 8;
+
+/// La taille d'une étoile : un groupe d'après ses tables ; un restaurant,
+/// plus petit, d'après ses repas.
+double _rayonGroupe(int tables) => math.min(22, 2.4 + 1.1 * math.sqrt(tables));
+double _rayonEtoile(int repas) => math.min(9, 1.4 + 0.75 * math.sqrt(repas));
 
 double _lisse(double a, double b, double x) {
   final t = ((x - a) / (b - a)).clamp(0.0, 1.0);
@@ -276,22 +251,14 @@ class _Astre {
   double rayonEcran = 0;
 }
 
+/// Un grain du courant, entre deux étoiles.
 class _Grain {
-  /// Un grain du courant, entre les villes.
-  _Grain.courant(math.Random h)
+  _Grain(math.Random h)
     : u = h.nextDouble(),
       ecart = (h.nextDouble() + h.nextDouble() + h.nextDouble()) / 1.5 - 1,
       ph = h.nextDouble() * 6.283,
       taille = 0.5 + math.pow(h.nextDouble(), 2) * 1.4,
       a = 0.35 + h.nextDouble() * 0.65;
-
-  /// Un grain de poussière, dans une ville.
-  _Grain.poussiere(math.Random h)
-    : u = h.nextDouble(),
-      ecart = h.nextDouble() + h.nextDouble() - 1,
-      ph = h.nextDouble() * 6.283,
-      taille = 0.4 + math.pow(h.nextDouble(), 2) * 0.7,
-      a = 0.4 + h.nextDouble() * 0.6;
 
   double u;
   final double ecart;
@@ -301,56 +268,51 @@ class _Grain {
 }
 
 class _Lien {
-  _Lien.courant(this.de, this.vers, this.cote, math.Random h, [this.groupe])
-    : grains = [for (var i = 0; i < 150; i++) _Grain.courant(h)];
-
-  _Lien.poussiere(this.de, this.vers, math.Random h)
-    : cote = 1,
-      groupe = null,
-      grains = [for (var i = 0; i < 24; i++) _Grain.poussiere(h)];
+  _Lien(this.de, this.vers, this.cote, this.groupe, math.Random h)
+    : grains = [for (var i = 0; i < 150; i++) _Grain(h)];
 
   final int de;
   final int vers;
   final double cote;
   final List<_Grain> grains;
 
-  /// Le groupe dont il relie deux parties : visible quand il est ouvert.
+  /// Le plus petit groupe qui contient ses deux étoiles : visible quand il
+  /// est ouvert.
   final _EtatGroupe? groupe;
 }
 
-class _EtatVille {
-  _EtatVille(this.ville, math.Random h)
-    : astre = _Astre(h),
-      etoiles = [for (final _ in ville.etoiles) _Astre(h)],
-      liens = [
-        for (final (de, vers) in ville.liens) _Lien.poussiere(de, vers, h),
-      ];
+class _EtatEtoile {
+  _EtatEtoile(this.etoile, this.rang, this.astre);
 
-  final VilleDuCiel ville;
+  final EtoileDuCiel etoile;
+
+  /// De la plus ancienne (0) à la plus récente.
+  final int rang;
   final _Astre astre;
-  final List<_Astre> etoiles;
-  final List<_Lien> liens;
-  double t = 0;
-  double allumee = 0;
-  double rs = 0;
-  int foule = 0;
 
-  /// Son groupe (région, pays), et combien il est ouvert (1 sans groupe) :
-  /// fermé, la ville se fond dans son étoile.
+  /// Son groupe, et combien il est ouvert (1 sans groupe) : fermé, elle se
+  /// fond dans son étoile.
   _EtatGroupe? groupe;
   double tp = 1;
+  double allumee = 0;
 }
 
 class _EtatGroupe {
   _EtatGroupe(this.groupe, this.parent)
-    : astre = _Astre(math.Random(groupe.nom.hashCode));
+    : astre = _Astre(math.Random(Object.hash(groupe.nom, groupe.cx)));
 
   final GroupeDuCiel groupe;
   final _EtatGroupe? parent;
   final _Astre astre;
 
-  /// Toutes ses villes, sous-groupes compris.
-  final villes = <_EtatVille>[];
+  /// Toutes ses étoiles, sous-groupes compris.
+  final etoiles = <_EtatEtoile>[];
+
+  /// La taille moyenne des étoiles qu'il réunit directement, combien il en
+  /// réunit, et le seul groupe qu'il contienne, s'il n'a que lui.
+  double rayonEnfants = 3;
+  int enfants = 0;
+  _EtatGroupe? seulEnfant;
   double t = 1;
   double e = 1;
 
@@ -427,12 +389,11 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   double _mouvement = 0;
   double _dernierMouvement = -1e9;
 
-  List<_EtatVille> _villes = const [];
+  List<_EtatEtoile> _etoiles = const [];
   List<_EtatGroupe> _groupes = const [];
-  List<_Lien> _liensVilles = const [];
+  List<_Lien> _liens = const [];
   final List<_EtoileFond> _fond = [];
 
-  late final ui.Image _lueurIvoire;
   late final ui.Image _lueurOr;
   final Map<String, _Etiquette> _etiquettes = {};
 
@@ -453,7 +414,6 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     for (var i = 0; i < 300; i++) {
       _fond.add(_EtoileFond(h));
     }
-    _lueurIvoire = _lueur(245, 236, 220);
     _lueurOr = _lueur(242, 196, 120);
     _preparer();
     _intro = widget.anime ? 0 : 1;
@@ -465,15 +425,15 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   @override
   void didUpdateWidget(TablCielConstellation ancien) {
     super.didUpdateWidget(ancien);
-    if (!identical(ancien.villes, widget.villes)) {
-      final etaitVide = ancien.villes.isEmpty;
+    if (!identical(ancien.etoiles, widget.etoiles)) {
+      final etaitVide = ancien.etoiles.isEmpty;
       _preparer();
       if (etaitVide) {
         _cadre = false;
         _intro = widget.anime ? 0 : 1;
       }
     } else if (!identical(ancien.groupes, widget.groupes) ||
-        !identical(ancien.liensEntreVilles, widget.liensEntreVilles)) {
+        !identical(ancien.liens, widget.liens)) {
       _preparerGroupes();
     }
     if (!identical(ancien.fond, widget.fond)) _camCarte = null;
@@ -483,7 +443,6 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   void dispose() {
     _ticker?.dispose();
     _battement.dispose();
-    _lueurIvoire.dispose();
     _lueurOr.dispose();
     _imageCarte?.dispose();
     for (final e in _etiquettes.values) {
@@ -494,49 +453,66 @@ class _TablCielConstellationState extends State<TablCielConstellation>
 
   void _preparer() {
     final h = math.Random(7);
-    _villes = [for (final v in widget.villes) _EtatVille(v, h)];
+    // Une étoile déjà là garde sa place (et sa façon de flotter).
+    final deja = {for (final e in _etoiles) e.etoile.cle: e.astre};
+    var rang = 0;
+    _etoiles = [
+      for (final e in widget.etoiles)
+        _EtatEtoile(e, rang++, deja[e.cle] ?? _Astre(h)),
+    ];
     _preparerGroupes();
   }
 
-  /// Les groupes et les liens entre villes (qui en dépendent).
+  /// Les groupes, et les liens (qui en dépendent).
   void _preparerGroupes() {
-    for (final v in _villes) {
-      v.groupe = null;
-    }
     final groupes = <_EtatGroupe>[];
     for (final g in widget.groupes) {
       final parent = g.parent >= 0 && g.parent < groupes.length
           ? groupes[g.parent]
           : null;
-      final etat = _EtatGroupe(g, parent);
-      groupes.add(etat);
-      for (final i in g.villes) {
-        if (i >= 0 && i < _villes.length) _villes[i].groupe = etat;
+      groupes.add(_EtatGroupe(g, parent));
+    }
+    final enfants = List.filled(groupes.length, 0);
+    final tailles = List.filled(groupes.length, 0.0);
+    for (var i = 0; i < groupes.length; i++) {
+      if (groupes[i].parent == null) continue;
+      final p = widget.groupes[i].parent;
+      enfants[p]++;
+      tailles[p] += _rayonGroupe(widget.groupes[i].poids);
+      groupes[p].seulEnfant = groupes[i];
+    }
+    for (final e in _etoiles) {
+      final i = e.etoile.groupe;
+      e.groupe = i >= 0 && i < groupes.length ? groupes[i] : null;
+      if (e.groupe == null) continue;
+      enfants[i]++;
+      tailles[i] += _rayonEtoile(e.etoile.poids);
+      for (var g = e.groupe; g != null; g = g.parent) {
+        g.etoiles.add(e);
       }
     }
-    for (final v in _villes) {
-      for (var g = v.groupe; g != null; g = g.parent) {
-        g.villes.add(v);
-      }
+    for (var i = 0; i < groupes.length; i++) {
+      groupes[i].enfants = enfants[i];
+      if (enfants[i] > 0) groupes[i].rayonEnfants = tailles[i] / enfants[i];
     }
     _groupes = [
       for (final g in groupes)
-        if (g.villes.isNotEmpty) g,
+        if (g.etoiles.isNotEmpty) g,
     ];
     final h = math.Random(11);
-    var i = 0;
-    bool dedans(int v) => v >= 0 && v < _villes.length;
-    _liensVilles = [
-      for (final l in widget.liensEntreVilles)
+    var k = 0;
+    bool dedans(int i) => i >= 0 && i < _etoiles.length;
+    _liens = [
+      for (final l in widget.liens)
         if (dedans(l.de) && dedans(l.vers))
-          _Lien.courant(
+          _Lien(
             l.de,
             l.vers,
-            i++ % 2 == 1 ? 1 : -1,
-            h,
+            k++ % 2 == 1 ? 1 : -1,
             l.groupe >= 0 && l.groupe < groupes.length
                 ? groupes[l.groupe]
                 : null,
+            h,
           ),
     ];
   }
@@ -589,19 +565,20 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     );
   }
 
-  _Camera _cadrageTout() {
+  _Camera _cadrageTout() =>
+      _cadrageEtoiles(widget.etoiles) ?? _Camera(4.6, -58, 300);
+
+  /// Le cadre de ces étoiles ; une seule adresse : environ une ville autour.
+  _Camera? _cadrageEtoiles(Iterable<EtoileDuCiel> etoiles) {
     var xmin = double.infinity, xmax = double.negativeInfinity;
     var ymin = double.infinity, ymax = double.negativeInfinity;
-    for (final v in widget.villes) {
-      for (final e in v.etoiles) {
-        xmin = math.min(xmin, e.x);
-        xmax = math.max(xmax, e.x);
-        ymin = math.min(ymin, e.y);
-        ymax = math.max(ymax, e.y);
-      }
+    for (final e in etoiles) {
+      xmin = math.min(xmin, e.x);
+      xmax = math.max(xmax, e.x);
+      ymin = math.min(ymin, e.y);
+      ymax = math.max(ymax, e.y);
     }
-    if (xmin.isInfinite) return _Camera(4.6, -58, 300);
-    // Une seule adresse : un cadre d'environ une ville autour d'elle.
+    if (xmin.isInfinite) return null;
     if (xmax - xmin < 0.02 && ymax - ymin < 0.02) {
       return _cadrage(xmin - 0.03, xmax + 0.03, ymin - 0.03, ymax + 0.03);
     }
@@ -609,37 +586,21 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   }
 
   _Camera _cadrageGroupe(_EtatGroupe g) {
-    var xmin = double.infinity, xmax = double.negativeInfinity;
-    var ymin = double.infinity, ymax = double.negativeInfinity;
-    for (final v in g.villes) {
-      for (final e in v.ville.etoiles) {
-        xmin = math.min(xmin, e.x);
-        xmax = math.max(xmax, e.x);
-        ymin = math.min(ymin, e.y);
-        ymax = math.max(ymax, e.y);
-      }
+    final c = _cadrageEtoiles([for (final e in g.etoiles) e.etoile])!;
+    // Assez près pour qu'il soit tout à fait ouvert ; et ce qu'il contient
+    // aussi, tant qu'il n'y a qu'une chose dedans (un pays d'une seule
+    // ville, une ville d'un seul restaurant).
+    for (
+      _EtatGroupe? h = g;
+      h != null;
+      h = h.enfants == 1 ? h.seulEnfant : null
+    ) {
+      c.s = math.max(
+        c.s,
+        _finOuverture(h.rayonEnfants) * 1.08 / h.groupe.ecart,
+      );
     }
-    final c = _cadrage(xmin, xmax, ymin, ymax);
-    // Assez près pour qu'il soit tout à fait ouvert.
-    c.s = math.min(
-      _echelleMax,
-      math.max(c.s, _ouvertureGroupe.$2 * 1.08 / g.groupe.ecart),
-    );
-    return c;
-  }
-
-  _Camera _cadrageVille(VilleDuCiel v) {
-    var xmin = double.infinity, xmax = double.negativeInfinity;
-    var ymin = double.infinity, ymax = double.negativeInfinity;
-    for (final e in v.etoiles) {
-      xmin = math.min(xmin, e.x);
-      xmax = math.max(xmax, e.x);
-      ymin = math.min(ymin, e.y);
-      ymax = math.max(ymax, e.y);
-    }
-    final c = _cadrage(xmin, xmax, ymin, ymax);
-    // Assez près pour qu'elle soit tout à fait ouverte.
-    c.s = math.min(_echelleMax, math.max(c.s * 0.8, 95 / v.rayon));
+    c.s = math.min(_echelleMax, c.s);
     return c;
   }
 
@@ -724,30 +685,15 @@ class _TablCielConstellationState extends State<TablCielConstellation>
 
   void _toucher(TapUpDetails d) {
     final p = d.localPosition;
-    // Un pays, une région, fermés : on s'en approche jusqu'à les ouvrir.
-    _EtatGroupe? groupe;
-    var dmin = double.infinity;
-    for (final g in _groupes) {
-      if (g.t >= 0.5 || g.tp <= 0.5) continue;
-      final d = (Offset(g.astre.ax, g.astre.ay) - p).distance;
-      if (d < math.max(26, g.astre.rayonEcran + 12) && d < dmin) {
-        dmin = d;
-        groupe = g;
-      }
-    }
-    if (groupe != null) {
+    final sous = _sous(p);
+    if (sous case _EtatGroupe g) {
+      // Un groupe fermé : on s'en approche jusqu'à ce qu'il se dédouble.
       widget.onTapVide();
-      _allerVers(_cadrageGroupe(groupe));
+      _allerVers(_cadrageGroupe(g));
       return;
     }
-    final cible = _etoileSous(p);
-    if (cible case (final ville, null)) {
-      widget.onTapVide();
-      _allerVers(_cadrageVille(ville.ville));
-      return;
-    }
-    if (cible case (_, final String cle)) {
-      widget.onTapEtoile(cle);
+    if (sous case _EtatEtoile e) {
+      widget.onTapEtoile(e.etoile.cle);
       return;
     }
     widget.onTapVide();
@@ -770,30 +716,25 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     _dernierToucherVide = _temps;
   }
 
-  /// La ville fermée ou l'étoile sous le doigt : (ville, null) ou (ville, clé).
-  (_EtatVille, String?)? _etoileSous(Offset p) {
-    (_EtatVille, String?)? meilleure;
+  /// Sous le doigt : un groupe fermé, ou une étoile ; la plus proche.
+  Object? _sous(Offset p) {
+    Object? meilleur;
     var dmin = double.infinity;
-    for (final v in _villes) {
-      if (v.t > 0.5) {
-        for (var i = 0; i < v.etoiles.length; i++) {
-          final a = v.etoiles[i];
-          final d = (Offset(a.ax, a.ay) - p).distance;
-          if (d < math.max(22, a.rayonEcran + 12) && d < dmin) {
-            dmin = d;
-            meilleure = (v, v.ville.etoiles[i].cle);
-          }
-        }
-      } else if (v.tp > 0.5) {
-        final a = v.astre;
-        final d = (Offset(a.ax, a.ay) - p).distance;
-        if (d < math.max(22, a.rayonEcran + 12) && d < dmin) {
-          dmin = d;
-          meilleure = (v, null);
-        }
+    void essayer(Object quoi, _Astre a) {
+      final d = (Offset(a.ax, a.ay) - p).distance;
+      if (d < math.max(22, a.rayonEcran + 12) && d < dmin) {
+        dmin = d;
+        meilleur = quoi;
       }
     }
-    return meilleure;
+
+    for (final g in _groupes) {
+      if (g.t < 0.5 && g.tp > 0.5) essayer(g, g.astre);
+    }
+    for (final e in _etoiles) {
+      if (e.tp > 0.5) essayer(e, e.astre);
+    }
+    return meilleur;
   }
 
   // ---------------------------------------------------------------
@@ -900,76 +841,47 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   }
 
   void _placer(double dt) {
-    final n = _villes.length;
-    for (final v in _villes) {
-      v.rs = v.ville.rayon * _cam.s;
-      v.foule = 0;
-      for (final w in _villes) {
-        if (identical(w, v)) continue;
-        final d =
-            math.sqrt(
-              math.pow(w.ville.cx - v.ville.cx, 2) +
-                  math.pow(w.ville.cy - v.ville.cy, 2),
-            ) *
-            _cam.s;
-        if (d < 26) v.foule++;
+    final n = _etoiles.length;
+    // Elles s'allument dans l'ordre où on les a connues ; un groupe, avec
+    // la première des siennes.
+    final fondu = math.max(0.7, n * 0.03);
+    for (final e in _etoiles) {
+      e.allumee = _lisse(e.rang - fondu, e.rang.toDouble(), _intro * (n - 1));
+    }
+    for (final g in _groupes) {
+      g.allumee = 0;
+    }
+    for (final e in _etoiles) {
+      for (var g = e.groupe; g != null && g.allumee < e.allumee; g = g.parent) {
+        g.allumee = e.allumee;
       }
     }
-    for (var rang = 0; rang < n; rang++) {
-      _villes[rang].allumee = _lisse(
-        rang - 0.7,
-        rang.toDouble(),
-        _intro * (n - 1),
-      );
-    }
-    // Un pays s'ouvre sur ses régions, une région sur ses villes, quand ce
-    // qu'ils contiennent a la place de se montrer : jamais une boule de
-    // lueurs. Les parents d'abord.
-    final (ouvreDe, ouvreA) = _ouvertureGroupe;
+    // Un groupe se dédouble quand ce qu'il réunit a la place de se montrer,
+    // jamais avant son parent.
     for (final g in _groupes) {
       final p = g.parent;
       g.tp = p?.t ?? 1;
-      g.t = math.min(_lisse(ouvreDe, ouvreA, g.groupe.ecart * _cam.s), g.tp);
+      final r = g.rayonEnfants;
+      g.t = math.min(
+        _lisse(_debutOuverture(r), _finOuverture(r), g.groupe.ecart * _cam.s),
+        g.tp,
+      );
       g.e = _sortie(g.t);
+      // Son centre, ramené vers celui de son parent tant qu'il est fermé.
       g.x = p == null ? g.groupe.cx : p.x + (g.groupe.cx - p.groupe.cx) * p.e;
       g.y = p == null ? g.groupe.cy : p.y + (g.groupe.cy - p.groupe.cy) * p.e;
-      g.allumee = g.villes.fold(0.0, (m, v) => math.max(m, v.allumee));
       final centre = _versEcranCible(g.x, g.y);
       _suivre(g.astre, centre + _flotter(g.astre, _flottement), dt);
-      // Plus il a de restaurants, plus son étoile est grosse.
-      g.astre.rayonEcran = math.min(22, 3 + 1.1 * math.sqrt(g.groupe.tables));
+      g.astre.rayonEcran = _rayonGroupe(g.groupe.poids);
     }
-    for (var rang = 0; rang < n; rang++) {
-      final v = _villes[rang];
-      final p = v.groupe;
-      v.tp = p?.t ?? 1;
-      // Fermée tant que son groupe l'est.
-      v.t = math.min(_lisse(14, 75, v.rs), v.tp);
-      final e = _sortie(v.t);
-      // Son centre, ramené vers celui de son groupe tant qu'il est fermé.
-      final vx = p == null
-          ? v.ville.cx
-          : p.x + (v.ville.cx - p.groupe.cx) * p.e;
-      final vy = p == null
-          ? v.ville.cy
-          : p.y + (v.ville.cy - p.groupe.cy) * p.e;
-      final centre = _versEcranCible(vx, vy);
-      _suivre(v.astre, centre + _flotter(v.astre, _flottement), dt);
-      // Plus elle a de restaurants, plus son étoile est grosse.
-      v.astre.rayonEcran = math.min(
-        16,
-        2.4 + 1.05 * math.sqrt(v.ville.etoiles.length),
-      );
-      for (var i = 0; i < v.etoiles.length; i++) {
-        final etoile = v.ville.etoiles[i];
-        final a = v.etoiles[i];
-        final place = _versEcranCible(
-          vx + (etoile.x - v.ville.cx) * e,
-          vy + (etoile.y - v.ville.cy) * e,
-        );
-        _suivre(a, place + _flotter(a, _flottement * v.t), dt);
-        a.rayonEcran = 1.3 + 0.9 * math.sqrt(etoile.repas);
-      }
+    for (final e in _etoiles) {
+      final p = e.groupe;
+      e.tp = p?.t ?? 1;
+      final x = p == null ? e.etoile.x : p.x + (e.etoile.x - p.groupe.cx) * p.e;
+      final y = p == null ? e.etoile.y : p.y + (e.etoile.y - p.groupe.cy) * p.e;
+      final place = _versEcranCible(x, y);
+      _suivre(e.astre, place + _flotter(e.astre, _flottement), dt);
+      e.astre.rayonEcran = _rayonEtoile(e.etoile.poids);
     }
   }
 
@@ -981,7 +893,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     _l = taille.width;
     _h = taille.height;
     if (_l <= 0 || _h <= 0) return;
-    if (!_cadre && widget.villes.isNotEmpty) {
+    if (!_cadre && widget.etoiles.isNotEmpty) {
       final tout = _cadrageTout();
       // Jusqu'au monde entier, même avec une seule adresse.
       _echelleMin = math.min(tout.s * 0.55, (_l - 56) / 360);
@@ -1000,11 +912,10 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     _avancer(dt);
     _dessinerFond(c);
     _dessinerImageCarte(c);
-    final or = _Lot(), ivoire = _Lot();
+    final or = _Lot();
     _dessinerCourant(c, dt, or);
-    _dessinerVilles(c, dt, or, ivoire);
+    _dessinerEtoiles(c, or);
     or.peindre(c, _lueurOr);
-    ivoire.peindre(c, _lueurIvoire);
     _dessinerChoisie(c);
     _dessinerNoms(c);
   }
@@ -1268,24 +1179,30 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   }
 
   void _dessinerCourant(Canvas c, double dt, _Lot or) {
-    final n = math.max(1, _villes.length - 1);
+    final n = math.max(1, _etoiles.length - 1);
     final pale = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..blendMode = BlendMode.plus;
     final ecran = math.max(_l, _h);
-    for (final lien in _liensVilles) {
-      final a = _villes[lien.de], b = _villes[lien.vers];
-      // Les liens d'un pays, d'une région, n'apparaissent qu'en l'ouvrant.
+    for (final lien in _liens) {
+      final a = _etoiles[lien.de], b = _etoiles[lien.vers];
+      // Il apparaît quand s'ouvre le plus petit groupe qui contient ses
+      // deux étoiles.
       final niveau = _lisse(0.15, 0.6, lien.groupe?.t ?? 1);
       final allumee = math.min(a.allumee, b.allumee) * niveau;
       if (allumee < 0.01) continue;
-      final ea = a.etoiles[a.ville.entree], eb = b.etoiles[b.ville.entree];
-      final arc = _mesurerArc(
-        Offset(ea.ax, ea.ay),
-        Offset(eb.ax, eb.ay),
-        lien.cote,
-      );
+      final pa = Offset(a.astre.ax, a.astre.ay);
+      final pb = Offset(b.astre.ax, b.astre.ay);
+      // Hors de l'écran, rien à dessiner (l'arc s'écarte peu de sa corde).
+      final marge = 0.1 * (pb - pa).distance + 24;
+      if (math.max(pa.dx, pb.dx) < -marge ||
+          math.min(pa.dx, pb.dx) > _l + marge ||
+          math.max(pa.dy, pb.dy) < -marge ||
+          math.min(pa.dy, pb.dy) > _h + marge) {
+        continue;
+      }
+      final arc = _mesurerArc(pa, pb, lien.cote);
       // Bien plus long que l'écran : il mène ailleurs, il s'efface.
       final loin = 1 - _lisse(1.1 * ecran, 2 * ecran, arc.longueur);
       if (arc.longueur < 2 || loin < 0.01) continue;
@@ -1301,10 +1218,9 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       final bord = math.min(0.4, 36 / arc.longueur);
       final largeur = math.min(16.0, 3 + arc.longueur * 0.03);
       final pas = dt * _vitesseCourant / arc.longueur;
-      for (var j = 0; j < lien.grains.length; j++) {
+      for (var j = 0; j < nombre; j++) {
         final g = lien.grains[j];
         g.u = (g.u + pas) % 1;
-        if (j >= nombre) continue;
         final (point, dir) = _surArc(arc, g.u);
         final enveloppe = math.pow(math.sin(math.pi * g.u), 0.8).toDouble();
         final ecart =
@@ -1323,148 +1239,56 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     }
   }
 
-  // --- Les villes et leurs étoiles.
+  // --- Les étoiles : restaurants et groupes fermés, dessinés de même.
 
-  void _dessinerVilles(Canvas c, double dt, _Lot or, _Lot ivoire) {
-    final traits = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..blendMode = BlendMode.plus;
+  void _dessinerEtoiles(Canvas c, _Lot or) {
     final coeur = Paint()..blendMode = BlendMode.plus;
-    for (final v in _villes) {
-      final allumee = v.allumee;
-      // Des villes empilées à l'écran ne font pas une tache blanche : leurs
-      // halos s'atténuent ensemble (le cœur des étoiles reste net).
-      final tasse = 1 / math.sqrt(1 + v.foule * (1 - v.t));
-      final nebuleuse = 0.11 * v.t * allumee * tasse;
-      if (nebuleuse > 0.005) {
-        final r = v.rs * 2.2;
-        if (v.astre.ax > -r &&
-            v.astre.ax < _l + r &&
-            v.astre.ay > -r &&
-            v.astre.ay < _h + r) {
-          or.ajouter(v.astre.ax, v.astre.ay, r, nebuleuse);
-        }
-      }
-      final alphaTraits = 0.3 * v.t * allumee;
-      if (alphaTraits > 0.005) {
-        traits.color = Color.fromRGBO(245, 236, 220, alphaTraits);
-        final chemin = Path();
-        for (final lien in v.liens) {
-          final a = v.etoiles[lien.de], b = v.etoiles[lien.vers];
-          chemin
-            ..moveTo(a.ax, a.ay)
-            ..lineTo(b.ax, b.ay);
-        }
-        c.drawPath(chemin, traits);
-      }
-      final force = _lisse(0.25, 0.8, v.t) * allumee;
-      if (force > 0.01) _poussiere(v, dt, force, ivoire);
-      // De loin, la ville en une seule étoile.
-      final fermee = (1 - v.t) * allumee * v.tp;
-      if (fermee > 0.01) {
-        final r =
-            v.astre.rayonEcran *
-            (1 + 0.06 * math.sin(_temps * 1.3 + v.astre.scintille));
-        or.ajouter(v.astre.ax, v.astre.ay, r * 5, fermee * tasse);
-        coeur.color = Color.fromRGBO(255, 246, 230, fermee);
-        c.drawCircle(Offset(v.astre.ax, v.astre.ay), r * 0.55, coeur);
-      }
-      // De près, ses restaurants.
-      if (v.t > 0.01) {
-        for (var i = 0; i < v.etoiles.length; i++) {
-          final e = v.etoiles[i];
-          final doree = v.ville.etoiles[i].repas >= 3;
-          final r = e.rayonEcran;
-          final brille = 0.82 + 0.18 * math.sin(_temps * 1.7 + e.scintille);
-          final alpha = v.t * allumee * brille;
-          (doree ? or : ivoire).ajouter(
-            e.ax,
-            e.ay,
-            r * (doree ? 7.5 : 5.5),
-            alpha * tasse,
-          );
-          coeur.color = doree
-              ? Color.fromRGBO(255, 233, 194, alpha.clamp(0.0, 1.0))
-              : Color.fromRGBO(255, 248, 238, alpha.clamp(0.0, 1.0));
-          c.drawCircle(Offset(e.ax, e.ay), r * 0.6, coeur);
-        }
-      }
-    }
-    // De loin, un pays, une région, en une seule étoile.
-    for (final g in _groupes) {
-      final ferme = (1 - g.t) * g.allumee * g.tp;
-      if (ferme <= 0.01) continue;
-      final a = g.astre;
-      final r =
-          a.rayonEcran * (1 + 0.06 * math.sin(_temps * 1.3 + a.scintille));
-      or.ajouter(a.ax, a.ay, r * 5, ferme);
-      coeur.color = Color.fromRGBO(255, 246, 230, ferme);
-      c.drawCircle(Offset(a.ax, a.ay), r * 0.55, coeur);
-    }
-  }
-
-  /// Dans une ville, une poussière d'étoiles d'argent qui scintille et
-  /// glisse, lentement, du restaurant connu en premier vers l'autre.
-  void _poussiere(_EtatVille v, double dt, double force, _Lot ivoire) {
-    for (final lien in v.liens) {
-      final a = v.etoiles[lien.de], b = v.etoiles[lien.vers];
-      final dx = b.ax - a.ax, dy = b.ay - a.ay;
-      final l = math.sqrt(dx * dx + dy * dy);
-      if (l < 10) continue;
-      if (math.max(a.ax, b.ax) < -20 ||
-          math.min(a.ax, b.ax) > _l + 20 ||
-          math.max(a.ay, b.ay) < -20 ||
-          math.min(a.ay, b.ay) > _h + 20) {
+    final visibles = <(_Astre, double)>[
+      for (final g in _groupes)
+        if ((1 - g.t) * g.tp * g.allumee > 0.01)
+          (g.astre, (1 - g.t) * g.tp * g.allumee),
+      for (final e in _etoiles)
+        if (e.tp * e.allumee > 0.01) (e.astre, e.tp * e.allumee),
+    ];
+    for (final (a, alpha) in visibles) {
+      if (a.ax < -60 || a.ax > _l + 60 || a.ay < -60 || a.ay > _h + 60) {
         continue;
       }
-      final tx = dx / l, ty = dy / l;
-      final nombre = math.max(3, math.min(lien.grains.length, (l / 9).round()));
-      final largeur = math.min(4.0, 1 + l * 0.02);
-      final pas = dt * _vitessePoussiere / l;
-      for (var j = 0; j < lien.grains.length; j++) {
-        final g = lien.grains[j];
-        g.u = (g.u + pas) % 1;
-        if (j >= nombre) continue;
-        final ecart =
-            (g.ecart * largeur +
-                math.sin(_temps * _rythmeFlottement * 2 + g.ph) * 0.8) *
-            math.sin(math.pi * g.u);
-        final scintille = 0.55 + 0.45 * math.sin(_temps * 2.6 + g.ph * 3);
-        ivoire.ajouter(
-          a.ax + dx * g.u - ty * ecart,
-          a.ay + dy * g.u + tx * ecart,
-          g.taille * 2.2,
-          g.a * force * scintille * _lisse(0, 0.1, g.u) * _lisse(1, 0.9, g.u),
-        );
+      // Des étoiles serrées ne font pas une tache blanche : leurs halos
+      // s'atténuent ensemble (leur cœur reste net).
+      var foule = 0;
+      for (final (b, _) in visibles) {
+        if ((b.ax - a.ax).abs() < 26 && (b.ay - a.ay).abs() < 26) foule++;
       }
+      final tasse = 1 / math.sqrt(foule);
+      final r =
+          a.rayonEcran * (1 + 0.06 * math.sin(_temps * 1.3 + a.scintille));
+      or.ajouter(a.ax, a.ay, r * 5, alpha * tasse);
+      coeur.color = Color.fromRGBO(255, 246, 230, alpha.clamp(0.0, 1.0));
+      c.drawCircle(Offset(a.ax, a.ay), r * 0.55, coeur);
     }
   }
 
   void _dessinerChoisie(Canvas c) {
     final cle = widget.cleChoisie;
     if (cle == null) return;
-    for (final v in _villes) {
-      for (var i = 0; i < v.etoiles.length; i++) {
-        if (v.ville.etoiles[i].cle != cle) continue;
-        final e = v.etoiles[i];
-        c.drawCircle(
-          Offset(e.ax, e.ay),
-          e.rayonEcran + 9,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.2
-            ..color = const Color.fromRGBO(242, 205, 138, 0.9),
-        );
-        return;
-      }
+    for (final e in _etoiles) {
+      if (e.etoile.cle != cle) continue;
+      c.drawCircle(
+        Offset(e.astre.ax, e.astre.ay),
+        e.astre.rayonEcran + 9,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = const Color.fromRGBO(242, 205, 138, 0.9),
+      );
+      return;
     }
   }
 
   // --- Les noms.
 
   static const _ivoire = Color(0xFFF5F0E8);
-  static const _or = Color(0xFFD9AC67);
 
   _Etiquette _etiquette(
     String texte,
@@ -1556,7 +1380,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   /// plus petite qu'elle, jamais une plus grande ni un autre nom.
   void _dessinerNoms(Canvas c) {
     final places = <(Rect, double)>[];
-    void occuper(_Astre a, int tables) {
+    void occuper(_Astre a) {
       final r = a.rayonEcran + 3;
       places.add((
         Rect.fromCenter(
@@ -1564,15 +1388,15 @@ class _TablCielConstellationState extends State<TablCielConstellation>
           width: 2 * r,
           height: 2 * r,
         ),
-        tables.toDouble(),
+        a.rayonEcran,
       ));
     }
 
     for (final g in _groupes) {
-      if (g.t < 0.35 && g.tp > 0.5) occuper(g.astre, g.groupe.tables);
+      if (g.t < 0.35 && g.tp > 0.5) occuper(g.astre);
     }
-    for (final v in _villes) {
-      if (v.t < 0.35 && v.tp > 0.5) occuper(v.astre, v.ville.etoiles.length);
+    for (final e in _etoiles) {
+      if (e.tp > 0.5) occuper(e.astre);
     }
     bool libre(Rect r, [double poids = 0]) =>
         r.left > 4 &&
@@ -1580,113 +1404,46 @@ class _TablCielConstellationState extends State<TablCielConstellation>
         r.top > widget.margeHaut - 10 &&
         r.bottom < _h - widget.margeBas + 20 &&
         !places.any((p) => p.$2 >= poids && p.$1.overlaps(r));
-    // Le nom d'un groupe s'efface dès qu'il s'ouvre ; ceux de ce qu'il
-    // contient n'arrivent qu'une fois qu'il est presque ouvert.
+    // Le nom d'un groupe s'efface pendant qu'il se dédouble, ceux de ce
+    // qu'il réunit arrivent dans le même temps : jamais de ciel sans nom.
     final candidats =
-        <({_Astre astre, String nom, String detail, double alpha, int poids})>[
+        <({_Astre astre, String nom, String detail, double alpha})>[
           for (final g in _groupes)
-            (
-              astre: g.astre,
-              nom: g.groupe.nom,
-              detail: g.groupe.etiquette,
-              alpha:
-                  (1 - _lisse(0.1, 0.4, g.t)) *
-                  _lisse(0.6, 0.95, g.tp) *
-                  g.allumee,
-              poids: g.groupe.tables,
-            ),
-          for (final v in _villes)
-            (
-              astre: v.astre,
-              nom: v.ville.nom,
-              detail: v.ville.etiquette,
-              alpha:
-                  (1 - _lisse(0.25, 0.7, v.t)) *
-                  _lisse(0.6, 0.95, v.tp) *
-                  v.allumee,
-              poids: v.ville.etoiles.length,
-            ),
-        ]..sort((a, b) => b.poids.compareTo(a.poids));
+            if ((1 - _lisse(0.25, 0.5, g.t)) *
+                    _lisse(0.45, 0.75, g.tp) *
+                    g.allumee
+                case final alpha when alpha > 0.02)
+              (
+                astre: g.astre,
+                nom: g.groupe.nom,
+                detail: g.groupe.etiquette,
+                alpha: alpha,
+              ),
+          for (final e in _etoiles)
+            if (_lisse(0.45, 0.75, e.tp) * e.allumee case final alpha
+                when alpha > 0.02)
+              (
+                astre: e.astre,
+                nom: e.etoile.nom,
+                detail: e.etoile.detail,
+                alpha: alpha,
+              ),
+        ]..sort((a, b) => b.astre.rayonEcran.compareTo(a.astre.rayonEcran));
     var poses = 0;
     for (final n in candidats) {
       if (poses >= _nomsMax) break;
-      if (n.alpha <= 0.02) continue;
       if (_poserNom(
         c,
         n.astre,
         _etiquette(n.nom, 15, 700, _ivoire),
         _etiquette(n.detail, 12, 500, _ivoire),
         n.alpha,
-        n.poids.toDouble(),
+        n.astre.rayonEcran,
         libre,
         places,
       )) {
         poses++;
       }
-    }
-    for (final v in _villes) {
-      final a = v.astre;
-      final allumee = v.allumee;
-      // Ouverte, la ville garde son nom en grand, au-dessus d'elle.
-      final haut = _lisse(0.35, 1, v.t) * allumee;
-      if (haut > 0.02) {
-        var dessus = double.infinity;
-        for (final e in v.etoiles) {
-          dessus = math.min(dessus, e.ay);
-        }
-        final titre = _etiquette(
-          v.ville.nom.toUpperCase().split('').join(' '),
-          12,
-          600,
-          _or,
-        );
-        final rect = Rect.fromLTWH(
-          a.ax - titre.largeur / 2,
-          dessus - 44,
-          titre.largeur,
-          18,
-        );
-        if (libre(rect)) {
-          places.add((rect, double.infinity));
-          _poser(c, titre, rect.left, rect.top, 0.75 * haut);
-        }
-      }
-    }
-    final candidates = <(int, int)>[];
-    for (var vi = 0; vi < _villes.length; vi++) {
-      final v = _villes[vi];
-      if (v.t <= 0.85) continue;
-      for (var i = 0; i < v.etoiles.length; i++) {
-        final e = v.etoiles[i];
-        if (e.ax > 0 && e.ax < _l && e.ay > 0 && e.ay < _h) {
-          candidates.add((vi, i));
-        }
-      }
-    }
-    candidates.sort(
-      (p, q) => _villes[q.$1].ville.etoiles[q.$2].repas.compareTo(
-        _villes[p.$1].ville.etoiles[p.$2].repas,
-      ),
-    );
-    for (final (vi, i) in candidates.take(60)) {
-      final v = _villes[vi];
-      final e = v.etoiles[i];
-      final nom = _etiquette(v.ville.etoiles[i].nom, 12, 500, _ivoire);
-      final rect = Rect.fromLTWH(
-        e.ax + e.rayonEcran + 6,
-        e.ay - 8,
-        nom.largeur + 2,
-        16,
-      );
-      if (!libre(rect)) continue;
-      places.add((rect, double.infinity));
-      _poser(
-        c,
-        nom,
-        rect.left,
-        e.ay - nom.hauteur / 2,
-        0.8 * _lisse(0.85, 1, v.t),
-      );
     }
   }
 
