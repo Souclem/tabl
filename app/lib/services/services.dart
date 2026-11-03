@@ -15,7 +15,6 @@ export 'avis/avis.dart';
 export 'carte/carte_service.dart';
 export 'carte/carte_service_supabase.dart';
 export 'carte/ciel_constellation.dart';
-export 'carte/constellation.dart';
 export 'carte/fiche_restaurant.dart';
 export 'carte/fond_carte.dart';
 export 'carte/filtres_carte.dart';

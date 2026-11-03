@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -362,18 +361,8 @@ class _EcranCarteState extends State<EcranCarte> {
         ModeExplorer.maCarte => 'Constellation',
       };
 
-  /// Sous le titre : ce qu'on trouve dans la zone regardée — ou, pour ma
-  /// Constellation vue de loin, ce qu'elle raconte.
+  /// Sous le titre : ce qu'on trouve dans la zone regardée.
   String _sousTitre(int nombre) {
-    if (_mode == ModeExplorer.maCarte) {
-      final ville = _villeRegardee;
-      if (ville == null) return 'Votre histoire, table par table.';
-      final ici = lieuxDeLaVille(_lieux, ville.nom);
-      return tablesEtRepas(
-        ici.length,
-        ici.fold(0, (n, l) => n + math.max(l.mesVisites, 1)),
-      );
-    }
     if (_mode == ModeExplorer.envies && _villeRegardee == null) {
       return 'Les adresses que vous gardez pour plus tard.';
     }
@@ -492,25 +481,6 @@ class _EcranCarteState extends State<EcranCarte> {
 
   void _tapLieu(String cle) {
     _fermetureEnAttente?.cancel();
-    // Une ville de ma Constellation : on s'en approche.
-    if (cle.startsWith('ville:')) {
-      final nom = cle.substring('ville:'.length);
-      final ville = villesConstellation(
-        _lieux,
-      ).where((v) => v.nom == nom).firstOrNull;
-      if (ville != null) {
-        _controleur.cadrer(
-          sud: ville.zone.sud,
-          ouest: ville.zone.ouest,
-          nord: ville.zone.nord,
-          est: ville.zone.est,
-          haut: _hauteurEnTete,
-          bas: _margeBarre,
-          zoomMax: 14.5,
-        );
-      }
-      return;
-    }
     final lieu = _lieux.where((l) => l.cle == cle).firstOrNull;
     if (lieu == null) return;
     _choisir(lieu, voisinsDepuis: lieu);
@@ -708,97 +678,6 @@ class _EcranCarteState extends State<EcranCarte> {
       detail: cuisineEtQuartier(lieu),
       proches: proches,
     );
-  }
-
-  /// Les actions d'un lieu de la liste.
-  Future<void> _options(LieuCarte lieu) async {
-    final choix = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF111216),
-      showDragHandle: true,
-      builder: (contexte) {
-        Widget action(String valeur, IconData icone, String libelle) =>
-            ListTile(
-              leading: Icon(icone, color: TablTokens.texte),
-              title: Text(libelle, style: TablTokens.corps),
-              onTap: () => Navigator.of(contexte).pop(valeur),
-            );
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL - 4,
-                  0,
-                  TablTokens.espaceL - 4,
-                  TablTokens.espaceS,
-                ),
-                child: Row(
-                  children: [
-                    TablPhotoLieu(nom: lieu.nom, url: _photo(lieu), taille: 44),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            lieu.nom,
-                            style: TablTokens.titreAffichage.copyWith(
-                              fontSize: 20,
-                            ),
-                          ),
-                          Text(
-                            cuisineEtQuartier(lieu),
-                            style: TablTokens.legende,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.souvenirService != null)
-                action('fiche', Icons.article_outlined, 'Voir la fiche'),
-              if (_peutDemander(lieu))
-                action(
-                  'demander',
-                  Icons.chat_bubble_outline_rounded,
-                  'Demander un avis',
-                ),
-              if (widget.tableService != null && _tables.isNotEmpty)
-                action(
-                  'proposer',
-                  Icons.person_add_alt_1_outlined,
-                  'Proposer à une Table',
-                ),
-              action(
-                'envie',
-                lieu.estEnvie
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                lieu.estEnvie ? 'Retirer de mes envies' : 'Enregistrer',
-              ),
-              if (widget.afficherCarte)
-                action('carte', Icons.map_outlined, 'Voir sur la carte'),
-            ],
-          ),
-        );
-      },
-    );
-    if (!mounted || choix == null) return;
-    switch (choix) {
-      case 'fiche':
-        _ouvrirFiche(lieu);
-      case 'demander':
-        _demander(lieu);
-      case 'proposer':
-        _proposer(lieu);
-      case 'envie':
-        _basculerEnvie(lieu);
-      case 'carte':
-        _montrerSurLaCarte(lieu);
-    }
   }
 
   /// Sur la carte, de près, l'aperçu du lieu ouvert.
@@ -1095,8 +974,6 @@ class _EcranCarteState extends State<EcranCarte> {
       geojsonLieux: constellation
           ? TablCarteMapbox.geojsonVide
           : geojsonLieux(_lieux, cleChoisie: _selection?.cle),
-      // La Constellation se dessine dans son propre ciel (VueConstellation).
-      geojsonConstellation: TablCarteMapbox.geojsonVide,
       // Belgique, avant de connaître la position.
       latitudeInitiale: 50.5,
       longitudeInitiale: 4.6,
@@ -1128,27 +1005,6 @@ class _EcranCarteState extends State<EcranCarte> {
               } else {
                 _controleur.centrerSur(p.latitude, p.longitude, zoom: 13.5);
               }
-            },
-          ),
-        ),
-      if (selection == null &&
-          _mode == ModeExplorer.maCarte &&
-          _lieux.isNotEmpty)
-        Positioned(
-          left: TablTokens.espaceL - 4,
-          bottom: _margeBarreFlottante + 8,
-          child: Builder(
-            builder: (_) {
-              final c = compteursConstellation(_lieux);
-              return TablCompteursConstellation(
-                chiffres: [
-                  (nombre: '${c.repas}', libelle: 'repas'),
-                  (
-                    nombre: '${c.villes}',
-                    libelle: c.villes == 1 ? 'ville' : 'villes',
-                  ),
-                ],
-              );
             },
           ),
         ),
@@ -1265,62 +1121,6 @@ class _EcranCarteState extends State<EcranCarte> {
       'Vos souvenirs apparaîtront ici, à leur place sur la carte.',
   };
 
-  /// « Ma carte » en liste : mes adresses par ville, la plus fréquentée
-  /// d'abord.
-  Widget _listeParVille(List<LieuCarte> lieux, double haut) {
-    final villes = villesConstellation(lieux)
-      ..sort((a, b) => b.repas.compareTo(a.repas));
-    final sansVille = [
-      for (final l in lieux)
-        if (l.ville.trim().isEmpty) l,
-    ];
-    Widget ligne(LieuCarte l) => TablLigneCercle(
-      key: ValueKey('ligne-${l.cle}'),
-      nom: l.nom,
-      photoUrl: _photo(l),
-      raison: repasEtDerniere(l),
-      detail: cuisineEtQuartier(l),
-      onPresse: () => _ouvrirFiche(l),
-      onOptions: () => _options(l),
-    );
-    return ColoredBox(
-      color: TablTokens.fond,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          TablTokens.espaceL - 4,
-          haut + TablTokens.espaceS,
-          TablTokens.espaceL - 4,
-          _margeBarre + TablTokens.espaceL,
-        ),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        children: [
-          for (final v in villes) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: TablTokens.espaceM),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    v.nom,
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 24),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    tablesEtRepas(v.tables, v.repas),
-                    style: TablTokens.legende.copyWith(fontSize: 12.5),
-                  ),
-                ],
-              ),
-            ),
-            for (final l in lieuxDeLaVille(lieux, v.nom)) ligne(l),
-          ],
-          for (final l in sansVille) ligne(l),
-        ],
-      ),
-    );
-  }
-
   Widget _grille() {
     final lieux = _lieuxListe;
     final palette = _palette;
@@ -1362,7 +1162,6 @@ class _EcranCarteState extends State<EcranCarte> {
         ),
       );
     }
-    if (_mode == ModeExplorer.maCarte) return _listeParVille(lieux, haut);
     // Deux par rangée, de la même hauteur.
     final rangees = [
       for (var i = 0; i < lieux.length; i += 2)
