@@ -414,6 +414,51 @@ class _Triangle {
       (x - ux) * (x - ux) + (y - uy) * (y - uy) < r2;
 }
 
+/// Un pays de ma Constellation : de loin, ses villes n'y font qu'une étoile.
+class PaysCiel {
+  const PaysCiel({
+    required this.nom,
+    required this.etiquette,
+    required this.villes,
+  });
+
+  /// « Belgique ».
+  final String nom;
+
+  /// « 137 tables ».
+  final String etiquette;
+
+  /// Indices dans [CielConstellation.villes].
+  final List<int> villes;
+}
+
+/// Les pays qui regroupent au moins deux de mes villes ([paysDe] : le pays
+/// d'un point du ciel, `null` en mer).
+List<PaysCiel> paysDuCiel(
+  CielConstellation ciel,
+  String? Function(double x, double y) paysDe,
+) {
+  final parPays = <String, List<int>>{};
+  for (var i = 0; i < ciel.villes.length; i++) {
+    final v = ciel.villes[i];
+    final e = v.etoiles[v.entree];
+    final pays = paysDe(v.cx, v.cy) ?? paysDe(e.x, e.y);
+    if (pays != null) parPays.putIfAbsent(pays, () => []).add(i);
+  }
+  return [
+    for (final MapEntry(key: nom, value: villes) in parPays.entries)
+      if (villes.length >= 2)
+        PaysCiel(
+          nom: nom,
+          etiquette: pluriel(
+            villes.fold(0, (n, i) => n + ciel.villes[i].etoiles.length),
+            'table',
+          ),
+          villes: villes,
+        ),
+  ];
+}
+
 /// Ce que dit la fiche d'une étoile qu'on touche.
 ({String nom, String detail, String depuis, bool retour}) ficheEtoile(
   EtoileCiel etoile,

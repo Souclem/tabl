@@ -38,12 +38,16 @@ class VueConstellation extends StatefulWidget {
 class _VueConstellationState extends State<VueConstellation>
     with SingleTickerProviderStateMixin {
   /// Le fond (terres, frontières, routes) : lu une fois pour toute l'app.
-  static Future<FondDuCiel>? _fondEnCours;
+  static Future<(FondCarte, FondDuCiel)>? _fondEnCours;
 
   CielConstellation _ciel = CielConstellation.vide;
   List<VilleDuCiel> _villes = const [];
   List<(int, int)> _liens = const [];
   FondDuCiel? _fond;
+
+  /// Les pays des villes, lus sur la carte (il faut qu'elle soit chargée).
+  FondCarte? _fondCarte;
+  List<PaysDuCiel> _pays = const [];
   String? _choisie;
   bool _aide = true;
 
@@ -111,18 +115,39 @@ class _VueConstellationState extends State<VueConstellation>
         ),
     ];
     _liens = [for (final l in ciel.liensEntreVilles) (l.de, l.vers)];
+    _calculerPays();
     if (_choisie != null && _etoile(_choisie!) == null) _choisie = null;
   }
 
   Future<void> _chargerFond() async {
     try {
-      final fond = await (_fondEnCours ??= chargerFondCarte().then(_versCiel));
-      if (mounted) setState(() => _fond = fond);
+      final (carte, fond) = await (_fondEnCours ??= chargerFondCarte().then(
+        (carte) => (carte, _versCiel(carte)),
+      ));
+      if (!mounted) return;
+      setState(() {
+        _fondCarte = carte;
+        _fond = fond;
+        _calculerPays();
+      });
     } catch (e) {
       // Sans carte, le ciel reste un ciel.
       debugPrint('Constellation : fond de carte : $e');
       _fondEnCours = null;
     }
+  }
+
+  void _calculerPays() {
+    final carte = _fondCarte;
+    _pays = carte == null
+        ? const []
+        : [
+            for (final p in paysDuCiel(
+              _ciel,
+              (x, y) => paysDuPoint(carte, x, y),
+            ))
+              PaysDuCiel(nom: p.nom, etiquette: p.etiquette, villes: p.villes),
+          ];
   }
 
   static FondDuCiel _versCiel(FondCarte fond) {
@@ -175,6 +200,7 @@ class _VueConstellationState extends State<VueConstellation>
                 widget.carte?.placer(c.latitude, c.longitude, c.zoom),
             villes: _villes,
             liensEntreVilles: _liens,
+            pays: _pays,
             fond: _fond,
             cleChoisie: _choisie,
             anime: widget.anime,

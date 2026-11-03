@@ -35,4 +35,19 @@ void main() {
     // -179° devient 181° : à côté de 179°, pas à l'autre bout du monde.
     expect(fond.terres.single.points[2], closeTo(181, 1e-9));
   });
+
+  test('le pays d\'un point : dedans, tout près d\'une côte, ou aucun', () {
+    // La Belgique en rectangle (lon 2,5 à 6,4 ; lat 49,5 à 51,5).
+    final fond = fondCarteDepuisJson(
+      terres: '[[250,4950,640,4950,640,5150,250,5150]]',
+      frontieres: '[]',
+      routes: '[]',
+      nomsTerres: '["Belgique"]',
+    );
+
+    expect(paysDuPoint(fond, 5.57, mercY(50.64)), 'Belgique');
+    // En mer, à deux pas de la côte.
+    expect(paysDuPoint(fond, 2.4, mercY(51.2)), 'Belgique');
+    expect(paysDuPoint(fond, 12.5, mercY(41.9)), isNull);
+  });
 }

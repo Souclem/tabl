@@ -64,6 +64,24 @@ class VilleDuCiel {
   final List<(int, int)> liens;
 }
 
+/// Un pays qui regroupe plusieurs villes : de loin une seule étoile, qui
+/// s'ouvre sur ses villes quand on s'en approche.
+class PaysDuCiel {
+  const PaysDuCiel({
+    required this.nom,
+    required this.etiquette,
+    required this.villes,
+  });
+
+  final String nom;
+
+  /// « 137 tables », sous son nom.
+  final String etiquette;
+
+  /// Indices dans [TablCielConstellation.villes].
+  final List<int> villes;
+}
+
 /// Un tracé de la carte, en coordonnées du ciel, et son emprise.
 class TraceDuCiel {
   const TraceDuCiel(
@@ -127,6 +145,7 @@ class TablCielConstellation extends StatefulWidget {
     required this.liensEntreVilles,
     required this.onTapEtoile,
     required this.onTapVide,
+    this.pays = const [],
     this.fond,
     this.cleChoisie,
     this.onGeste,
@@ -141,6 +160,9 @@ class TablCielConstellation extends StatefulWidget {
 
   /// (de, vers) dans [villes].
   final List<(int, int)> liensEntreVilles;
+
+  /// Les pays de plusieurs villes : elles s'y regroupent de loin.
+  final List<PaysDuCiel> pays;
   final FondDuCiel? fond;
 
   /// L'étoile entourée (celle dont la fiche est ouverte).
@@ -282,6 +304,36 @@ class _EtatVille {
   double allumee = 0;
   double rs = 0;
   int foule = 0;
+
+  /// Son pays, s'il en regroupe plusieurs ; et combien ce pays est ouvert
+  /// (1 sans pays) : fermé, la ville se fond dans l'étoile du pays.
+  _EtatPays? pays;
+  double tp = 1;
+}
+
+class _EtatPays {
+  _EtatPays(this.pays, this.villes)
+    : astre = _Astre(math.Random(pays.nom.hashCode)),
+      tables = villes.fold(0, (n, v) => n + v.ville.etoiles.length) {
+    cx = villes.fold(0.0, (n, v) => n + v.ville.cx) / villes.length;
+    cy = villes.fold(0.0, (n, v) => n + v.ville.cy) / villes.length;
+    final distances = [
+      for (final v in villes)
+        math.sqrt(math.pow(v.ville.cx - cx, 2) + math.pow(v.ville.cy - cy, 2)),
+    ]..sort();
+    rayon = math.max(0.05, distances[(distances.length * 0.8).floor()]);
+  }
+
+  final PaysDuCiel pays;
+  final List<_EtatVille> villes;
+  final _Astre astre;
+  final int tables;
+  late final double cx;
+  late final double cy;
+  late final double rayon;
+  double t = 1;
+  double e = 1;
+  double allumee = 0;
 }
 
 class _EtoileFond {
@@ -348,6 +400,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
   double _dernierMouvement = -1e9;
 
   List<_EtatVille> _villes = const [];
+  List<_EtatPays> _pays = const [];
   List<_Lien> _liensVilles = const [];
   final List<_EtoileFond> _fond = [];
 
@@ -392,6 +445,8 @@ class _TablCielConstellationState extends State<TablCielConstellation>
         _cadre = false;
         _intro = widget.anime ? 0 : 1;
       }
+    } else if (!identical(ancien.pays, widget.pays)) {
+      _preparerPays();
     }
     if (!identical(ancien.fond, widget.fond)) _camCarte = null;
   }
@@ -417,6 +472,23 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       for (final (de, vers) in widget.liensEntreVilles)
         _Lien.courant(de, vers, i++ % 2 == 1 ? 1 : -1, h),
     ];
+    _preparerPays();
+  }
+
+  void _preparerPays() {
+    for (final v in _villes) {
+      v.pays = null;
+    }
+    _pays = [
+      for (final p in widget.pays)
+        if (p.villes.every((i) => i >= 0 && i < _villes.length))
+          _EtatPays(p, [for (final i in p.villes) _villes[i]]),
+    ];
+    for (final p in _pays) {
+      for (final v in p.villes) {
+        v.pays = p;
+      }
+    }
   }
 
   void _tic(Duration ecoule) {
@@ -484,6 +556,23 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       return _cadrage(xmin - 0.03, xmax + 0.03, ymin - 0.03, ymax + 0.03);
     }
     return _cadrage(xmin, xmax, ymin, ymax);
+  }
+
+  _Camera _cadragePays(_EtatPays p) {
+    var xmin = double.infinity, xmax = double.negativeInfinity;
+    var ymin = double.infinity, ymax = double.negativeInfinity;
+    for (final v in p.villes) {
+      for (final e in v.ville.etoiles) {
+        xmin = math.min(xmin, e.x);
+        xmax = math.max(xmax, e.x);
+        ymin = math.min(ymin, e.y);
+        ymax = math.max(ymax, e.y);
+      }
+    }
+    final c = _cadrage(xmin, xmax, ymin, ymax);
+    // Assez près pour qu'il soit tout à fait ouvert.
+    c.s = math.min(_echelleMax, math.max(c.s * 0.85, 100 / p.rayon));
+    return c;
   }
 
   _Camera _cadrageVille(VilleDuCiel v) {
@@ -582,6 +671,15 @@ class _TablCielConstellationState extends State<TablCielConstellation>
 
   void _toucher(TapUpDetails d) {
     final p = d.localPosition;
+    for (final pays in _pays) {
+      final a = pays.astre;
+      if (pays.t < 0.5 &&
+          (Offset(a.ax, a.ay) - p).distance < math.max(26, a.rayonEcran + 12)) {
+        widget.onTapVide();
+        _allerVers(_cadragePays(pays));
+        return;
+      }
+    }
     final cible = _etoileSous(p);
     if (cible case (final ville, null)) {
       widget.onTapVide();
@@ -626,7 +724,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
             meilleure = (v, v.ville.etoiles[i].cle);
           }
         }
-      } else {
+      } else if (v.tp > 0.5) {
         final a = v.astre;
         final d = (Offset(a.ax, a.ay) - p).distance;
         if (d < math.max(22, a.rayonEcran + 12) && d < dmin) {
@@ -758,19 +856,45 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       }
     }
     for (var rang = 0; rang < n; rang++) {
+      _villes[rang].allumee = _lisse(
+        rang - 0.7,
+        rang.toDouble(),
+        _intro * (n - 1),
+      );
+    }
+    // Un pays s'ouvre sur ses villes comme une ville sur ses restaurants.
+    for (final p in _pays) {
+      p.t = _lisse(28, 95, p.rayon * _cam.s);
+      p.e = _sortie(p.t);
+      p.allumee = p.villes.fold(0.0, (m, v) => math.max(m, v.allumee));
+      final centre = _versEcranCible(p.cx, p.cy);
+      _suivre(p.astre, centre + _flotter(p.astre, _flottement), dt);
+      // Plus il a de restaurants, plus son étoile est grosse.
+      p.astre.rayonEcran = math.min(22, 3 + 1.1 * math.sqrt(p.tables));
+    }
+    for (var rang = 0; rang < n; rang++) {
       final v = _villes[rang];
-      v.t = _lisse(14, 75, v.rs);
+      final p = v.pays;
+      v.tp = p?.t ?? 1;
+      // Fermée tant que son pays l'est.
+      v.t = math.min(_lisse(14, 75, v.rs), v.tp);
       final e = _sortie(v.t);
-      v.allumee = _lisse(rang - 0.7, rang.toDouble(), _intro * (n - 1));
-      final centre = _versEcranCible(v.ville.cx, v.ville.cy);
+      // Son centre, ramené vers celui de son pays tant qu'il est fermé.
+      final vx = p == null ? v.ville.cx : p.cx + (v.ville.cx - p.cx) * p.e;
+      final vy = p == null ? v.ville.cy : p.cy + (v.ville.cy - p.cy) * p.e;
+      final centre = _versEcranCible(vx, vy);
       _suivre(v.astre, centre + _flotter(v.astre, _flottement), dt);
-      v.astre.rayonEcran = math.min(10, 2.6 + 0.8 * math.sqrt(v.ville.repas));
+      // Plus elle a de restaurants, plus son étoile est grosse.
+      v.astre.rayonEcran = math.min(
+        16,
+        2.4 + 1.05 * math.sqrt(v.ville.etoiles.length),
+      );
       for (var i = 0; i < v.etoiles.length; i++) {
         final etoile = v.ville.etoiles[i];
         final a = v.etoiles[i];
         final place = _versEcranCible(
-          v.ville.cx + (etoile.x - v.ville.cx) * e,
-          v.ville.cy + (etoile.y - v.ville.cy) * e,
+          vx + (etoile.x - v.ville.cx) * e,
+          vy + (etoile.y - v.ville.cy) * e,
         );
         _suivre(a, place + _flotter(a, _flottement * v.t), dt);
         a.rayonEcran = 1.3 + 0.9 * math.sqrt(etoile.repas);
@@ -1161,7 +1285,7 @@ class _TablCielConstellationState extends State<TablCielConstellation>
       final force = _lisse(0.25, 0.8, v.t) * allumee;
       if (force > 0.01) _poussiere(v, dt, force, ivoire);
       // De loin, la ville en une seule étoile.
-      final fermee = (1 - v.t) * allumee;
+      final fermee = (1 - v.t) * allumee * v.tp;
       if (fermee > 0.01) {
         final r =
             v.astre.rayonEcran *
@@ -1190,6 +1314,17 @@ class _TablCielConstellationState extends State<TablCielConstellation>
           c.drawCircle(Offset(e.ax, e.ay), r * 0.6, coeur);
         }
       }
+    }
+    // De loin, un pays de plusieurs villes en une seule étoile.
+    for (final p in _pays) {
+      final ferme = (1 - p.t) * p.allumee;
+      if (ferme <= 0.01) continue;
+      final a = p.astre;
+      final r =
+          a.rayonEcran * (1 + 0.06 * math.sin(_temps * 1.3 + a.scintille));
+      or.ajouter(a.ax, a.ay, r * 5, ferme);
+      coeur.color = Color.fromRGBO(255, 246, 230, ferme);
+      c.drawCircle(Offset(a.ax, a.ay), r * 0.55, coeur);
     }
   }
 
@@ -1303,13 +1438,60 @@ class _TablCielConstellationState extends State<TablCielConstellation>
     );
   }
 
+  /// Le nom d'une étoile de ville ou de pays et sa ligne de détail, sous
+  /// elle, sinon au-dessus ; nulle part s'il n'y a pas la place.
+  void _poserNom(
+    Canvas c,
+    _Astre a,
+    _Etiquette nom,
+    _Etiquette detail,
+    double alpha,
+    double poids,
+    bool Function(Rect, [double]) libre,
+    List<(Rect, double)> places,
+  ) {
+    if (alpha <= 0.02) return;
+    if (a.ax < -30 || a.ax > _l + 30 || a.ay < -30 || a.ay > _h + 30) return;
+    final w = math.max(nom.largeur, detail.largeur) + 4;
+    // Près du bord, le nom se décale vers l'intérieur.
+    final x = math.min(_l - 10 - w, math.max(10.0, a.ax - w / 2));
+    var rect = Rect.fromLTWH(x, a.ay + a.rayonEcran + 6, w, 34);
+    // Pas la place en dessous : au-dessus.
+    if (!libre(rect, poids)) {
+      rect = Rect.fromLTWH(x, a.ay - a.rayonEcran - 40, w, 34);
+    }
+    if (!libre(rect, poids)) return;
+    places.add((rect, double.infinity));
+    _poser(c, nom, x + w / 2 - nom.largeur / 2, rect.top, alpha);
+    _poser(
+      c,
+      detail,
+      x + w / 2 - detail.largeur / 2,
+      rect.top + 17,
+      0.55 * alpha,
+    );
+  }
+
   /// Les noms, sans qu'ils se chevauchent : les plus fréquentés d'abord.
   /// Le nom d'une ville peut recouvrir une ville plus petite qu'elle,
   /// jamais une plus grande ni un autre nom.
   void _dessinerNoms(Canvas c) {
     final places = <(Rect, double)>[];
+    for (final p in _pays) {
+      if (p.t < 0.35) {
+        final r = p.astre.rayonEcran + 3;
+        places.add((
+          Rect.fromCenter(
+            center: Offset(p.astre.ax, p.astre.ay),
+            width: 2 * r,
+            height: 2 * r,
+          ),
+          double.infinity,
+        ));
+      }
+    }
     for (final v in _villes) {
-      if (v.t < 0.35) {
+      if (v.t < 0.35 && v.tp > 0.5) {
         final r = v.astre.rayonEcran + 3;
         places.add((
           Rect.fromCenter(
@@ -1327,6 +1509,18 @@ class _TablCielConstellationState extends State<TablCielConstellation>
         r.top > widget.margeHaut - 10 &&
         r.bottom < _h - widget.margeBas + 20 &&
         !places.any((p) => p.$2 >= poids && p.$1.overlaps(r));
+    for (final p in [..._pays]..sort((a, b) => b.tables.compareTo(a.tables))) {
+      _poserNom(
+        c,
+        p.astre,
+        _etiquette(p.pays.nom, 15, 700, _ivoire),
+        _etiquette(p.pays.etiquette, 12, 500, _ivoire),
+        (1 - _lisse(0.25, 0.7, p.t)) * p.allumee,
+        double.infinity,
+        libre,
+        places,
+      );
+    }
     final parTaille = [..._villes]
       ..sort((a, b) => b.ville.repas.compareTo(a.ville.repas));
     for (final v in parTaille) {
@@ -1335,30 +1529,16 @@ class _TablCielConstellationState extends State<TablCielConstellation>
         continue;
       }
       final allumee = v.allumee;
-      final alpha = (1 - _lisse(0.25, 0.7, v.t)) * allumee;
-      if (alpha > 0.02) {
-        final nom = _etiquette(v.ville.nom, 15, 700, _ivoire);
-        final detail = _etiquette(v.ville.etiquette, 12, 500, _ivoire);
-        final w = math.max(nom.largeur, detail.largeur) + 4;
-        // Près du bord, le nom se décale vers l'intérieur.
-        final x = math.min(_l - 10 - w, math.max(10.0, a.ax - w / 2));
-        var rect = Rect.fromLTWH(x, a.ay + a.rayonEcran + 6, w, 34);
-        // Pas la place en dessous : au-dessus.
-        if (!libre(rect, v.ville.repas.toDouble())) {
-          rect = Rect.fromLTWH(x, a.ay - a.rayonEcran - 40, w, 34);
-        }
-        if (libre(rect, v.ville.repas.toDouble())) {
-          places.add((rect, double.infinity));
-          _poser(c, nom, x + w / 2 - nom.largeur / 2, rect.top, alpha);
-          _poser(
-            c,
-            detail,
-            x + w / 2 - detail.largeur / 2,
-            rect.top + 17,
-            0.55 * alpha,
-          );
-        }
-      }
+      _poserNom(
+        c,
+        a,
+        _etiquette(v.ville.nom, 15, 700, _ivoire),
+        _etiquette(v.ville.etiquette, 12, 500, _ivoire),
+        (1 - _lisse(0.25, 0.7, v.t)) * allumee * v.tp,
+        v.ville.repas.toDouble(),
+        libre,
+        places,
+      );
       // Ouverte, la ville garde son nom en grand, au-dessus d'elle.
       final haut = _lisse(0.35, 1, v.t) * allumee;
       if (haut > 0.02) {

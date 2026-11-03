@@ -113,4 +113,23 @@ void main() {
     expect(f.depuis, 'Première fois en mars 2022');
     expect(f.retour, isTrue);
   });
+
+  test('un pays de plusieurs villes les regroupe ; une ville seule dans son '
+      'pays reste à part', () {
+    final ciel = cielConstellation([
+      _lieu('Liège', 50.64, 5.57, DateTime(2020, 1)),
+      _lieu('Namur', 50.47, 4.87, DateTime(2021, 1)),
+      _lieu('Namur', 50.46, 4.86, DateTime(2021, 2)),
+      _lieu('Paris', 48.86, 2.35, DateTime(2022, 1)),
+    ]);
+    final pays = paysDuCiel(ciel, (x, y) => x > 2.5 ? 'Belgique' : 'France');
+
+    expect(pays, hasLength(1));
+    expect(pays.single.nom, 'Belgique');
+    expect(pays.single.etiquette, '3 tables');
+    expect(
+      [for (final i in pays.single.villes) ciel.villes[i].nom],
+      ['Liège', 'Namur'],
+    );
+  });
 }
