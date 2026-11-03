@@ -36,6 +36,11 @@ flutter:
   # Bricolage Grotesque (licence libre OFL, voir assets/polices/OFL.txt) :
   # les noms et les titres de l'Explorer, serrés comme dans la maquette
   # de Martin. Police variable : graisse et largeur se règlent à l'usage.
+  # Le fond de la Constellation : terres, frontières et grandes routes du
+  # monde (Natural Earth, domaine public), simplifiées.
+  assets:
+    - assets/carte/
+
   fonts:
     - family: BricolageGrotesque
       fonts:

@@ -131,8 +131,9 @@ LieuCarte _lieu(
 
 Future<_FauxCarteService> _ouvrir(
   WidgetTester tester,
-  List<LieuCarte> lieux,
-) async {
+  List<LieuCarte> lieux, {
+  ValueChanged<bool>? onImmersion,
+}) async {
   tester.view.physicalSize = const Size(1000, 2200);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -146,6 +147,7 @@ Future<_FauxCarteService> _ouvrir(
         abonnementService: _FauxAbonnementService(),
         rechercheEndroit: _FausseRechercheEndroit(),
         afficherCarte: false,
+        onImmersion: onImmersion,
       ),
     ),
   );
@@ -397,9 +399,9 @@ void main() {
     expect(service.envies.single.envie, isTrue);
   });
 
-  testWidgets('« Ma carte » : ma Constellation, et mes adresses par ville', (
-    tester,
-  ) async {
+  testWidgets('la Constellation, en plein écran : son ciel, son titre, et '
+      'rien d\'autre que le bouton pour en sortir', (tester) async {
+    final immersions = <bool>[];
     final service = await _ouvrir(tester, [
       LieuCarte(
         restaurantId: 'r1',
@@ -423,24 +425,25 @@ void main() {
         maPremiereVisite: DateTime(2025, 7, 1),
         maDerniereVisite: DateTime(2026, 7, 1),
       ),
-    ]);
+    ], onImmersion: immersions.add);
 
     await tester.tap(find.bySemanticsLabel('Constellation'));
     await tester.pumpAndSettle();
     expect(service.modes.last, ModeExplorer.maCarte);
-    expect(find.text('Votre histoire, table par table.'), findsOneWidget);
+    expect(immersions, [true]);
+    expect(find.byType(TablCielConstellation), findsOneWidget);
+    expect(find.text('2 tables · 8 repas · 2 villes'), findsOneWidget);
+    // Plus de recherche, de filtres ni de vue à choisir.
+    expect(find.byType(TablBarreExplorer), findsNothing);
     // Retenue pour la prochaine ouverture.
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('explorer_mode'), 'maCarte');
 
-    // Par ville, la plus fréquentée d'abord ; pas de tri à choisir.
-    expect(find.text('Ils y retournent'), findsNothing);
-    expect(find.text('1 table · 6 repas'), findsOneWidget);
-    expect(find.text('6 repas · août 2026'), findsOneWidget);
-    expect(
-      tester.getTopLeft(find.text('Liège').first).dy,
-      lessThan(tester.getTopLeft(find.text('Milan').first).dy),
-    );
+    await tester.tap(find.byType(TablBoutonConstellation));
+    await tester.pumpAndSettle();
+    expect(immersions, [true, false]);
+    expect(find.byType(TablCielConstellation), findsNothing);
+    expect(find.byType(TablBarreExplorer), findsOneWidget);
   });
 
   testWidgets('« Où cherchez-vous ? » : les villes du cercle', (tester) async {

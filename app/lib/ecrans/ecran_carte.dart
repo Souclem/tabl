@@ -11,6 +11,7 @@ import '../config_mapbox.dart';
 
 import 'feuille_demander_avis.dart';
 import 'feuille_filtres_explorer.dart';
+import 'vue_constellation.dart';
 import 'feuille_restaurant.dart';
 import 'recherche_explorer.dart';
 
@@ -41,6 +42,7 @@ class EcranCarte extends StatefulWidget {
     this.filtresInitiaux = FiltresCarte.aucun,
     this.estOnglet = true,
     this.afficherCarte = true,
+    this.onImmersion,
   });
 
   final CarteService carteService;
@@ -79,6 +81,10 @@ class EcranCarte extends StatefulWidget {
   /// indisponible hors d'un vrai appareil — le reste de l'écran reste
   /// testable.
   final bool afficherCarte;
+
+  /// `true` quand la Constellation s'ouvre en plein écran, `false` quand on
+  /// en sort : l'écran qui l'accueille cache alors ce qui l'entoure.
+  final ValueChanged<bool>? onImmersion;
 
   @override
   State<EcranCarte> createState() => _EcranCarteState();
@@ -174,6 +180,7 @@ class _EcranCarteState extends State<EcranCarte> {
         // Les envies ne sont plus un mode : « Le cercle ».
         if (valeur == ModeExplorer.maCarte.name && mounted) {
           setState(() => _mode = ModeExplorer.maCarte);
+          widget.onImmersion?.call(true);
         }
       } catch (_) {
         // Pas de préférence lisible : « Le cercle ».
@@ -189,6 +196,7 @@ class _EcranCarteState extends State<EcranCarte> {
       _selection = null;
       _lieux = const [];
     });
+    widget.onImmersion?.call(mode == ModeExplorer.maCarte);
     _charger();
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -879,16 +887,30 @@ class _EcranCarteState extends State<EcranCarte> {
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) => _mesurerEnTete());
     final nombre = _lieuxVisibles.length;
+    // La Constellation, en plein écran : rien d'autre que le ciel. La
+    // carte reste dessous, pour ne pas la recréer en revenant.
+    final constellation = _mode == ModeExplorer.maCarte;
     final ecran = Scaffold(
       backgroundColor: _palette.fond,
       body: Stack(
         children: [
           Positioned.fill(child: _carte()),
-          if (_enGrille) Positioned.fill(child: _grille()),
-          Positioned(left: 0, right: 0, top: 0, child: _enTete(nombre)),
-          if (!_enGrille) ..._surLaCarte(),
+          if (constellation)
+            Positioned.fill(
+              child: VueConstellation(
+                lieux: _lieux,
+                chargement: _chargement || !_chargeUneFois,
+                anime: widget.afficherCarte,
+                onQuitter: () => _choisirMode(ModeExplorer.cercle),
+                onOuvrirLieu: _ouvrirFiche,
+              ),
+            ),
+          if (_enGrille && !constellation) Positioned.fill(child: _grille()),
+          if (!constellation)
+            Positioned(left: 0, right: 0, top: 0, child: _enTete(nombre)),
+          if (!_enGrille && !constellation) ..._surLaCarte(),
           // Cachée tant que l'aperçu d'un lieu est ouvert.
-          if (_selection == null)
+          if (_selection == null && !constellation)
             Positioned(
               left: 12,
               right: 12,
@@ -1073,9 +1095,8 @@ class _EcranCarteState extends State<EcranCarte> {
       geojsonLieux: constellation
           ? TablCarteMapbox.geojsonVide
           : geojsonLieux(_lieux, cleChoisie: _selection?.cle),
-      geojsonConstellation: constellation
-          ? geojsonConstellation(_lieux, cleChoisie: _selection?.cle)
-          : TablCarteMapbox.geojsonVide,
+      // La Constellation se dessine dans son propre ciel (VueConstellation).
+      geojsonConstellation: TablCarteMapbox.geojsonVide,
       // Belgique, avant de connaître la position.
       latitudeInitiale: 50.5,
       longitudeInitiale: 4.6,

@@ -79,6 +79,9 @@ class EcranPrincipal extends StatefulWidget {
 class _EcranPrincipalState extends State<EcranPrincipal> {
   TablOnglet _onglet = TablOnglet.feed;
 
+  /// La Constellation est ouverte en plein écran : la barre s'efface.
+  bool _immersion = false;
+
   /// Change à chaque moment publié : le Feed repart de zéro et le montre.
   int _versionFeed = 0;
 
@@ -250,13 +253,22 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                       )
                     : const SizedBox.shrink(),
                 _ongletsConstruits.contains(TablOnglet.carte)
-                    ? EcranCarte(
-                        carteService: _carteService,
-                        positionService: _positionService,
-                        tableService: _tableService,
-                        abonnementService: widget.abonnementService,
-                        souvenirService: widget.souvenirService,
-                        avisService: _avisService,
+                    // Hors de l'onglet, le ciel de la Constellation s'arrête.
+                    ? TickerMode(
+                        enabled: _onglet == TablOnglet.carte,
+                        child: EcranCarte(
+                          carteService: _carteService,
+                          positionService: _positionService,
+                          tableService: _tableService,
+                          abonnementService: widget.abonnementService,
+                          souvenirService: widget.souvenirService,
+                          avisService: _avisService,
+                          onImmersion: (immersion) {
+                            if (immersion != _immersion) {
+                              setState(() => _immersion = immersion);
+                            }
+                          },
+                        ),
                       )
                     : const SizedBox.shrink(),
                 EcranProfil(
@@ -279,11 +291,28 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: TablBarreNavigation(
-              ongletActif: _onglet,
-              onSelection: _selectionnerOnglet,
-              onPublier: _publier,
-              compacte: _barreCompacte,
+            child: Builder(
+              builder: (_) {
+                final cachee = _immersion && _onglet == TablOnglet.carte;
+                return IgnorePointer(
+                  ignoring: cachee,
+                  child: AnimatedSlide(
+                    offset: cachee ? const Offset(0, 1.2) : Offset.zero,
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: cachee ? 0 : 1,
+                      duration: const Duration(milliseconds: 240),
+                      child: TablBarreNavigation(
+                        ongletActif: _onglet,
+                        onSelection: _selectionnerOnglet,
+                        onPublier: _publier,
+                        compacte: _barreCompacte,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
