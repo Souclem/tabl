@@ -62,4 +62,18 @@ cd app && flutter test         # tests
 
 - Noms de classes, variables et commentaires **en français**.
 - Les secrets (clés API, URL Supabase) ne sont jamais commités — voir `.gitignore`.
-- Le SDK Flutter est installé hors OneDrive, dans `C:\Users\lonne\dev\flutter`.
+- SDK Flutter : sur le Mac, `~/development/flutter` ; sur le PC Windows, hors
+  OneDrive, dans `C:\Users\lonne\dev\flutter`.
+
+## Règles et décisions
+
+Les règles nées de bugs réels, et les gestes réservés au propriétaire du
+projet (base de prod, déploiements, builds TestFlight), sont obligatoires :
+
+@docs/regles.md
+
+Avant de toucher une fonctionnalité, lire sa section dans
+`docs/decisions.md` (décisions produit, et ce qui attend une décision).
+
+Les agents automatiques (Paperclip…) passent par le garde-fou
+`.claude/hooks/garde_fou_agents.py`, qui bloque les gestes réservés.
