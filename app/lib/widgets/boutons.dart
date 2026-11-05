@@ -20,6 +20,7 @@ class TablBouton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final actif = onPresse != null && !enCours;
 
     return SizedBox(
@@ -28,22 +29,22 @@ class TablBouton extends StatelessWidget {
       child: FilledButton(
         onPressed: actif ? onPresse : null,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.primaire,
-          foregroundColor: TablTokens.texteSurPrimaire,
-          disabledBackgroundColor: TablTokens.primaire.withValues(alpha: 0.4),
-          disabledForegroundColor: TablTokens.texteSurPrimaire,
+          backgroundColor: c.primaire,
+          foregroundColor: c.texteSurPrimaire,
+          disabledBackgroundColor: c.primaire.withValues(alpha: 0.4),
+          disabledForegroundColor: c.texteSurPrimaire,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
           ),
           textStyle: TablTokens.libelleBouton,
         ),
         child: enCours
-            ? const SizedBox(
+            ? SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: TablTokens.texteSurPrimaire,
+                  color: c.texteSurPrimaire,
                 ),
               )
             : Text(libelle),
@@ -156,11 +157,7 @@ class TablBoutonSocial extends StatelessWidget {
 
 /// Bouton discret, sans fond : liens de bas de page, actions secondaires.
 class TablBoutonTexte extends StatelessWidget {
-  const TablBoutonTexte({
-    super.key,
-    required this.libelle,
-    this.onPresse,
-  });
+  const TablBoutonTexte({super.key, required this.libelle, this.onPresse});
 
   final String libelle;
   final VoidCallback? onPresse;
@@ -201,6 +198,7 @@ class TablPetitBouton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       enabled: onPresse != null,
@@ -216,16 +214,16 @@ class TablPetitBouton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: plein ? TablTokens.primaire : Colors.transparent,
+              color: plein ? c.primaire : Colors.transparent,
               borderRadius: BorderRadius.circular(TablTokens.arrondiS + 2),
-              border: plein ? null : Border.all(color: TablTokens.bordure),
+              border: plein ? null : Border.all(color: c.bordure),
             ),
             child: Text(
               libelle,
-              style: TablTokens.legende.copyWith(
+              style: c.legende.copyWith(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: plein ? TablTokens.texteSurPrimaire : TablTokens.texte,
+                color: plein ? c.texteSurPrimaire : c.texte,
               ),
             ),
           ),

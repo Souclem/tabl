@@ -221,7 +221,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: TablCouleurs.of(context).fond,
       // La barre flotte au-dessus du contenu (Stack), plutôt que
       // `bottomNavigationBar` qui la coincerait pleine largeur contre le
       // bord — voir la note de classe de TablBarreNavigation.

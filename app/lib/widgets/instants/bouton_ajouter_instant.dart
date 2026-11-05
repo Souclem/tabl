@@ -16,7 +16,7 @@ class TablBoutonAjouterInstant extends StatelessWidget {
     return TextButton.icon(
       onPressed: onPresse,
       style: TextButton.styleFrom(
-        foregroundColor: TablTokens.primaire,
+        foregroundColor: TablCouleurs.of(context).primaire,
         padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceXs),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,

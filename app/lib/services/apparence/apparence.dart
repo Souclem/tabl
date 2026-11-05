@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Clair ou sombre. Pour l'instant, seul l'Explorer suit ce réglage : le
-/// reste de l'app reste sombre.
+/// Clair ou sombre : le thème de l'app suit ce réglage (voir `TablTheme`),
+/// sauf la Constellation, toujours de nuit.
 enum Apparence {
   automatique('Automatique', 'Comme votre téléphone'),
   clair('Clair', 'Fond ivoire'),

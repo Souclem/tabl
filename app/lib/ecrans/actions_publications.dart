@@ -195,8 +195,9 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   void optionsPublication(SouvenirFeed souvenir) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       builder: (contexteFeuille) {
+        final erreur = TablCouleurs.of(contexteFeuille).erreur;
         void choisir(Future<void> Function(SouvenirFeed) action) {
           Navigator.of(contexteFeuille).pop();
           action(souvenir);
@@ -220,14 +221,8 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
                 onTap: () => choisir(modifierAudience),
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: TablTokens.erreur,
-                ),
-                title: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: TablTokens.erreur),
-                ),
+                leading: Icon(Icons.delete_outline_rounded, color: erreur),
+                title: Text('Supprimer', style: TextStyle(color: erreur)),
                 onTap: () => choisir(supprimerPublication),
               ),
             ],

@@ -843,7 +843,9 @@ class _EcranCarteState extends State<EcranCarte> {
     // c'est un ciel d'étoiles.
     return TablNuitForcee(
       active: _mode == ModeExplorer.maCarte,
-      child: barreEtat,
+      // L'Explorer a sa propre palette (PaletteExplorer) : il garde le
+      // thème sombre de l'app, que le reste de l'app suive le clair ou non.
+      child: Theme(data: TablTheme.sombre(), child: barreEtat),
     );
   }
 

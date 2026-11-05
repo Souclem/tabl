@@ -26,33 +26,30 @@ class TablLigneATableMaintenant extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final initiale = auteurPseudo.isEmpty ? '?' : auteurPseudo[0].toUpperCase();
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
         radius: 18,
-        backgroundColor: TablTokens.primaire.withValues(
-          alpha: nonVu ? 0.85 : 0.4,
-        ),
+        backgroundColor: c.primaire.withValues(alpha: nonVu ? 0.85 : 0.4),
         child: Text(
           initiale,
-          style: TablTokens.legende.copyWith(
-            color: TablTokens.texteSurPrimaire,
+          style: c.legende.copyWith(
+            color: c.texteSurPrimaire,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
       title: Text(
         auteurPseudo,
-        style: TablTokens.corps.copyWith(
+        style: c.corps.copyWith(
           fontWeight: nonVu ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
       subtitle: Text(
         '$restaurantNom · $libelleInstants',
-        style: TablTokens.legende.copyWith(
-          color: nonVu ? TablTokens.primaire : TablTokens.texteDoux,
-        ),
+        style: c.legende.copyWith(color: nonVu ? c.primaire : c.texteDoux),
       ),
     );
   }

@@ -22,6 +22,8 @@ class TablSignalInstants extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
+    final couleur = nonVus > 0 ? c.primaire : c.texteDoux;
     final libelle = nonVus > 0
         ? (nonVus > 1 ? '$nonVus nouveaux Instants' : '$nonVus nouvel Instant')
         : '$total Instant${total > 1 ? 's' : ''}';
@@ -34,22 +36,14 @@ class TablSignalInstants extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.play_circle_outline_rounded,
-              size: 15,
-              color: nonVus > 0
-                  ? TablTokens.primaire
-                  : TablTokens.texteDoux,
-            ),
+            Icon(Icons.play_circle_outline_rounded, size: 15, color: couleur),
             const SizedBox(width: 6),
             Text(
               libelle,
               style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: nonVus > 0 ? FontWeight.w600 : FontWeight.w500,
-                color: nonVus > 0
-                    ? TablTokens.primaire
-                    : TablTokens.texteDoux,
+                color: couleur,
               ),
             ),
           ],

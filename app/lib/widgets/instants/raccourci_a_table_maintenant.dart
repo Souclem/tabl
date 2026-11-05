@@ -18,6 +18,7 @@ class TablRaccourciATableMaintenant extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL,
@@ -26,7 +27,7 @@ class TablRaccourciATableMaintenant extends StatelessWidget {
         TablTokens.espaceS,
       ),
       child: Material(
-        color: TablTokens.texte.withValues(alpha: 0.03),
+        color: c.texte.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
         child: InkWell(
           onTap: onPresse,
@@ -38,25 +39,19 @@ class TablRaccourciATableMaintenant extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-              border: Border.all(
-                color: TablTokens.texte.withValues(alpha: 0.1),
-              ),
+              border: Border.all(color: c.texte.withValues(alpha: 0.1)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.restaurant_rounded,
-                  size: 15,
-                  color: TablTokens.primaire,
-                ),
+                Icon(Icons.restaurant_rounded, size: 15, color: c.primaire),
                 const SizedBox(width: 7),
                 Text(
                   'À table maintenant · $nombre',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: TablTokens.texte,
+                    color: c.texte,
                   ),
                 ),
               ],
