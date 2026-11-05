@@ -1,0 +1,18 @@
+{
+  "name": "tabl-garde-fous",
+  "version": "1.0.0",
+  "description": "Entrée « Garde-fous » dans la barre latérale de Paperclip : ouvre l'app Garde-fous Tabl.",
+  "type": "module",
+  "private": true,
+  "paperclipPlugin": {
+    "manifest": "./dist/manifest.js",
+    "worker": "./dist/worker.js",
+    "ui": "./dist/ui/"
+  },
+  "dependencies": {
+    "@paperclipai/plugin-sdk": "2026.1023.0"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}
