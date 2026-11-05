@@ -41,8 +41,11 @@ lancer :
 - Push sur `main`.
 
 Pour les agents automatiques (Paperclip…), ces gestes sont bloqués par
-`.claude/hooks/garde_fou_agents.py`. Ne pas chercher à le contourner : écrire
-dans la tâche ce qui reste à lancer.
+`.claude/hooks/garde_fou_agents.py`. Le propriétaire coche ou décoche chaque
+garde-fou dans l'app « Garde-fous Tabl » (source : `scripts/garde_fous_app/`,
+réglages dans `~/.config/tabl/garde_fous.json`). Un agent ne touche jamais à
+ces réglages et ne cherche pas à contourner un refus : il écrit dans sa tâche
+ce qui reste à lancer.
 
 ## Base de données (Supabase)
 
