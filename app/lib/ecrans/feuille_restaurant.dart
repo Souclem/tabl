@@ -1,12 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import '../navigation/transitions.dart';
 import 'actions_publications.dart';
 import 'feuille_demander_avis.dart';
 
 /// Ouvre la fiche d'un restaurant, en page : d'où qu'on vienne (Explorer,
-/// Feed, profil), c'est la même. Voir [FicheRestaurant].
+/// Feed, profil), c'est la même. Voir [FicheRestaurant]. [surLaCarte] :
+/// l'Explorer reste dessiné dessous (la carte Mapbox n'est pas recréée).
 Future<void> ouvrirFeuilleRestaurant(
   BuildContext context, {
   required String nom,
@@ -18,32 +21,39 @@ Future<void> ouvrirFeuilleRestaurant(
   String? restaurantId,
   String? resume,
   String? photoUrl,
+  double? latitude,
+  double? longitude,
   bool estEnvie = false,
+  bool surLaCarte = false,
   Future<String> Function()? entrerDansTabl,
   VoidCallback? onVoirSurLaCarte,
 }) {
+  final fiche = FicheRestaurant(
+    nom: nom,
+    sousTitre: sousTitre,
+    resume: resume,
+    photoUrl: photoUrl,
+    latitude: latitude,
+    longitude: longitude,
+    restaurantId: restaurantId,
+    estEnvie: estEnvie,
+    entrerDansTabl: entrerDansTabl,
+    souvenirService: souvenirService,
+    abonnementService: abonnementService,
+    tableService: tableService,
+    avisService: avisService,
+    onVoirSurLaCarte: onVoirSurLaCarte,
+  );
   return Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => FicheRestaurant(
-        nom: nom,
-        sousTitre: sousTitre,
-        resume: resume,
-        photoUrl: photoUrl,
-        restaurantId: restaurantId,
-        estEnvie: estEnvie,
-        entrerDansTabl: entrerDansTabl,
-        souvenirService: souvenirService,
-        abonnementService: abonnementService,
-        tableService: tableService,
-        avisService: avisService,
-        onVoirSurLaCarte: onVoirSurLaCarte,
-      ),
-    ),
+    surLaCarte
+        ? ouvrirSurLaCarte<void>(fiche)
+        : MaterialPageRoute<void>(builder: (_) => fiche),
   );
 }
 
-/// La fiche d'un restaurant, d'après le prototype : sa photo en grand,
-/// Garder · Proposer · Carte, puis ce que mon cercle en dit — l'avis du
+/// La fiche « Éventail » d'un restaurant : le bandeau nuit (photo, nom,
+/// marque-page), les proches qui y sont allés en éventail, « On y va ? » et
+/// Itinéraire, Demander · Carte, puis ce que mon cercle en dit — l'avis du
 /// cercle sur 5, qui le connaît, qui y retourne, qui l'a découvert le
 /// premier —, mon histoire ici, ce qui ressort, et les moments de mon
 /// cercle, qu'on agrandit sur place comme dans le Feed.
@@ -58,6 +68,8 @@ class FicheRestaurant extends StatefulWidget {
     this.avisService,
     this.resume,
     this.photoUrl,
+    this.latitude,
+    this.longitude,
     this.restaurantId,
     this.estEnvie = false,
     this.entrerDansTabl,
@@ -74,12 +86,17 @@ class FicheRestaurant extends StatefulWidget {
 
   /// Une photo déjà connue, en attendant celles des moments.
   final String? photoUrl;
+
+  /// Où il est, s'on le sait : l'Itinéraire part de là, sinon de son nom et
+  /// de son adresse.
+  final double? latitude;
+  final double? longitude;
   final SouvenirService souvenirService;
 
   /// Pour ouvrir le profil des proches.
   final AbonnementService? abonnementService;
 
-  /// Pour « Proposer » à une Table. `null` : pas de bouton.
+  /// Pour « On y va ? » (proposer à une Table). `null` : pas de bouton.
   final TableService? tableService;
 
   /// Pour « Demander » un avis à ceux qui y sont allés. `null` : pas de
@@ -193,6 +210,31 @@ class _FicheRestaurantState extends State<FicheRestaurant>
     return morceaux.length > 1 ? morceaux.last.trim() : '';
   }
 
+  /// L'adresse de la fiche (« Italien · Rue du Pont 16, Liège » → « Rue du
+  /// Pont 16, Liège »).
+  String get _adresse => widget.sousTitre.split(' · ').last;
+
+  Uri? get _lienItineraire => lienItineraire(
+    latitude: widget.latitude,
+    longitude: widget.longitude,
+    nom: widget.nom,
+    adresse: _adresse,
+    pourApple:
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS,
+  );
+
+  Future<void> _itineraire(Uri lien) async {
+    try {
+      if (await ouvrirItineraire(lien)) return;
+    } catch (e) {
+      debugPrint('FicheRestaurant: itinéraire : $e');
+    }
+    if (mounted) {
+      afficherMessage(context, 'Impossible d\'ouvrir l\'application de plans.');
+    }
+  }
+
   Future<void> _proposer() async {
     final service = widget.tableService;
     if (service == null || _tables.isEmpty) return;
@@ -258,7 +300,8 @@ class _FicheRestaurantState extends State<FicheRestaurant>
     }
   }
 
-  /// La liste de ceux qui le connaissent (ou y retournent).
+  /// La liste de ceux qui le connaissent (ou y retournent), et « Qui y est
+  /// allé » depuis la carte « +N » de l'éventail.
   void _voirProches(String titre, List<ProcheFiche> proches) {
     showModalBottomSheet<void>(
       context: context,
@@ -305,6 +348,33 @@ class _FicheRestaurantState extends State<FicheRestaurant>
     );
   }
 
+  Widget _eventail(List<ProcheFiche> proches, DateTime maintenant) {
+    final e = eventailProches(proches, maintenant);
+    final autres = e.autres;
+    return TablEventail(
+      cartes: [
+        for (final c in e.cartes)
+          CarteEventail(
+            pseudo: c.pseudo,
+            photoUrl: c.photoUrl,
+            fois: c.fois,
+            derniereVisite: c.derniereVisite,
+            ressenti: c.ressenti,
+            onPresse: abonnementService == null
+                ? null
+                : () => ouvrirProfilDe(c.id, c.pseudo),
+          ),
+      ],
+      autres: autres == null
+          ? null
+          : AutresEventail(
+              texte: autres.texte,
+              nombreux: autres.nombreux,
+              onPresse: () => _voirProches('Qui y est allé', proches),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final moments = souvenirs ?? const <SouvenirFeed>[];
@@ -320,6 +390,33 @@ class _FicheRestaurantState extends State<FicheRestaurant>
             : '${r.sansAvis} passages sans avis',
     ].join(' · ');
     final premiere = r.premiereDecouverte;
+    final lien = _lienItineraire;
+    final actions = [
+      if (widget.avisService != null &&
+          _restaurantId != null &&
+          r.connaissent.isNotEmpty)
+        ActionFiche(
+          icone: Icons.chat_bubble_outline_rounded,
+          libelle: 'Demander',
+          onPresse: () => demanderUnAvis(
+            context,
+            avisService: widget.avisService!,
+            restaurantId: _restaurantId!,
+            nom: widget.nom,
+            detail: widget.sousTitre,
+            proches: r.connaissent,
+          ),
+        ),
+      if (widget.onVoirSurLaCarte != null)
+        ActionFiche(
+          icone: Icons.map_outlined,
+          libelle: 'Carte',
+          onPresse: () {
+            Navigator.of(context).pop();
+            widget.onVoirSurLaCarte!();
+          },
+        ),
+    ];
     return Scaffold(
       backgroundColor: TablTokens.fond,
       body: ListView(
@@ -335,6 +432,8 @@ class _FicheRestaurantState extends State<FicheRestaurant>
                 ? 'Votre adresse · ${r.mesFois} fois'
                 : null,
             onRetour: () => Navigator.of(context).pop(),
+            onMarquePage: _basculerEnvieRestaurant,
+            gardee: _estEnvie,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -343,48 +442,21 @@ class _FicheRestaurantState extends State<FicheRestaurant>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TablActionsFiche(
-                  actions: [
-                    ActionFiche(
-                      icone: _estEnvie
-                          ? Icons.bookmark_rounded
-                          : Icons.bookmark_border_rounded,
-                      libelle: _estEnvie ? 'Gardée' : 'Garder',
-                      active: _estEnvie,
-                      onPresse: _basculerEnvieRestaurant,
-                    ),
-                    if (widget.tableService != null && _tables.isNotEmpty)
-                      ActionFiche(
-                        icone: Icons.person_add_alt_1_outlined,
-                        libelle: 'Proposer',
-                        onPresse: _proposer,
-                      ),
-                    if (widget.avisService != null &&
-                        _restaurantId != null &&
-                        r.connaissent.isNotEmpty)
-                      ActionFiche(
-                        icone: Icons.chat_bubble_outline_rounded,
-                        libelle: 'Demander',
-                        onPresse: () => demanderUnAvis(
-                          context,
-                          avisService: widget.avisService!,
-                          restaurantId: _restaurantId!,
-                          nom: widget.nom,
-                          detail: widget.sousTitre,
-                          proches: r.connaissent,
-                        ),
-                      ),
-                    if (widget.onVoirSurLaCarte != null)
-                      ActionFiche(
-                        icone: Icons.map_outlined,
-                        libelle: 'Carte',
-                        onPresse: () {
-                          Navigator.of(context).pop();
-                          widget.onVoirSurLaCarte!();
-                        },
-                      ),
-                  ],
+                if (!_chargement && !_erreur && r.connaissent.isNotEmpty) ...[
+                  const SizedBox(height: TablTokens.espaceS),
+                  _eventail(r.connaissent, maintenant),
+                  const SizedBox(height: TablTokens.espaceM),
+                ],
+                TablBarreOnYVa(
+                  onYVa: widget.tableService != null && _tables.isNotEmpty
+                      ? _proposer
+                      : null,
+                  onItineraire: lien == null ? null : () => _itineraire(lien),
                 ),
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  TablActionsFiche(actions: actions),
+                ],
                 const SizedBox(height: TablTokens.espaceM),
                 if (_erreur)
                   const _Message(texte: messageErreurGenerique)
