@@ -35,6 +35,7 @@ class TablLigneProposition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       label: '$restaurantNom $ville, proposé par $proposePar.',
       child: InkWell(
@@ -44,11 +45,11 @@ class TablLigneProposition extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(restaurantNom, style: TablTokens.corps),
+              Text(restaurantNom, style: c.corps),
               const SizedBox(height: 2),
               Text(
                 '$ville · Proposé par $proposePar',
-                style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                style: c.legende.copyWith(color: c.texteDoux),
               ),
               const SizedBox(height: TablTokens.espaceS),
               Row(
@@ -56,17 +57,19 @@ class TablLigneProposition extends StatelessWidget {
                   Expanded(
                     child: Text(
                       nombreGo == 0 ? etatTexte : '$etatTexte · $nombreGo GO',
-                      style: TablTokens.legende,
+                      style: c.legende,
                     ),
                   ),
                   if (active) ...[
                     _boutonReponse(
+                      context,
                       libelle: 'GO',
                       selectionne: monInteret == true,
                       onTap: onGo,
                     ),
                     const SizedBox(width: TablTokens.espaceXs),
                     _boutonReponse(
+                      context,
                       libelle: 'Je passe',
                       selectionne: monInteret == false,
                       onTap: onJePasse,
@@ -81,17 +84,19 @@ class TablLigneProposition extends StatelessWidget {
     );
   }
 
-  Widget _boutonReponse({
+  Widget _boutonReponse(
+    BuildContext context, {
     required String libelle,
     required bool selectionne,
     required VoidCallback? onTap,
   }) {
+    final c = TablCouleurs.of(context);
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        backgroundColor: selectionne ? TablTokens.primaire : null,
-        foregroundColor: selectionne ? TablTokens.texteSurPrimaire : TablTokens.texte,
-        side: BorderSide(color: selectionne ? TablTokens.primaire : TablTokens.bordure),
+        backgroundColor: selectionne ? c.primaire : null,
+        foregroundColor: selectionne ? c.texteSurPrimaire : c.texte,
+        side: BorderSide(color: selectionne ? c.primaire : c.bordure),
         padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceS),
       ),
       child: Text(libelle),

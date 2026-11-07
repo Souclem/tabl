@@ -108,8 +108,9 @@ class _EcranTablesState extends State<EcranTables> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -133,16 +134,16 @@ class _EcranTablesState extends State<EcranTables> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Vos Tables', style: TablTokens.titre),
+                        Text('Vos Tables', style: c.titre),
                         Text(
                           'Vos restaurants, entre vous.',
-                          style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                          style: c.legende.copyWith(color: c.texteDoux),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.add_circle_outline, color: TablTokens.primaire),
+                    icon: Icon(Icons.add_circle_outline, color: c.primaire),
                     onPressed: _creerTable,
                   ),
                 ],
@@ -156,17 +157,16 @@ class _EcranTablesState extends State<EcranTables> {
   }
 
   Widget _corps() {
+    final c = TablCouleurs.of(context);
     if (_chargement) {
-      return const Center(
-        child: CircularProgressIndicator(color: TablTokens.primaire),
-      );
+      return Center(child: CircularProgressIndicator(color: c.primaire));
     }
     if (_erreur) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Impossible de charger vos Tables.', style: TablTokens.corps),
+            Text('Impossible de charger vos Tables.', style: c.corps),
             const SizedBox(height: TablTokens.espaceM),
             OutlinedButton(onPressed: _charger, child: const Text('Réessayer')),
           ],
@@ -180,10 +180,10 @@ class _EcranTablesState extends State<EcranTables> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'Créez votre première Table pour garder une trace de vos '
                 'restaurants avec vos proches.',
-                style: TablTokens.corps,
+                style: c.corps,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: TablTokens.espaceM),
@@ -204,7 +204,7 @@ class _EcranTablesState extends State<EcranTables> {
       children: [
         if (_invitations.isNotEmpty) ...[
           const SizedBox(height: TablTokens.espaceM),
-          Text('Invitations', style: TablTokens.sousTitre),
+          Text('Invitations', style: c.sousTitre),
           for (final invitation in _invitations)
             _LigneInvitation(
               invitation: invitation,
@@ -244,6 +244,7 @@ class _LigneInvitation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
       child: Row(
@@ -253,7 +254,7 @@ class _LigneInvitation extends StatelessWidget {
               invitation.emoji == null
                   ? invitation.nom
                   : '${invitation.nom} ${invitation.emoji}',
-              style: TablTokens.corps,
+              style: c.corps,
             ),
           ),
           TextButton(onPressed: onRefuser, child: const Text('Refuser')),
@@ -261,8 +262,8 @@ class _LigneInvitation extends StatelessWidget {
           FilledButton(
             onPressed: onAccepter,
             style: FilledButton.styleFrom(
-              backgroundColor: TablTokens.primaire,
-              foregroundColor: TablTokens.texteSurPrimaire,
+              backgroundColor: c.primaire,
+              foregroundColor: c.texteSurPrimaire,
             ),
             child: const Text('Accepter'),
           ),

@@ -96,8 +96,9 @@ class _EcranAttenteConfirmationState extends State<EcranAttenteConfirmation>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Stack(
           children: [
@@ -111,21 +112,21 @@ class _EcranAttenteConfirmationState extends State<EcranAttenteConfirmation>
                       width: 96,
                       height: 96,
                       alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: TablTokens.surface,
+                      decoration: BoxDecoration(
+                        color: c.surface,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.mail_outline_rounded,
                         size: 44,
-                        color: TablTokens.primaire,
+                        color: c.primaire,
                       ),
                     ),
                     const SizedBox(height: TablTokens.espaceXl),
                     Text(
                       'Vérifie ta boîte mail',
                       textAlign: TextAlign.center,
-                      style: TablTokens.grandTitre,
+                      style: c.grandTitre,
                     ),
                     const SizedBox(height: TablTokens.espaceM),
                     Text(
@@ -133,17 +134,15 @@ class _EcranAttenteConfirmationState extends State<EcranAttenteConfirmation>
                       '${widget.email}. Cette page se met à jour toute '
                       'seule dès que tu l\'as confirmé.',
                       textAlign: TextAlign.center,
-                      style: TablTokens.corps.copyWith(
-                        color: TablTokens.texteDoux,
-                      ),
+                      style: c.corps.copyWith(color: c.texteDoux),
                     ),
                     const SizedBox(height: TablTokens.espaceXl),
-                    const SizedBox(
+                    SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: TablTokens.primaire,
+                        color: c.primaire,
                       ),
                     ),
                     const SizedBox(height: TablTokens.espaceXl),

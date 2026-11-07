@@ -24,6 +24,7 @@ class TablLigneExperienceHistoire extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceS),
       child: Row(
@@ -34,12 +35,12 @@ class TablLigneExperienceHistoire extends StatelessWidget {
               width: 56,
               height: 56,
               child: photoUrl == null
-                  ? Container(color: TablTokens.surface)
+                  ? Container(color: c.surface)
                   : Image.network(
                       photoUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stack) =>
-                          Container(color: TablTokens.surface),
+                          Container(color: c.surface),
                     ),
             ),
           ),
@@ -53,16 +54,16 @@ class TablLigneExperienceHistoire extends StatelessWidget {
                     Expanded(
                       child: Text(
                         restaurantNom,
-                        style: TablTokens.corps,
+                        style: c.corps,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (emoji != null) Text(emoji!, style: TablTokens.corps),
+                    if (emoji != null) Text(emoji!, style: c.corps),
                   ],
                 ),
                 Text(
                   '$ville · $dateLisible · $auteurPseudo',
-                  style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                  style: c.legende.copyWith(color: c.texteDoux),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

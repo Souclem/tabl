@@ -91,8 +91,9 @@ class _EcranAideState extends State<EcranAide> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 350),
@@ -113,6 +114,7 @@ class _EcranAideState extends State<EcranAide> {
   }
 
   Widget _formulaire() {
+    final c = TablCouleurs.of(context);
     const marge = TablTokens.espaceL - 4;
     return Column(
       key: const ValueKey('formulaire'),
@@ -129,7 +131,7 @@ class _EcranAideState extends State<EcranAide> {
             children: [
               TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
               const SizedBox(width: TablTokens.espaceM),
-              Text('Aide et contact', style: TablTokens.titre),
+              Text('Aide et contact', style: c.titre),
             ],
           ),
         ),
@@ -145,12 +147,12 @@ class _EcranAideState extends State<EcranAide> {
             children: [
               Text(
                 'Un souci, une idée ?',
-                style: TablTokens.titreAffichage.copyWith(fontSize: 28),
+                style: c.titreAffichage.copyWith(fontSize: 28),
               ),
               const SizedBox(height: TablTokens.espaceS),
               Text(
                 'Écris-nous : toute l’équipe lit chaque message.',
-                style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+                style: c.corps.copyWith(color: c.texteDoux),
               ),
               const SizedBox(height: TablTokens.espaceL),
               const TablTitreSection(texte: 'De quoi s’agit-il ?'),
@@ -174,24 +176,20 @@ class _EcranAideState extends State<EcranAide> {
                 maxLines: 10,
                 maxLength: longueurMaxRetour,
                 textCapitalization: TextCapitalization.sentences,
-                style: TablTokens.corps,
-                cursorColor: TablTokens.primaire,
+                style: c.corps,
+                cursorColor: c.primaire,
                 decoration: InputDecoration(
                   hintText:
                       _type?.invite ??
                       'Choisis d’abord de quoi il s’agit, puis raconte-nous.',
                   hintMaxLines: 3,
-                  hintStyle: TablTokens.corps.copyWith(
-                    color: TablTokens.texteDoux,
-                  ),
-                  counterStyle: TablTokens.legende.copyWith(fontSize: 12),
+                  hintStyle: c.corps.copyWith(color: c.texteDoux),
+                  counterStyle: c.legende.copyWith(fontSize: 12),
                   filled: true,
-                  fillColor: TablTokens.surfaceBasse,
+                  fillColor: c.surfaceBasse,
                   contentPadding: const EdgeInsets.all(TablTokens.espaceM),
-                  enabledBorder: _bord(TablTokens.bordure),
-                  focusedBorder: _bord(
-                    TablTokens.primaire.withValues(alpha: 0.6),
-                  ),
+                  enabledBorder: _bord(c.bordure),
+                  focusedBorder: _bord(c.primaire.withValues(alpha: 0.6)),
                 ),
               ),
               const SizedBox(height: TablTokens.espaceM),
@@ -199,7 +197,7 @@ class _EcranAideState extends State<EcranAide> {
               Text(
                 'Facultatif, $nombreMaxCaptures au plus. Pour un bug, une '
                 'capture vaut souvent mieux qu’un long texte.',
-                style: TablTokens.legende,
+                style: c.legende,
               ),
               const SizedBox(height: 12),
               TablVignettesCaptures(

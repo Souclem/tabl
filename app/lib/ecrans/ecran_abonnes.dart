@@ -211,9 +211,10 @@ class _EcranAbonnesState extends State<EcranAbonnes>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final enRecherche = _recherche.text.trim().isNotEmpty;
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -232,7 +233,7 @@ class _EcranAbonnesState extends State<EcranAbonnes>
                   const SizedBox(width: TablTokens.espaceS),
                   Text(
                     'Abonnés',
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                    style: c.titreAffichage.copyWith(fontSize: 26),
                   ),
                 ],
               ),
@@ -296,6 +297,7 @@ class _EcranAbonnesState extends State<EcranAbonnes>
   }
 
   List<Widget> _demandesEtRelations() {
+    final c = TablCouleurs.of(context);
     if (!_charge) {
       return [if (_chargementDemandes) const _Sablier()];
     }
@@ -383,10 +385,10 @@ class _EcranAbonnesState extends State<EcranAbonnes>
                 onPressed: _idsEnCours.contains(profil.id)
                     ? null
                     : () => _optionsAbonne(profil),
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_horiz_rounded,
                   size: 20,
-                  color: TablTokens.texteDoux,
+                  color: c.texteDoux,
                 ),
               ),
             ],
@@ -406,27 +408,25 @@ class _EcranAbonnesState extends State<EcranAbonnes>
   /// « Retirer » derrière « ⋯ » : un geste rare, qu'on ne fait pas par
   /// mégarde en parcourant la liste.
   void _optionsAbonne(ProfilPublic profil) {
+    final c = TablCouleurs.of(context);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       showDragHandle: true,
       builder: (contexteFeuille) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
-                Icons.person_remove_outlined,
-                color: TablTokens.erreur,
-              ),
-              title: const Text(
+              leading: Icon(Icons.person_remove_outlined, color: c.erreur),
+              title: Text(
                 'Retirer de mes abonnés',
-                style: TextStyle(color: TablTokens.erreur),
+                style: TextStyle(color: c.erreur),
               ),
               subtitle: Text(
                 '${profil.pseudo} ne verra plus vos moments réservés à '
                 'vos abonnés. Aucune notification ne lui est envoyée.',
-                style: TablTokens.legende,
+                style: c.legende,
               ),
               onTap: () {
                 Navigator.of(contexteFeuille).pop();
@@ -486,6 +486,7 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -495,11 +496,11 @@ class _Section extends StatelessWidget {
       ),
       child: Text(
         titre.toUpperCase(),
-        style: TablTokens.legende.copyWith(
+        style: c.legende.copyWith(
           fontSize: 11,
           letterSpacing: 1.5,
           fontWeight: FontWeight.w700,
-          color: TablTokens.texte.withValues(alpha: 0.45),
+          color: c.texte.withValues(alpha: 0.45),
         ),
       ),
     );
@@ -511,16 +512,14 @@ class _Sablier extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    final c = TablCouleurs.of(context);
+    return Padding(
       padding: EdgeInsets.all(TablTokens.espaceXl),
       child: Center(
         child: SizedBox(
           width: 22,
           height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: TablTokens.primaire,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: c.primaire),
         ),
       ),
     );
@@ -536,6 +535,7 @@ class _Vide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceXl,
@@ -545,19 +545,19 @@ class _Vide extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Icon(icone, size: 34, color: TablTokens.texteDoux),
+          Icon(icone, size: 34, color: c.texteDoux),
           const SizedBox(height: TablTokens.espaceM),
           Text(
             texte,
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 20),
+            style: c.titreAffichage.copyWith(fontSize: 20),
           ),
           if (detail != null) ...[
             const SizedBox(height: TablTokens.espaceS),
             Text(
               detail!,
               textAlign: TextAlign.center,
-              style: TablTokens.legende.copyWith(fontSize: 14),
+              style: c.legende.copyWith(fontSize: 14),
             ),
           ],
         ],

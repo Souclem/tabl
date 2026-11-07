@@ -34,8 +34,18 @@ class TablCalendrierJours extends StatelessWidget {
   final VoidCallback onMoisSuivant;
 
   static const _moisNoms = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre',
   ];
   static const _joursEntete = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -44,6 +54,7 @@ class TablCalendrierJours extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final premierJourMois = DateTime(mois.year, mois.month, 1);
     final nombreJours = DateTime(mois.year, mois.month + 1, 0).day;
     // 1 (lundi) à 7 (dimanche) — décalage pour placer le 1er du mois à
@@ -57,18 +68,18 @@ class TablCalendrierJours extends StatelessWidget {
           children: [
             IconButton(
               onPressed: onMoisPrecedent,
-              icon: const Icon(Icons.chevron_left, color: TablTokens.texte),
+              icon: Icon(Icons.chevron_left, color: c.texte),
             ),
             Expanded(
               child: Text(
                 '${_moisNoms[mois.month - 1]} ${mois.year}',
-                style: TablTokens.sousTitre,
+                style: c.sousTitre,
                 textAlign: TextAlign.center,
               ),
             ),
             IconButton(
               onPressed: onMoisSuivant,
-              icon: const Icon(Icons.chevron_right, color: TablTokens.texte),
+              icon: Icon(Icons.chevron_right, color: c.texte),
             ),
           ],
         ),
@@ -77,10 +88,7 @@ class TablCalendrierJours extends StatelessWidget {
             for (final j in _joursEntete)
               Expanded(
                 child: Center(
-                  child: Text(
-                    j,
-                    style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
-                  ),
+                  child: Text(j, style: c.legende.copyWith(color: c.texteDoux)),
                 ),
               ),
           ],
@@ -89,12 +97,16 @@ class TablCalendrierJours extends StatelessWidget {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+          ),
           itemCount: decalage + nombreJours,
           itemBuilder: (context, index) {
             if (index < decalage) return const SizedBox.shrink();
             final jour = DateTime(mois.year, mois.month, index - decalage + 1);
-            final selectionne = joursSelectionnes.any((d) => _memeJour(d, jour));
+            final selectionne = joursSelectionnes.any(
+              (d) => _memeJour(d, jour),
+            );
             final desactive = joursDesactives.any((d) => _memeJour(d, jour));
             return _JourCase(
               jour: jour.day,
@@ -124,6 +136,7 @@ class _JourCase extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       selected: selectionne,
@@ -138,16 +151,18 @@ class _JourCase extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: selectionne ? TablTokens.primaire.withValues(alpha: 0.18) : null,
+                color: selectionne ? c.primaire.withValues(alpha: 0.18) : null,
                 border: selectionne
-                    ? Border.all(color: TablTokens.primaire, width: 1.5)
+                    ? Border.all(color: c.primaire, width: 1.5)
                     : null,
               ),
               child: Center(
                 child: Text(
                   '$jour',
-                  style: TablTokens.corps.copyWith(
-                    color: desactive ? TablTokens.texteDoux.withValues(alpha: 0.5) : TablTokens.texte,
+                  style: c.corps.copyWith(
+                    color: desactive
+                        ? c.texteDoux.withValues(alpha: 0.5)
+                        : c.texte,
                   ),
                 ),
               ),
