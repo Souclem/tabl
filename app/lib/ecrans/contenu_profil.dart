@@ -143,6 +143,7 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
     final annee = annees.contains(anneeBilan) ? anneeBilan : null;
     final bilan = bilanDuProfil(tous, annee: annee, prenom: prenomProfil);
     final titres = bilan.titres;
+    final c = TablCouleurs.of(context);
     var rang = 0;
     // Chaque section arrive après la précédente ; une autre période les
     // fait toutes revenir.
@@ -181,14 +182,14 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
                 children: [
                   Text(
                     bilan.titre,
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 36),
+                    style: c.titreAffichage.copyWith(fontSize: 36),
                   ),
                   const SizedBox(height: TablTokens.espaceS),
                   Text(
                     bilan.resume,
-                    style: TablTokens.corps.copyWith(
+                    style: c.corps.copyWith(
                       fontSize: 14,
-                      color: TablTokens.texte.withValues(alpha: 0.75),
+                      color: c.texte.withValues(alpha: 0.75),
                     ),
                   ),
                 ],
@@ -313,7 +314,7 @@ mixin ContenuProfil<T extends StatefulWidget> on ActionsPublications<T> {
                   ],
                 ),
               ),
-            Text(titres.pied, style: TablTokens.legende),
+            Text(titres.pied, style: c.legende),
           ],
         ),
       ),
@@ -383,18 +384,16 @@ class _MessageDiscret extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-        border: Border.all(color: TablTokens.bordure),
+        border: Border.all(color: c.bordure),
       ),
       child: Text(
         texte,
-        style: TablTokens.corps.copyWith(
-          fontSize: 14,
-          color: TablTokens.texteDoux,
-        ),
+        style: c.corps.copyWith(fontSize: 14, color: c.texteDoux),
       ),
     );
   }

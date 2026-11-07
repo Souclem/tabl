@@ -93,7 +93,7 @@ class _EtatPublicationDepliable extends State<TablPublicationDepliable>
       _animation.status == AnimationStatus.completed ||
       _animation.status == AnimationStatus.dismissed;
 
-  Widget get _complet => Column(
+  Widget _complet(TablCouleurs c) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       SizedBox(
@@ -104,7 +104,7 @@ class _EtatPublicationDepliable extends State<TablPublicationDepliable>
             onPressed: widget.onReduire,
             icon: const Icon(Icons.expand_less_rounded, size: 18),
             label: const Text('Réduire'),
-            style: TextButton.styleFrom(foregroundColor: TablTokens.texteDoux),
+            style: TextButton.styleFrom(foregroundColor: c.texteDoux),
           ),
         ),
       ),
@@ -114,19 +114,20 @@ class _EtatPublicationDepliable extends State<TablPublicationDepliable>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     // Au repos : la version affichée, telle quelle.
     if (_auRepos && !(widget.ouvert && _hauteurComplete == null)) {
-      return widget.ouvert ? _complet : widget.compact;
+      return widget.ouvert ? _complet(c) : widget.compact;
     }
     return LayoutBuilder(
       builder: (context, contraintes) => AnimatedBuilder(
         animation: _animation,
-        builder: (context, _) => _enMouvement(contraintes.maxWidth),
+        builder: (context, _) => _enMouvement(contraintes.maxWidth, c),
       ),
     );
   }
 
-  Widget _enMouvement(double largeur) {
+  Widget _enMouvement(double largeur, TablCouleurs c) {
     final t = Curves.easeInOutCubic.transform(_animation.value);
     final hauteurCompacte =
         _hauteurCompacte ??
@@ -170,7 +171,7 @@ class _EtatPublicationDepliable extends State<TablPublicationDepliable>
             children: [
               Opacity(
                 opacity: apparition,
-                child: KeyedSubtree(key: _cleComplet, child: _complet),
+                child: KeyedSubtree(key: _cleComplet, child: _complet(c)),
               ),
               Positioned(
                 left: 0,
@@ -194,13 +195,13 @@ class _EtatPublicationDepliable extends State<TablPublicationDepliable>
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(arrondi),
                   child: widget.photoUrl == null
-                      ? const ColoredBox(color: TablTokens.surface)
+                      ? ColoredBox(color: c.surface)
                       : Image.network(
                           widget.photoUrl!,
                           fit: BoxFit.cover,
                           gaplessPlayback: true,
                           errorBuilder: (_, _, _) =>
-                              const ColoredBox(color: TablTokens.surface),
+                              ColoredBox(color: c.surface),
                         ),
                 ),
               ),

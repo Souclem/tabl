@@ -107,14 +107,14 @@ class _EcranViewerInstantsState extends State<EcranViewerInstants> {
     if (instant == null) return;
 
     if (instant.type == TypeMediaInstant.video) {
-      final controleur = VideoPlayerController.networkUrl(
-        Uri.parse(instant.mediaUrl),
-      )..initialize().then((_) {
-        if (!mounted) return;
-        setState(() {});
-        _controleurVideo?.setLooping(true);
-        _controleurVideo?.play();
-      });
+      final controleur =
+          VideoPlayerController.networkUrl(Uri.parse(instant.mediaUrl))
+            ..initialize().then((_) {
+              if (!mounted) return;
+              setState(() {});
+              _controleurVideo?.setLooping(true);
+              _controleurVideo?.play();
+            });
       _controleurVideo = controleur;
     }
 
@@ -151,23 +151,24 @@ class _EcranViewerInstantsState extends State<EcranViewerInstants> {
   }
 
   Future<void> _supprimer(String instantId) async {
+    final c = TablCouleurs.of(context);
     final confirme = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: TablTokens.erreur),
-              title: const Text(
+              leading: Icon(Icons.delete_outline, color: c.erreur),
+              title: Text(
                 'Supprimer cet Instant',
-                style: TextStyle(color: TablTokens.erreur),
+                style: TextStyle(color: c.erreur),
               ),
               onTap: () => Navigator.of(context).pop(true),
             ),
             ListTile(
-              title: const Text('Annuler', style: TablTokens.corps),
+              title: Text('Annuler', style: c.corps),
               onTap: () => Navigator.of(context).pop(false),
             ),
           ],
@@ -212,11 +213,12 @@ class _EcranViewerInstantsState extends State<EcranViewerInstants> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
       backgroundColor: Colors.black,
       body: switch (_mode) {
-        _Mode.chargement => const Center(
-          child: CircularProgressIndicator(color: TablTokens.primaire),
+        _Mode.chargement => Center(
+          child: CircularProgressIndicator(color: c.primaire),
         ),
         _Mode.indisponible => _Indisponible(
           onFermer: () => Navigator.of(context).pop(),
@@ -245,7 +247,7 @@ class _EcranViewerInstantsState extends State<EcranViewerInstants> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              ColoredBox(color: TablTokens.surface),
+              ColoredBox(color: TablCouleurs.sombre.surface),
               if (instant.type == TypeMediaInstant.photo)
                 Image.network(instant.mediaUrl, fit: BoxFit.cover)
               else if (_controleurVideo?.value.isInitialized ?? false)

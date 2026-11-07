@@ -64,6 +64,7 @@ class _TablApercuPhotosState extends State<TablApercuPhotos> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final photos = widget.photos;
     return Stack(
       fit: StackFit.expand,
@@ -96,7 +97,7 @@ class _TablApercuPhotosState extends State<TablApercuPhotos> {
                   Colors.black.withValues(alpha: 0.38),
                   Colors.transparent,
                   Colors.transparent,
-                  TablTokens.fond,
+                  c.fond,
                 ],
               ),
             ),
@@ -135,18 +136,19 @@ class TablApercuSansPhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: TablTokens.surfaceBasse),
-        CustomPaint(painter: _Quadrillage()),
-        const DecoratedBox(
+        ColoredBox(color: c.surfaceBasse),
+        CustomPaint(painter: _Quadrillage(c.texte)),
+        DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               stops: [0.55, 1],
-              colors: [Colors.transparent, TablTokens.fond],
+              colors: [Colors.transparent, c.fond],
             ),
           ),
         ),
@@ -159,23 +161,18 @@ class TablApercuSansPhoto extends StatelessWidget {
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.surface,
-                  border: Border.all(
-                    color: TablTokens.texte.withValues(alpha: 0.12),
-                  ),
+                  color: c.surface,
+                  border: Border.all(color: c.texte.withValues(alpha: 0.12)),
                 ),
                 child: Icon(
                   actions.firstOrNull?.icone ??
                       Icons.add_photo_alternate_outlined,
-                  color: TablTokens.texte,
+                  color: c.texte,
                 ),
               ),
               if (titre != null) ...[
                 const SizedBox(height: TablTokens.espaceM),
-                Text(
-                  titre!,
-                  style: TablTokens.titreAffichage.copyWith(fontSize: 20),
-                ),
+                Text(titre!, style: c.titreAffichage.copyWith(fontSize: 20)),
               ],
               const SizedBox(height: TablTokens.espaceM),
               Wrap(
@@ -201,10 +198,14 @@ class TablApercuSansPhoto extends StatelessWidget {
 
 /// Un quadrillage discret, comme une carte vue de nuit.
 class _Quadrillage extends CustomPainter {
+  _Quadrillage(this.couleur);
+
+  final Color couleur;
+
   @override
   void paint(Canvas canvas, Size size) {
     final trait = Paint()
-      ..color = TablTokens.texte.withValues(alpha: 0.05)
+      ..color = couleur.withValues(alpha: 0.05)
       ..strokeWidth = 1;
     const pas = 36.0;
     for (var x = pas / 2; x < size.width; x += pas) {
@@ -216,7 +217,7 @@ class _Quadrillage extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_Quadrillage ancien) => false;
+  bool shouldRepaint(_Quadrillage ancien) => ancien.couleur != couleur;
 }
 
 /// Pilule en verre dépoli posée sur une photo ou une carte
@@ -237,14 +238,15 @@ class TablPiluleVerre extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Material(
-          color: TablTokens.fond.withValues(alpha: 0.45),
+          color: c.fond.withValues(alpha: 0.45),
           shape: StadiumBorder(
-            side: BorderSide(color: TablTokens.texte.withValues(alpha: 0.14)),
+            side: BorderSide(color: c.texte.withValues(alpha: 0.14)),
           ),
           child: InkWell(
             onTap: onPresse,
@@ -253,14 +255,11 @@ class TablPiluleVerre extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icone, size: 16, color: TablTokens.texte),
+                  Icon(icone, size: 16, color: c.texte),
                   const SizedBox(width: 6),
                   Text(
                     libelle,
-                    style: TablTokens.corps.copyWith(
-                      fontSize: 13,
-                      color: TablTokens.texte,
-                    ),
+                    style: c.corps.copyWith(fontSize: 13, color: c.texte),
                   ),
                 ],
               ),
@@ -295,6 +294,7 @@ class TablBandeVignettes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return SizedBox(
       height: _cote,
       child: ListView(
@@ -319,7 +319,7 @@ class TablBandeVignettes extends StatelessWidget {
                       TablTokens.arrondiS + 2,
                     ),
                     border: Border.all(
-                      color: i == page ? TablTokens.texte : Colors.transparent,
+                      color: i == page ? c.texte : Colors.transparent,
                       width: 2,
                     ),
                   ),
@@ -347,7 +347,7 @@ class TablBandeVignettes extends StatelessWidget {
                           child: Text(
                             '★',
                             style: TextStyle(
-                              color: TablTokens.texte,
+                              color: Colors.white,
                               fontSize: 12,
                               shadows: [
                                 Shadow(color: Colors.black87, blurRadius: 4),
@@ -376,12 +376,9 @@ class TablBandeVignettes extends StatelessWidget {
                     borderRadius: BorderRadius.circular(
                       TablTokens.arrondiS + 2,
                     ),
-                    border: Border.all(color: TablTokens.bordure),
+                    border: Border.all(color: c.bordure),
                   ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: TablTokens.texteDoux,
-                  ),
+                  child: Icon(Icons.add_rounded, color: c.texteDoux),
                 ),
               ),
             ),

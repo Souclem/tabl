@@ -278,10 +278,11 @@ class _EcranPublierState extends State<EcranPublier>
     String titre,
     Widget Function(VoidCallback redessiner) contenu,
   ) {
+    final c = TablCouleurs.of(context);
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       showDragHandle: true,
       builder: (contexteFeuille) => StatefulBuilder(
         builder: (contexteFeuille, redessinerFeuille) => SafeArea(
@@ -297,10 +298,7 @@ class _EcranPublierState extends State<EcranPublier>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  titre,
-                  style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-                ),
+                Text(titre, style: c.titreAffichage.copyWith(fontSize: 26)),
                 const SizedBox(height: TablTokens.espaceM),
                 contenu(() {
                   setState(() {});
@@ -320,13 +318,14 @@ class _EcranPublierState extends State<EcranPublier>
   }
 
   void _choisirAvecQui() {
+    final c = TablCouleurs.of(context);
     _feuille('Avec qui ?', (redessiner) {
       final relations = _donnees?.relations ?? const <ProfilPublic>[];
       if (relations.isEmpty) {
         return Text(
           'Personne à taguer pour l\'instant : suivez des gens pour les '
           'retrouver ici.',
-          style: TablTokens.legende,
+          style: c.legende,
         );
       }
       return TablSelecteurPersonnes(
@@ -404,27 +403,22 @@ class _EcranPublierState extends State<EcranPublier>
   /// L'étiquette, la bouteille : l'appareil photo, ou une photo déjà
   /// prise.
   Future<void> _photographierBoisson() async {
+    final c = TablCouleurs.of(context);
     final appareil = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       builder: (contexteFeuille) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
-                Icons.photo_camera_outlined,
-                color: TablTokens.texte,
-              ),
-              title: const Text('Prendre une photo', style: TablTokens.corps),
+              leading: Icon(Icons.photo_camera_outlined, color: c.texte),
+              title: Text('Prendre une photo', style: c.corps),
               onTap: () => Navigator.of(contexteFeuille).pop(true),
             ),
             ListTile(
-              leading: const Icon(
-                Icons.photo_library_outlined,
-                color: TablTokens.texte,
-              ),
-              title: const Text('Photothèque', style: TablTokens.corps),
+              leading: Icon(Icons.photo_library_outlined, color: c.texte),
+              title: Text('Photothèque', style: c.corps),
               onTap: () => Navigator.of(contexteFeuille).pop(false),
             ),
           ],
@@ -553,10 +547,11 @@ class _EcranPublierState extends State<EcranPublier>
       Navigator.of(context).pop();
       return;
     }
+    final c = TablCouleurs.of(context);
     final abandonner = await showDialog<bool>(
       context: context,
       builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
+        backgroundColor: c.surface,
         title: const Text('Abandonner les modifications ?'),
         actions: [
           TextButton(
@@ -565,10 +560,7 @@ class _EcranPublierState extends State<EcranPublier>
           ),
           TextButton(
             onPressed: () => Navigator.of(contexteDialogue).pop(true),
-            child: const Text(
-              'Abandonner',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text('Abandonner', style: TextStyle(color: c.erreur)),
           ),
         ],
       ),
@@ -585,10 +577,11 @@ class _EcranPublierState extends State<EcranPublier>
       return;
     }
     final lieu = this.lieu;
+    final c = TablCouleurs.of(context);
     final choix = await showDialog<_Fermeture>(
       context: context,
       builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
+        backgroundColor: c.surface,
         title: const Text('Abandonner ce moment ?'),
         content: const Text('Vos photos ne seront pas gardées.'),
         actions: [
@@ -605,10 +598,7 @@ class _EcranPublierState extends State<EcranPublier>
           TextButton(
             onPressed: () =>
                 Navigator.of(contexteDialogue).pop(_Fermeture.abandonner),
-            child: const Text(
-              'Abandonner',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text('Abandonner', style: TextStyle(color: c.erreur)),
           ),
         ],
       ),
@@ -637,6 +627,7 @@ class _EcranPublierState extends State<EcranPublier>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final lieu = this.lieu;
     final pseudos = _pseudos;
     final tagues = [for (final id in _amisTaguesIds) ?pseudos[id]];
@@ -659,7 +650,7 @@ class _EcranPublierState extends State<EcranPublier>
         if (!aQuitte && !_enCours && !_publie) _fermer();
       },
       child: Scaffold(
-        backgroundColor: TablTokens.fond,
+        backgroundColor: c.fond,
         body: Stack(
           children: [
             SingleChildScrollView(
@@ -716,9 +707,9 @@ class _EcranPublierState extends State<EcranPublier>
                           onPresse: changerLieu,
                         ),
                         const SizedBox(height: TablTokens.espaceM),
-                        const Divider(height: 1, color: TablTokens.surface),
+                        Divider(height: 1, color: c.surface),
                         const SizedBox(height: TablTokens.espaceL - 4),
-                        Text('Comment c\'était ?', style: TablTokens.legende),
+                        Text('Comment c\'était ?', style: c.legende),
                         const SizedBox(height: TablTokens.espaceS),
                         TablSelecteurEmotion(
                           emojis: [for (final e in Emotion.values) e.emoji],
@@ -734,7 +725,7 @@ class _EcranPublierState extends State<EcranPublier>
                           indication: 'Ce que vous voudrez vous rappeler',
                         ),
                         const SizedBox(height: TablTokens.espaceM),
-                        const Divider(height: 1, color: TablTokens.surface),
+                        Divider(height: 1, color: c.surface),
                         const SizedBox(height: TablTokens.espaceXs),
                         TablLigneOption(
                           icone: Icons.people_outline_rounded,
@@ -789,7 +780,7 @@ class _EcranPublierState extends State<EcranPublier>
                           onPresse: _choisirBoisson,
                         ),
                         const SizedBox(height: TablTokens.espaceXs),
-                        const Divider(height: 1, color: TablTokens.surface),
+                        Divider(height: 1, color: c.surface),
                         const SizedBox(height: TablTokens.espaceM),
                         TablLigneAudience(
                           libelle: libelleAudience(
@@ -813,9 +804,7 @@ class _EcranPublierState extends State<EcranPublier>
                             child: Text(
                               '${pseudos[id] ?? 'Une personne taguée'} '
                               'ne verra pas ce moment.',
-                              style: TablTokens.legende.copyWith(
-                                color: TablTokens.primaire,
-                              ),
+                              style: c.legende.copyWith(color: c.primaire),
                             ),
                           ),
                         // La place du bouton, qui flotte par-dessus.
@@ -869,10 +858,7 @@ class _EcranPublierState extends State<EcranPublier>
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      TablTokens.fond.withValues(alpha: 0),
-                      TablTokens.fond,
-                    ],
+                    colors: [c.fond.withValues(alpha: 0), c.fond],
                     stops: const [0, 0.22],
                   ),
                 ),
@@ -893,7 +879,7 @@ class _EcranPublierState extends State<EcranPublier>
                           Text(
                             manque,
                             textAlign: TextAlign.center,
-                            style: TablTokens.legende.copyWith(fontSize: 13),
+                            style: c.legende.copyWith(fontSize: 13),
                           ),
                           const SizedBox(height: TablTokens.espaceS),
                         ],
@@ -934,6 +920,7 @@ class _VignetteBoisson extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       label: 'Photo de la boisson',
@@ -944,18 +931,14 @@ class _VignetteBoisson extends StatelessWidget {
           width: TablTokens.hauteurControle,
           height: TablTokens.hauteurControle,
           decoration: BoxDecoration(
-            color: TablTokens.surfaceBasse,
+            color: c.surfaceBasse,
             borderRadius: BorderRadius.circular(TablTokens.arrondiS),
-            border: Border.all(color: TablTokens.bordure),
+            border: Border.all(color: c.bordure),
           ),
           clipBehavior: Clip.antiAlias,
           child: photo != null
               ? Image.memory(photo!, fit: BoxFit.cover)
-              : const Icon(
-                  Icons.add_a_photo_outlined,
-                  color: TablTokens.texteDoux,
-                  size: 20,
-                ),
+              : Icon(Icons.add_a_photo_outlined, color: c.texteDoux, size: 20),
         ),
       ),
     );
@@ -969,6 +952,7 @@ class _MomentGarde extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 380),
@@ -976,7 +960,7 @@ class _MomentGarde extends StatelessWidget {
       builder: (context, t, enfant) => Opacity(
         opacity: t,
         child: ColoredBox(
-          color: TablTokens.fond.withValues(alpha: 0.86),
+          color: c.fond.withValues(alpha: 0.86),
           child: Center(
             child: Transform.scale(scale: 0.85 + 0.15 * t, child: enfant),
           ),
@@ -985,16 +969,9 @@ class _MomentGarde extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.check_circle_rounded,
-            color: TablTokens.primaire,
-            size: 64,
-          ),
+          Icon(Icons.check_circle_rounded, color: c.primaire, size: 64),
           const SizedBox(height: TablTokens.espaceM),
-          Text(
-            'Moment gardé.',
-            style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-          ),
+          Text('Moment gardé.', style: c.titreAffichage.copyWith(fontSize: 26)),
         ],
       ),
     );

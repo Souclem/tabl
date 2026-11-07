@@ -13,22 +13,21 @@ class TablSeparateurTexte extends StatelessWidget {
   final String texte;
 
   /// `letterSpacing` du texte, quand il doit être aéré (ex. petites
-  /// majuscules). `null` garde l'espacement par défaut de `TablTokens.legende`.
+  /// majuscules). `null` garde l'espacement par défaut de la légende.
   final double? espacementLettres;
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final style = espacementLettres == null
-        ? TablTokens.legende
-        : TablTokens.legende.copyWith(letterSpacing: espacementLettres);
+        ? c.legende
+        : c.legende.copyWith(letterSpacing: espacementLettres);
 
     return Row(
       children: [
         const Expanded(child: Divider()),
         Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: TablTokens.espaceM,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
           child: Text(texte, style: style),
         ),
         const Expanded(child: Divider()),

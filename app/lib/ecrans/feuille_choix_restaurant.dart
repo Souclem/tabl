@@ -22,10 +22,11 @@ Future<LieuRestaurant?> choisirRestaurant(
   RepereDistance repere = RepereDistance.photo,
   LieuRestaurant? choisi,
 }) {
+  final c = TablCouleurs.of(context);
   return showModalBottomSheet<LieuRestaurant>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: TablTokens.surface,
+    backgroundColor: c.surface,
     showDragHandle: true,
     builder: (_) => _FeuilleRestaurant(
       rechercheLieuService: rechercheLieuService,
@@ -234,6 +235,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final hauteur = MediaQuery.sizeOf(context).height * 0.85;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -254,7 +256,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
                   Expanded(
                     child: Text(
                       'Quel restaurant ?',
-                      style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                      style: c.titreAffichage.copyWith(fontSize: 26),
                     ),
                   ),
                   if (!_aLaMain && !_nouveauLieuPersonnel)
@@ -315,6 +317,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   }
 
   Widget _vueLieuPersonnel() {
+    final c = TablCouleurs.of(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -326,12 +329,12 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 1),
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
               child: Icon(
                 Icons.lock_outline_rounded,
                 size: 15,
-                color: TablTokens.texteDoux,
+                color: c.texteDoux,
               ),
             ),
             const SizedBox(width: TablTokens.espaceS),
@@ -340,7 +343,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
                 'Un lieu à vous, comme « Chez mes parents ». Seul son nom '
                 'apparaît sur vos souvenirs : jamais d\'adresse ni de '
                 'position, et personne d\'autre ne le retrouve.',
-                style: TablTokens.legende.copyWith(fontSize: 13),
+                style: c.legende.copyWith(fontSize: 13),
               ),
             ),
           ],
@@ -361,6 +364,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   }
 
   Widget _vueListe() {
+    final c = TablCouleurs.of(context);
     final aCherche = recherche.text.trim().length >= 2;
     final texte = normaliserPourRecherche(recherche.text.trim());
     final mesLieux = aCherche
@@ -373,7 +377,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
       padding: const EdgeInsets.only(top: TablTokens.espaceM),
       child: Text(
         titre,
-        style: TablTokens.legende.copyWith(
+        style: c.legende.copyWith(
           fontSize: 11,
           letterSpacing: 1.6,
           fontWeight: FontWeight.w600,
@@ -405,9 +409,9 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
           },
         ),
         if (rechercheEnCours)
-          const LinearProgressIndicator(
+          LinearProgressIndicator(
             minHeight: 2,
-            color: TablTokens.primaire,
+            color: c.primaire,
             backgroundColor: Colors.transparent,
           ),
         if (aCherche && mesLieux.isNotEmpty) ...[
@@ -419,10 +423,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
           if (!rechercheEnCours && suggestions.isEmpty && mesLieux.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
-              child: Text(
-                'Aucun restaurant trouvé.',
-                style: TablTokens.legende,
-              ),
+              child: Text('Aucun restaurant trouvé.', style: c.legende),
             ),
         ] else
           for (var i = 0; i < widget.prochesParEndroit.length; i++)

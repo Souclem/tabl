@@ -32,6 +32,7 @@ class TablFeuilleCommentaires extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final fils = this.fils;
     return Column(
       children: [
@@ -46,12 +47,10 @@ class TablFeuilleCommentaires extends StatelessWidget {
                 delegate: _EnTete(titre: titre),
               ),
               if (fils == null)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: Center(
-                    child: CircularProgressIndicator(
-                      color: TablTokens.primaire,
-                    ),
+                    child: CircularProgressIndicator(color: c.primaire),
                   ),
                 )
               else if (fils.isEmpty)
@@ -65,16 +64,11 @@ class TablFeuilleCommentaires extends StatelessWidget {
                         children: [
                           Text(
                             'Aucun commentaire pour l\'instant.',
-                            style: TablTokens.titreAffichage.copyWith(
-                              fontSize: 20,
-                            ),
+                            style: c.titreAffichage.copyWith(fontSize: 20),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: TablTokens.espaceS),
-                          Text(
-                            'Lancez la conversation.',
-                            style: TablTokens.legende,
-                          ),
+                          Text('Lancez la conversation.', style: c.legende),
                         ],
                       ),
                     ),
@@ -96,7 +90,7 @@ class TablFeuilleCommentaires extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(height: 1, color: TablTokens.bordure),
+        Divider(height: 1, color: c.bordure),
         SafeArea(
           top: false,
           child: Padding(
@@ -132,8 +126,9 @@ class _EnTete extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double decalage, bool recouvre) {
+    final c = TablCouleurs.of(context);
     return ColoredBox(
-      color: TablTokens.surface,
+      color: c.surface,
       child: Column(
         children: [
           const SizedBox(height: 10),
@@ -141,18 +136,14 @@ class _EnTete extends SliverPersistentHeaderDelegate {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: TablTokens.texteDoux.withValues(alpha: 0.4),
+              color: c.texteDoux.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            titre,
-            style: TablTokens.corps.copyWith(fontWeight: FontWeight.w600),
-          ),
+          Text(titre, style: c.corps.copyWith(fontWeight: FontWeight.w600)),
           const Spacer(),
-          if (recouvre || decalage > 0)
-            const Divider(height: 1, color: TablTokens.bordure),
+          if (recouvre || decalage > 0) Divider(height: 1, color: c.bordure),
         ],
       ),
     );

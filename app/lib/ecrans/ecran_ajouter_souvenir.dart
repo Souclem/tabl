@@ -134,7 +134,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
     final choisi =
         await showModalBottomSheet<({DateSouvenir date, String? moment})>(
           context: context,
-          backgroundColor: TablTokens.surface,
+          backgroundColor: TablCouleurs.of(context).surface,
           showDragHandle: true,
           builder: (_) => _FeuilleQuand(
             date:
@@ -211,12 +211,13 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final lieu = this.lieu;
     final date = _date;
     final heurePhotos = _heurePhotos;
 
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -274,9 +275,9 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
                         onPresse: _choisirQuand,
                       ),
                       const SizedBox(height: TablTokens.espaceM),
-                      const Divider(height: 1, color: TablTokens.surface),
+                      Divider(height: 1, color: c.surface),
                       const SizedBox(height: TablTokens.espaceL - 4),
-                      Text('Comment c\'était ?', style: TablTokens.legende),
+                      Text('Comment c\'était ?', style: c.legende),
                       const SizedBox(height: TablTokens.espaceS),
                       TablSelecteurEmotion(
                         emojis: [for (final e in Emotion.values) e.emoji],
@@ -292,7 +293,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
                         indication: 'Quelques mots, si vous le souhaitez',
                       ),
                       const SizedBox(height: TablTokens.espaceM),
-                      const Divider(height: 1, color: TablTokens.surface),
+                      Divider(height: 1, color: c.surface),
                       const SizedBox(height: TablTokens.espaceM),
                       FutureBuilder<DonneesAudience>(
                         future: _futurAudience,
@@ -322,16 +323,16 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
                       const SizedBox(height: TablTokens.espaceS),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.nightlight_round,
                             size: 13,
-                            color: TablTokens.texteDoux,
+                            color: c.texteDoux,
                           ),
                           const SizedBox(width: TablTokens.espaceS),
                           Expanded(
                             child: Text(
                               'Visible sur votre profil, jamais dans le Feed.',
-                              style: TablTokens.legende.copyWith(fontSize: 13),
+                              style: c.legende.copyWith(fontSize: 13),
                             ),
                           ),
                         ],
@@ -385,10 +386,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    TablTokens.fond.withValues(alpha: 0),
-                    TablTokens.fond,
-                  ],
+                  colors: [c.fond.withValues(alpha: 0), c.fond],
                   stops: const [0, 0.22],
                 ),
               ),
@@ -443,6 +441,7 @@ class _FeuilleQuandState extends State<_FeuilleQuand> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final futur = _date.estDansLeFutur(widget.maintenant);
     final jours = joursDansLeMois(_date.annee, _date.mois);
     return SafeArea(
@@ -459,7 +458,7 @@ class _FeuilleQuandState extends State<_FeuilleQuand> {
           children: [
             Text(
               'Quand était-ce ?',
-              style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+              style: c.titreAffichage.copyWith(fontSize: 26),
             ),
             const SizedBox(height: TablTokens.espaceS),
             TablRouesDate(
@@ -497,9 +496,7 @@ class _FeuilleQuandState extends State<_FeuilleQuand> {
                   ? Center(
                       child: Text(
                         'Cette date n\'est pas encore passée.',
-                        style: TablTokens.legende.copyWith(
-                          color: TablTokens.erreur,
-                        ),
+                        style: c.legende.copyWith(color: c.erreur),
                       ),
                     )
                   : null,
