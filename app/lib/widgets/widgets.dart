@@ -20,6 +20,7 @@ export 'carte/barre_explorer.dart';
 export 'carte/carnet_filtres.dart';
 export 'carte/ciel_constellation.dart';
 export 'carte/carte_mapbox.dart';
+export 'carte/eventail_proches.dart';
 export 'carte/explorer.dart';
 export 'carte/fiche.dart';
 export 'carte/habillage_constellation.dart';

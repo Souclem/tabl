@@ -19,6 +19,7 @@ export 'carte/fiche_restaurant.dart';
 export 'carte/fond_carte.dart';
 export 'carte/filtres_carte.dart';
 export 'carte/geojson_carte.dart';
+export 'carte/itineraire.dart';
 export 'carte/lieu_carte.dart';
 export 'carte/presentation_carte.dart';
 export 'carte/presentation_filtres.dart';

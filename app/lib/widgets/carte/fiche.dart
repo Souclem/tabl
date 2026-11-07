@@ -57,8 +57,9 @@ class _Case extends StatelessWidget {
   }
 }
 
-/// Le haut de la fiche : la photo en grand, le retour, le nom et où
-/// c'est ; une mention dorée quand c'est l'une de mes adresses.
+/// Le bandeau nuit, haut de la fiche : la photo en grand sous un voile qui
+/// se fond dans la nuit, le retour, le marque-page, le nom et où c'est ;
+/// une mention dorée quand c'est l'une de mes adresses.
 class TablHerosFiche extends StatelessWidget {
   const TablHerosFiche({
     super.key,
@@ -67,6 +68,8 @@ class TablHerosFiche extends StatelessWidget {
     required this.photoUrl,
     required this.onRetour,
     this.mention,
+    this.onMarquePage,
+    this.gardee = false,
   });
 
   final String nom;
@@ -78,6 +81,12 @@ class TablHerosFiche extends StatelessWidget {
   /// "Votre adresse · 7 fois".
   final String? mention;
   final VoidCallback onRetour;
+
+  /// Garde ou retire l'adresse de mes envies ; `null` : pas de marque-page.
+  final VoidCallback? onMarquePage;
+
+  /// L'adresse est dans mes envies : marque-page plein et doré.
+  final bool gardee;
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +127,21 @@ class TablHerosFiche extends StatelessWidget {
               onPresse: onRetour,
             ),
           ),
+          if (onMarquePage != null)
+            Positioned(
+              top: haut + TablTokens.espaceS,
+              right: TablTokens.espaceM,
+              child: TablBoutonVerre(
+                icone: gardee
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                libelle: gardee
+                    ? 'Retirer de mes envies'
+                    : 'Garder pour plus tard',
+                doree: gardee,
+                onPresse: onMarquePage!,
+              ),
+            ),
           Positioned(
             left: TablTokens.espaceL - 4,
             right: TablTokens.espaceL - 4,

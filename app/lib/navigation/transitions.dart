@@ -27,6 +27,34 @@ Route<T> ouvrirFormulaire<T>(Widget page) {
   );
 }
 
+/// Une page posée par-dessus l'Explorer sans le cacher (`opaque: false`) :
+/// sa carte Mapbox n'est pas recréée au retour et reçoit encore les
+/// déplacements qu'on lui demande. Fondu + légère montée.
+Route<T> ouvrirSurLaCarte<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    opaque: false,
+    transitionDuration: const Duration(milliseconds: 320),
+    reverseTransitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (context, animation, secondaryAnimation) => page,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final courbe = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: courbe,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.04),
+            end: Offset.zero,
+          ).animate(courbe),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 /// Bouton retour défensif : dépile s'il y a quelque chose en dessous,
 /// sinon exécute [secours].
 ///
