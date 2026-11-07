@@ -13,6 +13,7 @@ class TablBoutonVerre extends StatelessWidget {
     required this.libelle,
     required this.onPresse,
     this.pastille = false,
+    this.doree = false,
   });
 
   final IconData icone;
@@ -23,6 +24,9 @@ class TablBoutonVerre extends StatelessWidget {
 
   /// Petit point doré : quelque chose attend derrière ce bouton.
   final bool pastille;
+
+  /// Icône dorée : le geste est déjà fait (marque-page gardé).
+  final bool doree;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +49,11 @@ class TablBoutonVerre extends StatelessWidget {
                 child: IconButton(
                   onPressed: onPresse,
                   tooltip: libelle,
-                  icon: Icon(icone, size: 20, color: TablTokens.texte),
+                  icon: Icon(
+                    icone,
+                    size: 20,
+                    color: doree ? TablTokens.primaire : TablTokens.texte,
+                  ),
                 ),
               ),
             ),
