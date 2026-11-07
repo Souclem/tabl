@@ -22,6 +22,12 @@ abstract interface class CarteService {
   /// par chemin — à demander seulement pour ce qui s'affiche.
   Future<Map<String, String>> photos(Iterable<String> chemins);
 
+  /// Un restaurant connu par son identifiant — adresse, catégories et
+  /// coordonnées de quoi remplir sa fiche (les chiffres du réseau restent
+  /// à zéro) —, d'où qu'on y arrive (notification…). `null` s'il est
+  /// introuvable ou sans coordonnées.
+  Future<LieuCarte?> lieuDuRestaurant(String restaurantId);
+
   /// L'identifiant `restaurants` d'un lieu, en l'y faisant entrer s'il
   /// n'est encore que dans l'annuaire (mettre en envie un lieu jamais
   /// visité le fait entrer dans Tabl, comme une première visite).

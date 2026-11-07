@@ -211,6 +211,9 @@ class _EcranFeedState extends State<EcranFeed>
           souvenirService: widget.souvenirService,
           // Construit seulement ici, au tap sur la cloche.
           avisService: AvisServiceSupabase(TablBackend.client),
+          carteService: CarteServiceSupabase(TablBackend.client),
+          tableService:
+              widget.tableService ?? TableServiceSupabase(TablBackend.client),
         ),
       ),
     );

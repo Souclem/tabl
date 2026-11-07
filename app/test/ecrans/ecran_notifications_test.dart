@@ -45,6 +45,43 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
+      const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class _FauxCarteService implements CarteService {
+  @override
+  Future<LieuCarte?> lieuDuRestaurant(String restaurantId) async =>
+      const LieuCarte(
+        restaurantId: 'r1',
+        nom: 'Bibo',
+        ville: 'Liège',
+        adresse: 'Rue du Pont 16',
+        categories: ['italien'],
+        latitude: 50.6,
+        longitude: 5.5,
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+class _FausseTableService implements TableService {
+  @override
+  Future<List<ResumeTable>> mesTables() async => const [
+    ResumeTable(
+      id: 't1',
+      nom: 'Les mardis',
+      nombreMembres: 4,
+      etatTexte: '',
+      actionRequise: false,
+    ),
+  ];
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
@@ -64,8 +101,10 @@ NotificationTabl _n(
 Future<void> _ouvrir(
   WidgetTester tester,
   _FauxNotificationService notifications,
-  _FauxAbonnementService abonnements,
-) async {
+  _FauxAbonnementService abonnements, {
+  CarteService? carteService,
+  TableService? tableService,
+}) async {
   tester.view.physicalSize = const Size(1000, 2200);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -78,6 +117,8 @@ Future<void> _ouvrir(
           notificationService: notifications,
           abonnementService: abonnements,
           souvenirService: _FauxSouvenirService(),
+          carteService: carteService,
+          tableService: tableService,
         ),
       ),
     );
@@ -86,6 +127,33 @@ Future<void> _ouvrir(
 }
 
 void main() {
+  testWidgets('un avis reçu ouvre la fiche : sous-titre et « On y va ? »', (
+    tester,
+  ) async {
+    final notifications = _FauxNotificationService([
+      NotificationTabl(
+        type: TypeNotification.avisRecu,
+        acteur: (id: 'emma', pseudo: 'Emma', photoUrl: null),
+        creeLe: DateTime.now(),
+        restaurantId: 'r1',
+        restaurantNom: 'Bibo',
+      ),
+    ]);
+    await _ouvrir(
+      tester,
+      notifications,
+      _FauxAbonnementService(),
+      carteService: _FauxCarteService(),
+      tableService: _FausseTableService(),
+    );
+
+    await tester.tap(find.textContaining('Emma'));
+    await mockNetworkImagesFor(() => tester.pumpAndSettle());
+
+    expect(find.text('On y va ?'), findsOneWidget);
+    expect(find.textContaining('Rue du Pont 16'), findsWidgets);
+  });
+
   testWidgets('les demandes en tête, puis les nouvelles et le reste', (
     tester,
   ) async {
