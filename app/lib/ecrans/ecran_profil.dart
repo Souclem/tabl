@@ -234,8 +234,7 @@ class _EcranProfilState extends State<EcranProfil>
   late Future<int> _nombreDemandes = widget.abonnementService
       .nombreDemandesEnAttente();
 
-  /// Clair, sombre, ou comme le téléphone. Pour l'instant, seul
-  /// l'Explorer en tient compte.
+  /// Clair, sombre, ou comme le téléphone.
   void _choisirApparence() {
     final actuelle = TablApparence.of(context);
     showModalBottomSheet<void>(
@@ -333,7 +332,7 @@ class _EcranProfilState extends State<EcranProfil>
                   leading: Icon(Icons.contrast_rounded, color: c.primaire),
                   title: Text('Apparence', style: c.corps),
                   subtitle: Text(
-                    '${TablApparence.of(context).libelle} · pour l’Explorer',
+                    TablApparence.of(context).libelle,
                     style: c.legende,
                   ),
                   trailing: Icon(

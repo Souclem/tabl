@@ -165,6 +165,10 @@ monde entier, jamais de liste d'exclusion à la main.
 - Connexion, inscription et accueil suivent aussi le réglage.
 - Un écran lit ses couleurs par `TablCouleurs.of(context)` (dans
   `theme/tokens.dart`), jamais par `TablTokens.fond` & co, qui sont les
-  couleurs du sombre seul. Migration écran par écran : Feed fait ; tout
-  écran qui lit encore `TablTokens.<couleur>` est illisible en clair tant
-  qu'il n'est pas migré.
+  couleurs du sombre seul. Un écran qui lit encore `TablTokens.<couleur>`
+  est illisible en clair tant qu'il n'est pas migré.
+- L'Explorer garde un thème sombre sous sa propre palette
+  (`PaletteExplorer`) ; ses messages sur la carte suivent cette palette, ses
+  feuilles (« Proposer », « Où cherchez-vous ? ») suivent le réglage. La
+  fiche d'un restaurant (`widgets/carte/fiche.dart`) suit le réglage ; seul
+  le voile noir posé sur sa photo, derrière le bouton retour, reste noir.
