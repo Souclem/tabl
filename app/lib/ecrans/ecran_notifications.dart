@@ -200,26 +200,30 @@ class _EcranNotificationsState extends State<EcranNotifications>
     );
   }
 
-  Widget _section(String titre) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      TablTokens.espaceL - 4,
-      TablTokens.espaceL,
-      TablTokens.espaceL - 4,
-      TablTokens.espaceXs,
-    ),
-    child: Text(
-      titre.toUpperCase(),
-      style: TablTokens.legende.copyWith(
-        fontSize: 11,
-        letterSpacing: 1.5,
-        fontWeight: FontWeight.w700,
-        color: TablTokens.texte.withValues(alpha: 0.45),
+  Widget _section(BuildContext context, String titre) {
+    final c = TablCouleurs.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceL - 4,
+        TablTokens.espaceL,
+        TablTokens.espaceL - 4,
+        TablTokens.espaceXs,
       ),
-    ),
-  );
+      child: Text(
+        titre.toUpperCase(),
+        style: c.legende.copyWith(
+          fontSize: 11,
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.w700,
+          color: c.texte.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final demandes = [
       for (final d in _demandes ?? const <LigneNotification>[])
         if (!_repondues.contains(d.acteur.id)) d,
@@ -234,7 +238,7 @@ class _EcranNotificationsState extends State<EcranNotifications>
     ];
     final charge = _demandes != null;
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -253,14 +257,14 @@ class _EcranNotificationsState extends State<EcranNotifications>
                   const SizedBox(width: TablTokens.espaceS),
                   Text(
                     'Notifications',
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                    style: c.titreAffichage.copyWith(fontSize: 26),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: RefreshIndicator(
-                color: TablTokens.primaire,
+                color: c.primaire,
                 onRefresh: recharger,
                 child: ListView(
                   padding: EdgeInsets.only(
@@ -272,12 +276,10 @@ class _EcranNotificationsState extends State<EcranNotifications>
                     if (_erreur && !charge)
                       const _Vide(texte: messageErreurGenerique)
                     else if (!charge)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(TablTokens.espaceXl),
                         child: Center(
-                          child: CircularProgressIndicator(
-                            color: TablTokens.primaire,
-                          ),
+                          child: CircularProgressIndicator(color: c.primaire),
                         ),
                       )
                     else if (demandes.isEmpty && _autres.isEmpty)
@@ -290,6 +292,7 @@ class _EcranNotificationsState extends State<EcranNotifications>
                     else ...[
                       if (demandes.isNotEmpty) ...[
                         _section(
+                          context,
                           demandes.every(
                                 (d) => d.type == TypeNotification.demandeSuivi,
                               )
@@ -303,11 +306,11 @@ class _EcranNotificationsState extends State<EcranNotifications>
                         for (final d in demandes) _ligne(d),
                       ],
                       if (nouvelles.isNotEmpty) ...[
-                        _section('Nouvelles'),
+                        _section(context, 'Nouvelles'),
                         for (final l in nouvelles) _ligne(l),
                       ],
                       if (avant.isNotEmpty) ...[
-                        _section('Plus tôt'),
+                        _section(context, 'Plus tôt'),
                         for (final l in avant) _ligne(l),
                       ],
                     ],
@@ -330,6 +333,7 @@ class _Vide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceXl,
@@ -339,23 +343,19 @@ class _Vide extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.notifications_none_rounded,
-            size: 36,
-            color: TablTokens.texteDoux,
-          ),
+          Icon(Icons.notifications_none_rounded, size: 36, color: c.texteDoux),
           const SizedBox(height: TablTokens.espaceM),
           Text(
             texte,
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 21),
+            style: c.titreAffichage.copyWith(fontSize: 21),
           ),
           if (detail != null) ...[
             const SizedBox(height: TablTokens.espaceS),
             Text(
               detail!,
               textAlign: TextAlign.center,
-              style: TablTokens.legende.copyWith(fontSize: 14),
+              style: c.legende.copyWith(fontSize: 14),
             ),
           ],
         ],

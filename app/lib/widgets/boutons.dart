@@ -62,10 +62,11 @@ enum TablBoutonSocialStyle {
   /// création de compte mise en avant sans être un bouton plein.
   contourAccent,
 
-  /// Fond clair, texte foncé — pour un bouton posé sur un fond sombre.
+  /// Fond de la couleur du texte, texte de la couleur du fond : le bouton
+  /// qui tranche sur la page (ivoire en sombre, encre en clair).
   clair,
 
-  /// Fond sombre plein, texte clair.
+  /// Fond de surface plein, texte de l'apparence.
   sombre,
 }
 
@@ -92,6 +93,7 @@ class TablBoutonSocial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final forme = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(
         pilule ? TablTokens.hauteurControle / 2 : TablTokens.arrondiS,
@@ -106,8 +108,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.texte,
-          foregroundColor: TablTokens.fond,
+          backgroundColor: c.texte,
+          foregroundColor: c.fond,
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -117,8 +119,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.surface,
-          foregroundColor: TablTokens.texte,
+          backgroundColor: c.surface,
+          foregroundColor: c.texte,
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -128,8 +130,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: OutlinedButton.styleFrom(
-          foregroundColor: TablTokens.primaire,
-          side: const BorderSide(color: TablTokens.primaire),
+          foregroundColor: c.primaire,
+          side: BorderSide(color: c.primaire),
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -139,8 +141,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: OutlinedButton.styleFrom(
-          foregroundColor: TablTokens.texte,
-          side: const BorderSide(color: TablTokens.bordure),
+          foregroundColor: c.texte,
+          side: BorderSide(color: c.bordure),
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -164,10 +166,11 @@ class TablBoutonTexte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return TextButton(
       onPressed: onPresse,
       style: TextButton.styleFrom(
-        foregroundColor: TablTokens.primaire,
+        foregroundColor: c.primaire,
         textStyle: TablTokens.libelleBouton,
         padding: const EdgeInsets.symmetric(
           horizontal: TablTokens.espaceS,

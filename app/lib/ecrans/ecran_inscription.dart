@@ -172,9 +172,11 @@ class _EcranInscriptionState extends State<EcranInscription> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return EnveloppeFormulaire(
       titre: 'Créer un compte',
-      sousTitre: 'Tabl est privé par défaut : tu choisis qui voit ce que tu publies.',
+      sousTitre:
+          'Tabl est privé par défaut : tu choisis qui voit ce que tu publies.',
       onRetour: () => revenirVersAccueilOuSecours(
         context,
         widget.authService,
@@ -265,7 +267,7 @@ class _EcranInscriptionState extends State<EcranInscription> {
           "En créant un compte, vous acceptez nos Conditions d'utilisation "
           'et notre Politique de confidentialité.',
           textAlign: TextAlign.center,
-          style: TablTokens.legende,
+          style: c.legende,
         ),
       ],
     );

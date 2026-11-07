@@ -28,6 +28,7 @@ class TablLigneTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final sousTitre = nombreMembres == 1
         ? '1 personne'
         : '$nombreMembres personnes';
@@ -43,7 +44,10 @@ class TablLigneTable extends StatelessWidget {
               SizedBox(
                 width: 52,
                 height: 52,
-                child: TablCouvertureTable(urls: visuelUrls, arrondi: TablTokens.espaceS),
+                child: TablCouvertureTable(
+                  urls: visuelUrls,
+                  arrondi: TablTokens.espaceS,
+                ),
               ),
               const SizedBox(width: TablTokens.espaceM),
               Expanded(
@@ -52,17 +56,22 @@ class TablLigneTable extends StatelessWidget {
                   children: [
                     Text(
                       emoji == null ? nom : '$nom $emoji',
-                      style: TablTokens.sousTitre,
+                      style: c.sousTitre,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
-                    Text(sousTitre, style: TablTokens.legende.copyWith(color: TablTokens.texteDoux)),
+                    Text(
+                      sousTitre,
+                      style: c.legende.copyWith(color: c.texteDoux),
+                    ),
                     Text(
                       etatTexte,
-                      style: TablTokens.legende.copyWith(
-                        color: actionRequise ? TablTokens.primaire : TablTokens.texteDoux,
-                        fontWeight: actionRequise ? FontWeight.w700 : FontWeight.w400,
+                      style: c.legende.copyWith(
+                        color: actionRequise ? c.primaire : c.texteDoux,
+                        fontWeight: actionRequise
+                            ? FontWeight.w700
+                            : FontWeight.w400,
                       ),
                     ),
                   ],

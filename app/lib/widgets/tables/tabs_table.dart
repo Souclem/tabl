@@ -26,12 +26,14 @@ class TablTabsTable extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        for (var i = 0; i < options.length; i++) Expanded(child: _tab(options[i], i)),
+        for (var i = 0; i < options.length; i++)
+          Expanded(child: _tab(context, options[i], i)),
       ],
     );
   }
 
-  Widget _tab(String libelle, int index) {
+  Widget _tab(BuildContext context, String libelle, int index) {
+    final c = TablCouleurs.of(context);
     final actif = index == selectionne;
     return Semantics(
       label: actif ? '$libelle, sélectionné' : libelle,
@@ -45,7 +47,7 @@ class TablTabsTable extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: actif ? TablTokens.primaire : Colors.transparent,
+                color: actif ? c.primaire : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -54,9 +56,9 @@ class TablTabsTable extends StatelessWidget {
           child: Text(
             libelle,
             textAlign: TextAlign.center,
-            style: TablTokens.legende.copyWith(
+            style: c.legende.copyWith(
               fontWeight: actif ? FontWeight.w700 : FontWeight.w500,
-              color: actif ? TablTokens.texte : TablTokens.texteDoux,
+              color: actif ? c.texte : c.texteDoux,
             ),
           ),
         ),

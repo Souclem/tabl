@@ -57,6 +57,7 @@ class TablBarreNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final v = _VerreBarre.de(context);
     final hauteur = compacte ? _hauteurCompacte : _hauteur;
     final rayon = compacte ? 28.0 : 32.0;
     return Padding(
@@ -82,16 +83,16 @@ class TablBarreNavigation extends StatelessWidget {
               height: hauteur,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(rayon),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
-                    color: Color(0x75000000),
+                    color: v.ombreLarge,
                     blurRadius: 54,
-                    offset: Offset(0, 22),
+                    offset: const Offset(0, 22),
                   ),
                   BoxShadow(
-                    color: Color(0x4D000000),
+                    color: v.ombreProche,
                     blurRadius: 10,
-                    offset: Offset(0, 2),
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -102,19 +103,17 @@ class TablBarreNavigation extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(rayon),
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Color(0x801A1A1D), Color(0xB808090C)],
+                        colors: [v.verreHaut, v.verreBas],
                       ),
-                      border: Border.all(
-                        color: TablTokens.texte.withValues(alpha: 0.07),
-                      ),
+                      border: Border.all(color: v.contour),
                     ),
                     child: Stack(
                       children: [
                         // Un reflet en haut, comme sur du verre.
-                        const Positioned(
+                        Positioned(
                           top: 0,
                           left: 0,
                           right: 0,
@@ -125,23 +124,23 @@ class TablBarreNavigation extends StatelessWidget {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Color(0x00FFFFFF),
-                                    Color(0x80FFFFFF),
-                                    Color(0x00FFFFFF),
+                                    v.reflet.withAlpha(0),
+                                    v.reflet,
+                                    v.reflet.withAlpha(0),
                                   ],
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        const Positioned.fill(
+                        Positioned.fill(
                           child: DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: RadialGradient(
-                                center: Alignment(0, -1.4),
+                                center: const Alignment(0, -1.4),
                                 radius: 1.1,
-                                colors: [Color(0x12FFFFFF), Color(0x00FFFFFF)],
-                                stops: [0, 0.62],
+                                colors: [v.lueur, v.lueur.withAlpha(0)],
+                                stops: const [0, 0.62],
                               ),
                             ),
                           ),
@@ -154,17 +153,17 @@ class TablBarreNavigation extends StatelessWidget {
                           top: hauteur / 2 - 26,
                           width: 52,
                           height: 52,
-                          child: const IgnorePointer(
+                          child: IgnorePointer(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    Color(0x38D9AC67),
-                                    Color(0x14D9AC67),
-                                    Color(0x00D9AC67),
+                                    v.accent.withAlpha(v.alphaHalo),
+                                    v.accent.withAlpha(0x14),
+                                    v.accent.withAlpha(0),
                                   ],
-                                  stops: [0, 0.46, 0.72],
+                                  stops: const [0, 0.46, 0.72],
                                 ),
                               ),
                             ),
@@ -178,22 +177,22 @@ class TablBarreNavigation extends StatelessWidget {
                           bottom: 12,
                           width: 16,
                           height: 2,
-                          child: const IgnorePointer(
+                          child: IgnorePointer(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.all(
+                                borderRadius: const BorderRadius.all(
                                   Radius.circular(2),
                                 ),
                                 gradient: LinearGradient(
                                   colors: [
-                                    Color(0x33D9AC67),
-                                    TablTokens.primaire,
-                                    Color(0x33D9AC67),
+                                    v.accent.withAlpha(0x33),
+                                    v.accent,
+                                    v.accent.withAlpha(0x33),
                                   ],
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Color(0x73D9AC67),
+                                    color: v.accent.withAlpha(0x73),
                                     blurRadius: 8,
                                   ),
                                 ],
@@ -282,6 +281,7 @@ class _OngletState extends State<_Onglet> {
 
   @override
   Widget build(BuildContext context) {
+    final v = _VerreBarre.de(context);
     return Semantics(
       button: true,
       selected: widget.actif,
@@ -309,11 +309,11 @@ class _OngletState extends State<_Onglet> {
                     duration: const Duration(milliseconds: 220),
                     builder: (_, t, _) => CustomPaint(
                       size: const Size.square(26),
-                      painter: _PeintreIcone(widget.icone, t),
+                      painter: _PeintreIcone(widget.icone, t, v),
                     ),
                   ),
                   if (widget.pastille)
-                    const Positioned(
+                    Positioned(
                       top: -1,
                       right: -3,
                       child: SizedBox(
@@ -322,10 +322,10 @@ class _OngletState extends State<_Onglet> {
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: TablTokens.primaire,
+                            color: v.accent,
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xCCD9AC67),
+                                color: v.accent.withAlpha(0xCC),
                                 blurRadius: 7,
                               ),
                             ],
@@ -359,6 +359,7 @@ class _BoutonPublierState extends State<_BoutonPublier> {
 
   @override
   Widget build(BuildContext context) {
+    final v = _VerreBarre.de(context);
     return Semantics(
       button: true,
       label: 'Publier un moment',
@@ -380,17 +381,15 @@ class _BoutonPublierState extends State<_BoutonPublier> {
               height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: TablTokens.primaire.withValues(
-                  alpha: _enfonce ? 0.14 : 0.05,
-                ),
+                color: v.accent.withValues(alpha: _enfonce ? 0.14 : 0.05),
                 border: Border.all(
-                  color: TablTokens.primaire.withValues(alpha: 0.5),
+                  color: v.accent.withValues(alpha: 0.5),
                   width: 1.2,
                 ),
                 boxShadow: _enfonce
                     ? [
                         BoxShadow(
-                          color: TablTokens.primaire.withValues(alpha: 0.35),
+                          color: v.accent.withValues(alpha: 0.35),
                           blurRadius: 16,
                         ),
                       ]
@@ -398,10 +397,10 @@ class _BoutonPublierState extends State<_BoutonPublier> {
               ),
               // Centré : sans lui, le dessin prendrait toute la place de
               // l'anneau.
-              child: const Center(
+              child: Center(
                 child: CustomPaint(
-                  size: Size.square(23),
-                  painter: _PeintrePlus(),
+                  size: const Size.square(23),
+                  painter: _PeintrePlus(v.plus),
                 ),
               ),
             ),
@@ -418,27 +417,25 @@ enum _Icone { feed, tables, explorer, profil }
 /// 24, trait arrondi). [actif] de 0 à 1 : du contour clair à l'icône
 /// pleine, dorée.
 class _PeintreIcone extends CustomPainter {
-  const _PeintreIcone(this.icone, this.actif);
+  const _PeintreIcone(this.icone, this.actif, this.verre);
 
   final _Icone icone;
   final double actif;
-
-  static const _inactif = Color(0x9EF5F0E8);
-  static const _or = TablTokens.primaire;
-  static const _orPlein = Color(0xE6D9AC67);
+  final _VerreBarre verre;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final inactif = verre.iconeInactive;
     canvas.scale(size.width / 24);
     final trait = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.7 - 0.2 * actif
       ..strokeJoin = StrokeJoin.round
       ..strokeCap = StrokeCap.round
-      ..color = Color.lerp(_inactif, _or, actif)!;
+      ..color = Color.lerp(inactif, verre.accent, actif)!;
     final plein = Paint()
       ..style = PaintingStyle.fill
-      ..color = _orPlein.withValues(alpha: 0.9 * actif);
+      ..color = verre.iconePleine.withValues(alpha: 0.9 * actif);
 
     void dessiner(Path chemin, {bool remplir = true}) {
       if (remplir && actif > 0) canvas.drawPath(chemin, plein);
@@ -522,7 +519,7 @@ class _PeintreIcone extends CustomPainter {
         if (actif > 0) {
           canvas.drawPath(
             coeur,
-            Paint()..color = const Color(0xFF12141A).withValues(alpha: actif),
+            Paint()..color = verre.coeurEpingle.withValues(alpha: actif),
           );
         }
         canvas.drawPath(
@@ -530,7 +527,7 @@ class _PeintreIcone extends CustomPainter {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.5
-            ..color = _inactif.withValues(alpha: 0.62 * (1 - actif)),
+            ..color = inactif.withValues(alpha: 0.62 * (1 - actif)),
         );
       case _Icone.profil:
         dessiner(
@@ -550,11 +547,13 @@ class _PeintreIcone extends CustomPainter {
 
   @override
   bool shouldRepaint(_PeintreIcone ancien) =>
-      ancien.icone != icone || ancien.actif != actif;
+      ancien.icone != icone || ancien.actif != actif || ancien.verre != verre;
 }
 
 class _PeintrePlus extends CustomPainter {
-  const _PeintrePlus();
+  const _PeintrePlus(this.couleur);
+
+  final Color couleur;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -563,11 +562,95 @@ class _PeintrePlus extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round
-      ..color = const Color(0xE6E2C48A);
+      ..color = couleur;
     canvas.drawLine(const Offset(9, 3), const Offset(9, 15), trait);
     canvas.drawLine(const Offset(3, 9), const Offset(15, 9), trait);
   }
 
   @override
-  bool shouldRepaint(_PeintrePlus ancien) => false;
+  bool shouldRepaint(_PeintrePlus ancien) => ancien.couleur != couleur;
+}
+
+/// Les couleurs du verre de la barre. Le sombre est le rendu d'origine
+/// (verre fumé, or) ; le clair — verre d'ivoire, braise, encre — est une
+/// proposition de design, à valider.
+@immutable
+class _VerreBarre {
+  const _VerreBarre({
+    required this.accent,
+    required this.alphaHalo,
+    required this.verreHaut,
+    required this.verreBas,
+    required this.contour,
+    required this.ombreLarge,
+    required this.ombreProche,
+    required this.reflet,
+    required this.lueur,
+    required this.iconeInactive,
+    required this.iconePleine,
+    required this.coeurEpingle,
+    required this.plus,
+  });
+
+  factory _VerreBarre.de(BuildContext context) {
+    final c = TablCouleurs.of(context);
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return _VerreBarre(
+        accent: c.primaire,
+        alphaHalo: 0x38,
+        verreHaut: const Color(0x801A1A1D),
+        verreBas: const Color(0xB808090C),
+        contour: c.texte.withValues(alpha: 0.07),
+        ombreLarge: const Color(0x75000000),
+        ombreProche: const Color(0x4D000000),
+        reflet: const Color(0x80FFFFFF),
+        lueur: const Color(0x12FFFFFF),
+        iconeInactive: c.texte.withAlpha(0x9E),
+        iconePleine: c.primaire.withAlpha(0xE6),
+        coeurEpingle: const Color(0xFF12141A),
+        plus: const Color(0xE6E2C48A),
+      );
+    }
+    return _VerreBarre(
+      accent: c.primaire,
+      alphaHalo: 0x2E,
+      verreHaut: c.surface.withAlpha(0xD9),
+      verreBas: c.surfaceBasse.withAlpha(0xE6),
+      contour: c.texte.withValues(alpha: 0.1),
+      ombreLarge: c.texte.withAlpha(0x2E),
+      ombreProche: c.texte.withAlpha(0x1A),
+      reflet: const Color(0xCCFFFFFF),
+      lueur: const Color(0x40FFFFFF),
+      iconeInactive: c.texte.withAlpha(0xA3),
+      iconePleine: c.primaire.withAlpha(0xE6),
+      coeurEpingle: c.surface,
+      plus: c.primaireFoncee,
+    );
+  }
+
+  final Color accent;
+  final int alphaHalo;
+  final Color verreHaut;
+  final Color verreBas;
+  final Color contour;
+  final Color ombreLarge;
+  final Color ombreProche;
+  final Color reflet;
+  final Color lueur;
+  final Color iconeInactive;
+  final Color iconePleine;
+  final Color coeurEpingle;
+  final Color plus;
+
+  @override
+  bool operator ==(Object autre) =>
+      autre is _VerreBarre &&
+      autre.accent == accent &&
+      autre.iconeInactive == iconeInactive &&
+      autre.iconePleine == iconePleine &&
+      autre.coeurEpingle == coeurEpingle;
+
+  @override
+  int get hashCode =>
+      Object.hash(accent, iconeInactive, iconePleine, coeurEpingle);
 }

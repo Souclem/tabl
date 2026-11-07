@@ -31,6 +31,7 @@ class EtapeOnboarding extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: TablTokens.espaceL,
@@ -47,27 +48,19 @@ class EtapeOnboarding extends StatelessWidget {
                   width: 160,
                   height: 160,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                    color: TablTokens.surface,
+                  decoration: BoxDecoration(
+                    color: c.surface,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icone,
-                    size: 72,
-                    color: TablTokens.primaire,
-                  ),
+                  child: Icon(icone, size: 72, color: c.primaire),
                 ),
                 const SizedBox(height: TablTokens.espaceXl),
-                Text(
-                  titre,
-                  textAlign: TextAlign.center,
-                  style: TablTokens.grandTitre,
-                ),
+                Text(titre, textAlign: TextAlign.center, style: c.grandTitre),
                 const SizedBox(height: TablTokens.espaceM),
                 Text(
                   texte,
                   textAlign: TextAlign.center,
-                  style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+                  style: c.corps.copyWith(color: c.texteDoux),
                 ),
               ],
             ),
@@ -78,7 +71,7 @@ class EtapeOnboarding extends StatelessWidget {
               child: TextButton(
                 onPressed: onPasser,
                 style: TextButton.styleFrom(
-                  foregroundColor: TablTokens.texteDoux,
+                  foregroundColor: c.texteDoux,
                   textStyle: TablTokens.libelleBouton,
                 ),
                 child: Text(libellePasser),

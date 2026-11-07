@@ -182,18 +182,17 @@ class _EcranTableState extends State<EcranTable> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     if (_chargement) {
-      return const Scaffold(
-        backgroundColor: TablTokens.fond,
-        body: Center(
-          child: CircularProgressIndicator(color: TablTokens.primaire),
-        ),
+      return Scaffold(
+        backgroundColor: c.fond,
+        body: Center(child: CircularProgressIndicator(color: c.primaire)),
       );
     }
     final table = _table;
     if (_erreur || table == null) {
       return Scaffold(
-        backgroundColor: TablTokens.fond,
+        backgroundColor: c.fond,
         body: SafeArea(
           child: Column(
             children: [
@@ -206,9 +205,9 @@ class _EcranTableState extends State<EcranTable> {
                       // Message sobre, pas de crash, pas de fuite de nom/membres
                       // (règle 89) — couvre aussi bien "supprimée" que "hors
                       // ligne"/"non autorisé".
-                      const Text(
+                      Text(
                         'Cette Table n\'est plus disponible.',
-                        style: TablTokens.corps,
+                        style: c.corps,
                       ),
                       const SizedBox(height: TablTokens.espaceM),
                       OutlinedButton(
@@ -226,7 +225,7 @@ class _EcranTableState extends State<EcranTable> {
     }
 
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -243,10 +242,7 @@ class _EcranTableState extends State<EcranTable> {
                 children: [
                   TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
                   IconButton(
-                    icon: const Icon(
-                      Icons.settings_outlined,
-                      color: TablTokens.texteDoux,
-                    ),
+                    icon: Icon(Icons.settings_outlined, color: c.texteDoux),
                     tooltip: 'Gérer la Table',
                     onPressed: _gererLaTable,
                   ),
@@ -259,7 +255,7 @@ class _EcranTableState extends State<EcranTable> {
               selectionne: _tab,
               onSelection: (i) => setState(() => _tab = i),
             ),
-            const Divider(color: TablTokens.bordure, height: 1),
+            Divider(color: c.bordure, height: 1),
             Expanded(child: _contenuTab(table)),
           ],
         ),
@@ -284,6 +280,7 @@ class _EcranTableState extends State<EcranTable> {
   }
 
   Widget _entete(GroupeTable table) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL,
@@ -311,16 +308,14 @@ class _EcranTableState extends State<EcranTable> {
                   table.emoji == null
                       ? table.nom
                       : '${table.nom} ${table.emoji}',
-                  style: TablTokens.titre,
+                  style: c.titre,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   table.nombreMembresActifs == 1
                       ? '1 personne'
                       : '${table.nombreMembresActifs} personnes',
-                  style: TablTokens.legende.copyWith(
-                    color: TablTokens.texteDoux,
-                  ),
+                  style: c.legende.copyWith(color: c.texteDoux),
                 ),
                 TextButton(
                   onPressed: _voirSurLaCarte,
@@ -347,6 +342,7 @@ class _EcranTableState extends State<EcranTable> {
   }
 
   Widget _notreHistoire() {
+    final c = TablCouleurs.of(context);
     if (_experiences.isEmpty) {
       return _etatVide(
         'Votre histoire commence ici.',
@@ -358,7 +354,7 @@ class _EcranTableState extends State<EcranTable> {
       children: [
         if (_laOuOnRevient.isNotEmpty) ...[
           const SizedBox(height: TablTokens.espaceM),
-          Text('Là où l\'on revient', style: TablTokens.sousTitre),
+          Text('Là où l\'on revient', style: c.sousTitre),
           for (final r in _laOuOnRevient)
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -366,12 +362,12 @@ class _EcranTableState extends State<EcranTable> {
               ),
               child: Text(
                 '${r.restaurantNom} · ${r.nombreFois} fois ensemble',
-                style: TablTokens.corps,
+                style: c.corps,
               ),
             ),
           const SizedBox(height: TablTokens.espaceM),
         ],
-        Text('Nos moments', style: TablTokens.sousTitre),
+        Text('Nos moments', style: c.sousTitre),
         for (final e in _experiences)
           TablLigneExperienceHistoire(
             photoUrl: e.photoUrl,
@@ -434,6 +430,7 @@ class _EcranTableState extends State<EcranTable> {
   }
 
   Widget _aDecouvrir() {
+    final c = TablCouleurs.of(context);
     if (_decouvertes.isEmpty) {
       return _etatVide(
         'Rien de nouveau pour le moment.',
@@ -443,8 +440,7 @@ class _EcranTableState extends State<EcranTable> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceL),
       itemCount: _decouvertes.length,
-      separatorBuilder: (_, _) =>
-          const Divider(color: TablTokens.bordure, height: 1),
+      separatorBuilder: (_, _) => Divider(color: c.bordure, height: 1),
       itemBuilder: (context, index) {
         final d = _decouvertes[index];
         return TablLigneDecouverte(
@@ -463,17 +459,18 @@ class _EcranTableState extends State<EcranTable> {
   }
 
   Widget _etatVide(String titre, String sousTitre) {
+    final c = TablCouleurs.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(TablTokens.espaceL),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(titre, style: TablTokens.corps, textAlign: TextAlign.center),
+            Text(titre, style: c.corps, textAlign: TextAlign.center),
             const SizedBox(height: TablTokens.espaceXs),
             Text(
               sousTitre,
-              style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+              style: c.legende.copyWith(color: c.texteDoux),
               textAlign: TextAlign.center,
             ),
           ],
@@ -534,9 +531,10 @@ class _DialogueProposerRestaurantState
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return AlertDialog(
-      backgroundColor: TablTokens.surface,
-      title: const Text('Proposer un restaurant', style: TablTokens.sousTitre),
+      backgroundColor: c.surface,
+      title: Text('Proposer un restaurant', style: c.sousTitre),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -567,8 +565,8 @@ class _DialogueProposerRestaurantState
                 ).pop((nom: _nom.text.trim(), ville: _ville.text.trim()))
               : null,
           style: FilledButton.styleFrom(
-            backgroundColor: TablTokens.primaire,
-            foregroundColor: TablTokens.texteSurPrimaire,
+            backgroundColor: c.primaire,
+            foregroundColor: c.texteSurPrimaire,
           ),
           child: const Text('Proposer'),
         ),
