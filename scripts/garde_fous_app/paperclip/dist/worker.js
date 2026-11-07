@@ -24,9 +24,49 @@ async function etat() {
   return { actifs, total: GARDE_FOUS.length };
 }
 
+// Bascule automatique entre comptes Claude : ses réglages et son état.
+const COMPTES = path.join(os.homedir(), ".config", "tabl", "comptes_claude.json");
+const ETAT_BASCULE = path.join(os.homedir(), ".config", "tabl", "bascule_comptes_etat.json");
+
+async function lireJson(chemin) {
+  try {
+    return JSON.parse(await readFile(chemin, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** Le compte que les agents utilisent (le compte par défaut de Paperclip) et ceux épuisés. */
+async function compte() {
+  const reglages = await lireJson(COMPTES);
+  if (!reglages || !Array.isArray(reglages.ordre)) return { installe: false };
+  const bascule = (await lireJson(ETAT_BASCULE)) || {};
+  const numero = (id) => reglages.ordre.indexOf(id) + 1 || null;
+
+  let actif = null;
+  try {
+    const reponse = await fetch(`${reglages.api}/companies/${reglages.societe}/ai-connections`);
+    const liste = await reponse.json();
+    const connexions = Array.isArray(liste) ? liste : liste.connections || [];
+    actif = connexions.find((c) => c.isDefault)?.id ?? null;
+  } catch {
+    // Paperclip injoignable : on se fie à la dernière bascule notée.
+  }
+  const historique = bascule.historique || [];
+  if (!actif && historique.length) actif = historique[historique.length - 1].compte;
+
+  const maintenant = Date.now();
+  const epuises = Object.entries(bascule.epuise_jusqua || {})
+    .filter(([, fin]) => Date.parse(fin) > maintenant)
+    .map(([id, fin]) => ({ numero: numero(id), jusqua: fin }))
+    .sort((a, b) => a.numero - b.numero);
+  return { installe: true, actif: numero(actif), epuises, tousEpuises: bascule.tous_epuises_signale === true };
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     ctx.data.register("etat", etat);
+    ctx.data.register("compte", compte);
     ctx.actions.register("ouvrir", async () => {
       await new Promise((ok, echec) =>
         execFile("/usr/bin/open", [APP], (erreur) => (erreur ? echec(erreur) : ok())),
