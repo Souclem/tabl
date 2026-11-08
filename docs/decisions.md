@@ -21,8 +21,10 @@ sont dans `docs/regles.md`.
 - **Explorer** : étapes 3 (fiche « Éventail ») et 4 (« Où explorer ») de la
   maquette pas encore faites (voir plus bas).
 - **Deep linking** (retour dans l'app depuis un e-mail) : pas fait.
-- Catégories Foursquare parfois en anglais (« Cupcake Shop ») : à traduire
-  un jour.
+- Catégories Foursquare : traduites côté app par `libelleCategorie`
+  (table de la taxonomie « Dining and Drinking » + adjectif de cuisine pour
+  « X Restaurant »). Une catégorie inconnue reste en anglais : compléter la
+  table au besoin.
 
 ## Social
 
