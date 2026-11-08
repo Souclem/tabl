@@ -12,7 +12,8 @@ import 'recherche_lieu_en_direct.dart';
 /// carte, ses lieux personnels (« Mes lieux »), la recherche au fil de
 /// la frappe — triée autour des endroits, sinon du téléphone
 /// ([positionService]) —, la saisie à la main en dernier recours, ou un
-/// nouveau lieu personnel. `null` : fermée sans choisir.
+/// nouveau lieu personnel (d'emblée avec [lieuPersonnelDAbord]). `null` :
+/// fermée sans choisir.
 Future<LieuRestaurant?> choisirRestaurant(
   BuildContext context, {
   required RechercheLieuService? rechercheLieuService,
@@ -21,6 +22,7 @@ Future<LieuRestaurant?> choisirRestaurant(
   List<List<LieuRestaurant>> prochesParEndroit = const [],
   RepereDistance repere = RepereDistance.photo,
   LieuRestaurant? choisi,
+  bool lieuPersonnelDAbord = false,
 }) {
   final c = TablCouleurs.of(context);
   return showModalBottomSheet<LieuRestaurant>(
@@ -37,6 +39,7 @@ Future<LieuRestaurant?> choisirRestaurant(
       prochesParEndroit: prochesParEndroit,
       repere: repere,
       choisi: choisi,
+      lieuPersonnelDAbord: lieuPersonnelDAbord,
     ),
   );
 }
@@ -63,6 +66,7 @@ class _FeuilleRestaurant extends StatefulWidget {
     required this.prochesParEndroit,
     required this.repere,
     required this.choisi,
+    required this.lieuPersonnelDAbord,
   });
 
   final RechercheLieuService? rechercheLieuService;
@@ -76,6 +80,9 @@ class _FeuilleRestaurant extends StatefulWidget {
 
   /// Celui déjà choisi, qui ressort sur la carte.
   final LieuRestaurant? choisi;
+
+  /// S'ouvre sur « Créer un lieu personnel ».
+  final bool lieuPersonnelDAbord;
 
   @override
   State<_FeuilleRestaurant> createState() => _FeuilleRestaurantState();
@@ -96,7 +103,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   String? _erreurVille;
 
   /// « Créer un lieu personnel » : seulement un nom.
-  bool _nouveauLieuPersonnel = false;
+  late bool _nouveauLieuPersonnel = widget.lieuPersonnelDAbord;
   final _nomLieuPersonnel = TextEditingController();
   String? _erreurLieuPersonnel;
 

@@ -68,6 +68,7 @@ export 'souvenirs/nouveau_souvenir.dart';
 export 'souvenirs/personne_presente.dart';
 export 'souvenirs/personne_qui_aime.dart';
 export 'souvenirs/precompletion_souvenir.dart';
+export 'souvenirs/presentation_feuilles.dart';
 export 'souvenirs/presentation_finalisation.dart';
 export 'souvenirs/presentation_souvenir.dart';
 export 'souvenirs/souvenir_feed.dart';

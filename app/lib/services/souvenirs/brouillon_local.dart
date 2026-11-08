@@ -52,6 +52,7 @@ class Brouillon {
     this.etoiles = const {},
     this.avecQuiIds = const {},
     this.audience = AudienceSouvenir.toutLeMonde,
+    this.horsPublicationIds = const {},
   });
 
   final String id;
@@ -78,6 +79,16 @@ class Brouillon {
   final Map<String, int> etoiles;
   final Set<String> avecQuiIds;
   final AudienceSouvenir audience;
+
+  /// Les photos gardées dans le brouillon mais retirées de la publication.
+  final Set<String> horsPublicationIds;
+
+  /// Les photos qui seront publiées, dans l'ordre : la première est la
+  /// couverture.
+  List<PhotoBrouillon> get photosAPublier => [
+    for (final p in photos)
+      if (!horsPublicationIds.contains(p.id)) p,
+  ];
 
   /// Le moment de la dernière photo : c'est lui qu'une nouvelle photo
   /// compare à [delaiRegroupementRepas].
@@ -106,6 +117,7 @@ class Brouillon {
     Map<String, int>? etoiles,
     Set<String>? avecQuiIds,
     AudienceSouvenir? audience,
+    Set<String>? horsPublicationIds,
   }) => Brouillon(
     id: id,
     creeLe: creeLe,
@@ -119,6 +131,7 @@ class Brouillon {
     etoiles: etoiles ?? this.etoiles,
     avecQuiIds: avecQuiIds ?? this.avecQuiIds,
     audience: audience ?? this.audience,
+    horsPublicationIds: horsPublicationIds ?? this.horsPublicationIds,
   );
 
   Map<String, Object?> versJson() => {
@@ -146,6 +159,7 @@ class Brouillon {
       'tableIds': audience.tableIds.toList()..sort(),
       'personneIds': audience.personneIds.toList()..sort(),
     },
+    'horsPublicationIds': horsPublicationIds.toList()..sort(),
   };
 
   /// Relit un brouillon écrit par [versJson]. Lève une erreur si le JSON
@@ -194,6 +208,9 @@ class Brouillon {
                     .cast<String>(),
               },
             ),
+      horsPublicationIds: {
+        ...((json['horsPublicationIds'] as List?) ?? const []).cast<String>(),
+      },
     );
   }
 }
@@ -405,6 +422,7 @@ class BrouillonsLocaux {
           actuel.copieAvec(
             modifieLe: maintenant,
             photos: [...actuel.photos]..removeAt(rang),
+            horsPublicationIds: {...actuel.horsPublicationIds}..remove(photoId),
           ),
         );
         return entree;
