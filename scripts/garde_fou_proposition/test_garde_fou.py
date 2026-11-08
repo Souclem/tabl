@@ -58,7 +58,9 @@ class BaseDeTest(unittest.TestCase):
 
     def setUp(self):
         env = {"PAPERCLIP_API_URL": "http://localhost:3100", "PAPERCLIP_API_KEY": "cle",
-               "CLAUDE_PROJECT_DIR": RACINE}
+               "CLAUDE_PROJECT_DIR": RACINE,
+               "CLAUDE_CONFIG_DIR": os.path.join(self.tmp, "config_claude"),
+               "HOME": os.path.join(self.tmp, "home_agent")}
         patcher = mock.patch.dict(os.environ, env)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -69,7 +71,9 @@ class BaseDeTest(unittest.TestCase):
     def remplacer(self, valeur):
         if isinstance(valeur, str):
             for ancien, nouveau in (("/Users/{USER}", gf.DOSSIER_PERSO),
-                                    ("{TMP}", self.tmp), ("{MAIN}", self.main), ("{BRANCHE}", self.branche)):
+                                    ("{TMP}", self.tmp), ("{MAIN}", self.main), ("{BRANCHE}", self.branche),
+                                    ("{CFG}", os.path.join(self.tmp, "config_claude")),
+                                    ("{AGENT_HOME}", os.path.join(self.tmp, "home_agent"))):
                 valeur = valeur.replace(ancien, nouveau)
             return valeur
         if isinstance(valeur, dict):

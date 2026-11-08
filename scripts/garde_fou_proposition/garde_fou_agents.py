@@ -41,6 +41,7 @@ import os
 import posixpath
 import pwd
 import re
+import shutil
 import subprocess
 import sys
 import unicodedata
@@ -119,6 +120,7 @@ def variables_d_environnement_connues() -> Dict[str, str]:
     connues = {nom: valeur for nom, valeur in os.environ.items()
                if nom.startswith("PAPERCLIP_") or nom in ("CLAUDE_PROJECT_DIR", "USER", "TMPDIR", "LOGNAME")}
     connues["HOME"] = DOSSIER_PERSO
+    connues["CLAUDE_CONFIG_DIR"] = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(DOSSIER_PERSO, ".claude")
     return connues
 
 
@@ -131,6 +133,7 @@ class Analyseur:
         base: Dict[str, Optional[str]] = dict(variables_d_environnement_connues())
         base.update(variables or {})
         self.variables = base
+        self.entre_guillemets = False
 
     # -- utilitaires -------------------------------------------------------
     def erreur(self, message: str) -> None:
@@ -391,6 +394,14 @@ class Analyseur:
 
     def lire_dq(self, m: Mot, fin: Optional[str]) -> None:
         """Contenu entre guillemets doubles (fin='\"'), ou corps de heredoc (fin=None)."""
+        avant = self.entre_guillemets
+        self.entre_guillemets = True
+        try:
+            self._lire_dq(m, fin)
+        finally:
+            self.entre_guillemets = avant
+
+    def _lire_dq(self, m: Mot, fin: Optional[str]) -> None:
         s, n = self.s, len(self.s)
         while self.i < n:
             c = s[self.i]
@@ -417,6 +428,15 @@ class Analyseur:
         if fin:
             self.erreur("guillemet non fermé")
 
+    def analyser_contenu(self, texte: str) -> None:
+        """Les $( ) et `…` cachés dans un $(( )) ou un ${ } s'exécutent : on les analyse."""
+        if "$" not in texte and "`" not in texte:
+            return
+        sous = Analyseur(texte, self.variables)
+        sous.lire_dq(Mot(), None)
+        self.commandes.extend(sous.commandes)
+        self.erreurs.extend(e for e in sous.erreurs if e not in self.erreurs)
+
     def dollar(self, m: Mot) -> None:
         s, n = self.s, len(self.s)
         suite = s[self.i + 1:self.i + 2]
@@ -430,11 +450,15 @@ class Analyseur:
                     if profondeur == 0:
                         break
                 j += 1
+            self.analyser_contenu(s[self.i + 3:max(self.i + 3, j - 1)])
             self.i = min(n, j + 1)
             m.marquer()
         elif suite == "(":
             self.i += 2
+            avant = self.entre_guillemets
+            self.entre_guillemets = False
             self.liste(")")
+            self.entre_guillemets = avant
             m.marquer()
         elif suite == "{":
             j = s.find("}", self.i + 2)
@@ -453,6 +477,7 @@ class Analyseur:
             elif nom and nom.group(0).startswith("PAPERCLIP_") and self.variables.get(nom.group(0)) is not None:
                 m.texte += self.variables[nom.group(0)]  # ${PAPERCLIP_API_URL%/} : valeur approchée suffisante
             else:
+                self.analyser_contenu(interieur)
                 m.marquer()
         elif suite == "'":
             j = self.i + 2
@@ -465,12 +490,25 @@ class Analyseur:
                         tampon.append(chr(int(h, 16)))
                         j += 2 + len(h)
                         continue
+                    if code in "uU":
+                        h = re.match(r"[0-9a-fA-F]{1,%d}" % (4 if code == "u" else 8), s[j + 2:j + 10])
+                        if h:
+                            try:
+                                tampon.append(chr(int(h.group(0), 16)))
+                            except (ValueError, OverflowError):
+                                tampon.append("\ufffd")
+                            j += 2 + len(h.group(0))
+                            continue
+                    if code == "c" and j + 2 < n:
+                        tampon.append(chr(ord(s[j + 2].upper()) & 0x1F))
+                        j += 3
+                        continue
                     if code in "01234567":
                         o = re.match(r"[0-7]{1,3}", s[j + 1:j + 4]).group(0)
                         tampon.append(chr(int(o, 8) & 0xFF))
                         j += 1 + len(o)
                         continue
-                    tampon.append({"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "e": "\x1b",
+                    tampon.append({"n": "\n", "t": "\t", "r": "\r", "a": "\a", "b": "\b", "e": "\x1b", "E": "\x1b",
                                    "f": "\f", "v": "\v"}.get(code, code))
                     j += 2
                 else:
@@ -503,6 +541,9 @@ class Analyseur:
             valeur = self.variables[nom]
             if valeur is None:
                 m.marquer()
+            elif not self.entre_guillemets and re.search(r"\s", valeur):
+                m.texte += valeur  # non citée : bash la découpe en plusieurs mots
+                m.marquer()
             else:
                 m.texte += valeur
         else:
@@ -526,6 +567,13 @@ SECRETS_RELATIFS = (".config/tabl", ".supabase", ".config/supabase", ".ssh", ".a
 # Le garde-fou lui-même et les réglages de Claude Code : protégés quel que soit le réglage.
 RE_GARDE_FOU = re.compile(
     r"(^|/)\.claude/(hooks(/|$)|settings[^/]*\.json$)|(^|/)garde_fous\.json$|(^|/)\.claude\.json$")
+# Zones où une écriture se déclenche plus tard, hors de portée du garde-fou : démarrage du shell, configuration et
+# hooks de git, instantanés de shell de Claude Code, lancement à la connexion, démarrage de Python.
+RE_ZONES_DIFFEREES = re.compile(
+    r"(^|/)\.git/(.*/)?(hooks(/|$)|config(\.worktree)?$)|(^|/)\.gitconfig$|(^|/)\.config/git(/|$)"
+    r"|(^|/)shell-snapshots(/|$)|(^|/)node_modules(/|$)"
+    r"|(^|/)\.(zshenv|zprofile|zshrc|zlogin|zlogout|bashrc|bash_profile|bash_login|bash_logout|profile)$"
+    r"|(^|/)library/launch(agents|daemons)(/|$)|\.pth$|(^|/)(site|user)customize\.py$")
 RE_DOSSIER_CLAUDE = re.compile(r"(^|/)\.claude/?$")
 RE_SECRET_TEXTE = re.compile(r"\.config/tabl|(^|/)\.supabase(/|$)|(^|/)\.ssh(/|$)|(^|/)\.aws(/|$)|(^|/)\.netrc$"
                              r"|\.config/gh(/|$)|Library/Keychains|\.config/supabase", re.I)
@@ -543,6 +591,14 @@ def chemin_absolu(chemin: str, dossier: Optional[str]) -> str:
         chemin = DOSSIER_PERSO + chemin.split("HOME", 1)[1].lstrip("}")
     base = dossier or os.getcwd()
     return os.path.realpath(os.path.join(base, chemin))
+
+
+def chemin_sans_liens(chemin: str, dossier: Optional[str]) -> str:
+    """Le chemin tel que tapé (~ développé, .. résolus) mais sans suivre les liens : une écriture via un lien
+    `node_modules/.bin/x` vise aussi le lien lui-même."""
+    if chemin == "~" or chemin.startswith("~/"):
+        chemin = DOSSIER_PERSO + chemin[1:]
+    return os.path.normpath(os.path.join(dossier or os.getcwd(), chemin))
 
 
 def _formes(chemin: str) -> List[str]:
@@ -573,8 +629,59 @@ def est_secret(chemin: str) -> bool:
     return any(est_dans(k, racine) for racine in dossiers_secrets())
 
 
+def dossiers_perso() -> List[str]:
+    """Le vrai dossier personnel et celui que l'environnement annonce (un orchestrateur peut changer HOME)."""
+    sorties = [DOSSIER_PERSO]
+    home = os.environ.get("HOME")
+    if home and home not in sorties:
+        sorties.append(home)
+    return sorties
+
+
+def dossiers_config_claude() -> List[str]:
+    sorties = [os.path.join(h, ".claude") for h in dossiers_perso()]
+    for var in ("CLAUDE_CONFIG_DIR",):
+        valeur = os.environ.get(var)
+        if valeur:
+            sorties.append(valeur)
+    return sorties
+
+
+def dossiers_du_path() -> List[str]:
+    """Dossiers dont un fichier se lance en tapant son nom : on n'y écrit rien (un faux `git` s'y cacherait)."""
+    candidats = [d for d in os.environ.get("PATH", "").split(os.pathsep) if d.startswith("/")]
+    for h in dossiers_perso():
+        candidats += [os.path.join(h, "bin"), os.path.join(h, ".local", "bin")]
+    candidats += ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin"]
+    for base in dossiers_du_projet():
+        candidats.append(os.path.join(base, "node_modules", ".bin"))
+    projets = [cle(p) for p in dossiers_du_projet()]
+    sorties: List[str] = []
+    for d in candidats:
+        for forme in _formes(d):
+            englobe_le_projet = any(est_dans(p, forme) for p in projets)
+            if forme in ("/", "") or forme in (cle(h) for h in dossiers_perso()) or englobe_le_projet:
+                continue
+            if forme not in sorties:
+                sorties.append(forme)
+    return sorties
+
+
+def est_garde_fou_texte(k: str) -> bool:
+    return bool(RE_GARDE_FOU.search(k) or RE_ZONES_DIFFEREES.search(k))
+
+
 def est_garde_fou(chemin: str) -> bool:
-    return bool(RE_GARDE_FOU.search(cle(chemin)))
+    k = cle(chemin)
+    if est_garde_fou_texte(k):
+        return True
+    for dossier in dossiers_config_claude():
+        for forme in _formes(dossier):
+            if est_dans(k, forme) and re.match(
+                    r"/?(settings[^/]*\.json|\.claude\.json|hooks(/|$)|plugins(/|$)|shell-snapshots(/|$))",
+                    k[len(forme):].lstrip("/")):
+                return True
+    return any(est_dans(k, d) for d in dossiers_du_path())
 
 
 def contient_une_zone_protegee(chemin: str) -> bool:
@@ -587,6 +694,7 @@ def contient_une_zone_protegee(chemin: str) -> bool:
     zones = dossiers_secrets() + [cle(os.path.join(DOSSIER_PERSO, ".claude")),
                                   cle(os.path.join(DOSSIER_PERSO, ".claude.json"))]
     zones += [cle(os.path.join(p, ".claude")) for p in dossiers_du_projet()]
+    zones += dossiers_du_path()
     if any(z.startswith(k.rstrip("/") + "/") for z in zones):
         return True
     try:
@@ -666,6 +774,7 @@ def chemins_du_mot(mot: Mot, dossier: Optional[str]) -> List[str]:
             if not morceau:
                 continue
             chemins.append(chemin_absolu(morceau, dossier))
+            chemins.append(chemin_sans_liens(morceau, dossier))
             if mot.glob:
                 try:
                     base = dossier or os.getcwd()
@@ -699,7 +808,7 @@ RE_HOTE_DANS_TEXTE = re.compile(r"supabase\.(co|in|net|io|red)(?![a-z0-9])|poole
                                 r"|api\.supabase\.com", re.I)
 
 MOTS_RESERVES = {"!", "{", "}", "if", "then", "elif", "else", "fi", "while", "until", "do", "done", "time",
-                 "coproc", "function"}
+                 "coproc", "function", "always", "-"}
 ENTETES_SANS_COMMANDE = {"for", "select"}
 
 SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "csh", "tcsh", "fish", "ash"}
@@ -708,6 +817,19 @@ RE_INTERPRETE_CODE = re.compile(r"^(python[0-9.]*|pypy[0-9]*|node|nodejs|deno|bu
 INLINE_CODE = {"-c", "-e", "-E", "-p", "-r", "--eval", "--print", "-x"}
 RE_CODE_OFFUSQUE = re.compile(r"b64decode|fromhex|rot13|atob\(|fromCharCode|marshal\.loads|zlib\.decompress|__import__", re.I)
 RE_CODE_DYNAMIQUE = re.compile(r"\beval\s*\(|\bexec\s*\(|\bcompile\s*\(|importlib")
+RE_PROCESSUS = re.compile(
+    r"subprocess|popen|posix_spawn|\bspawn\w*|\bexec[lv]\w*|\bfork(pty)?\b|\bsystem\b|\bpty\b|\bctypes\b|\bcffi\b"
+    r"|\bgetattr\b|__builtins__|\bpexpect\b|\bos\.startfile|child_process|\bexecsync\b|deno\.command|bun\.spawn"
+    r"|\bshell_exec\b|\bpassthru\b|proc_open|open3|\bnstask\b|\bprocess\s*\(\s*\)|do shell script|\bfunction\s*\("
+    r"|(?<![.\w])exec\s*[(\"'\s]|\brequire\s*\(\s*[^'\"\s)]|\bimport\s*\(\s*[^'\"\s)]|\bprocess\.binding"
+    r"|\bnew\s+function\b", re.I)
+RE_PROCESSUS_COMPACT = re.compile(r"subprocess|popen|child_process|posix_spawn|\.system|os\.exec|os\.spawn|shell_exec|"
+                                  r"proc_open|passthru|ctypes|getattr")
+RE_PROCESSUS_ACCENTS = re.compile(r"`|%x[({\[<|!/]|\bqx\b", re.I)
+RE_PROCESSUS_AWK = re.compile(r"\bsystem\b|\bgetline\b|(?<!\|)\|(?!\|)", re.I)
+LANGAGES_A_ACCENTS = {"ruby", "perl", "php", "irb", "pl", "rb"}
+MSG_PROCESSUS = ("Ce code lance un autre programme (subprocess, system, exec, child_process…) : il échapperait au "
+                 "garde-fou. Écris la commande en clair dans le terminal.")
 MSG_TESTFLIGHT = "Les builds pour TestFlight / les stores ne partent que sur demande explicite du propriétaire."
 # Motifs cherchés dans du code (texte sans espaces ni guillemets) : (garde-fou, motif, message)
 CODE_INTERDIT: List[Tuple[Optional[str], "re.Pattern[str]", str]] = [
@@ -723,7 +845,11 @@ CODE_INTERDIT: List[Tuple[Optional[str], "re.Pattern[str]", str]] = [
     ("secrets", re.compile(r"\.config/?tabl|\.supabase/|\.config/?supabase|\.ssh/|\.aws/|\.netrc|library/keychains|"
                            r"api-keys|security(find|dump|export)|ghauthtoken"),
      MSG_SECRETS),
-    (None, re.compile(r"garde_fous?\.json|garde_fou_agents|\.claude/?(hooks|settings)"), REFUS_GARDE_FOU),
+    (None, re.compile(r"garde_fous?\.json|garde_fou_agents|\.claude/?(hooks|settings)|shell-snapshots|"
+                      r"\.(zshenv|zprofile|zshrc|zlogin|bashrc|bash_profile|profile)(?![a-z0-9_])|\.gitconfig|"
+                      r"\.config/?git|\.git/?(hooks|config)|library/launch(agents|daemons)|sitecustomize|"
+                      r"usercustomize|\.pth(?![a-z0-9_])|\.local/bin|opt/homebrew/s?bin|usr/local/bin|"
+                      r"node_modules/\.bin|~/bin/"), REFUS_GARDE_FOU),
     ("testflight", re.compile(r"flutterbuild(ipa|appbundle)|xcodebuild.{0,60}archive|altool|itmstransporter|fastlane"),
      MSG_TESTFLIGHT),
     ("push_main", re.compile(r"gitpush.{0,80}?(main|master|mac-mini|force|-f)|ghprmerge|ghapi.{0,80}(refs|merge)"),
@@ -769,7 +895,9 @@ VARIABLES_DANGEREUSES = {"PATH", "BASH_ENV", "ENV", "LD_PRELOAD", "LD_LIBRARY_PA
                          "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH", "GIT_EXEC_PATH", "GIT_SSH", "GIT_SSH_COMMAND",
                          "GIT_PROXY_COMMAND", "GIT_ASKPASS", "PYTHONSTARTUP", "NODE_OPTIONS", "ZDOTDIR",
                          "SHELLOPTS", "PROMPT_COMMAND", "HOME", "XDG_CONFIG_HOME", "GIT_DIR", "GIT_WORK_TREE",
-                         "CLAUDE_PROJECT_DIR", "CLAUDE_CONFIG_DIR"}
+                         "CLAUDE_PROJECT_DIR", "CLAUDE_CONFIG_DIR", "IFS", "PS0", "PS1", "PS2", "PS3", "PS4",
+                         "PROMPT", "PROMPT2", "PROMPT3", "PROMPT4", "RPROMPT", "RPS1", "RPS2", "RPROMPT2",
+                         "FPATH", "fpath", "path", "module_path", "MAILPATH"}
 
 ENVELOPPES = {  # nom: (options qui prennent une valeur, NOM=valeur permis)
     "env": ({"-u", "-C", "-P", "--unset", "--chdir"}, True),
@@ -780,12 +908,49 @@ ENVELOPPES = {  # nom: (options qui prennent une valeur, NOM=valeur permis)
     "ionice": ({"-c", "-n", "-p"}, False), "stdbuf": ({"-i", "-o", "-e"}, False),
     "caffeinate": ({"-t", "-w"}, False), "arch": ({"-arch"}, False), "chronic": (set(), False),
     "command": (set(), False), "xcrun": ({"--sdk", "-sdk", "--toolchain"}, False),
+    "noglob": (set(), False), "nocorrect": (set(), False),
 }
 ENVELOPPES_AVEC_SOUS_COMMANDE = {  # nom: mots à sauter après les options
     "bundle": ("exec",), "rbenv": ("exec",), "pyenv": ("exec",), "asdf": ("exec",), "mise": ("exec", "x"),
     "direnv": ("exec",), "poetry": ("run",), "pipenv": ("run",), "pipx": ("run",), "fvm": ("exec",),
     "rtx": ("exec",), "flox": ("activate",),
 }
+
+
+RE_EXECUTABLE_OUVRABLE = re.compile(r"\.(command|app|workflow|terminal|tool|scpt|scptd|action|pkg|mpkg|dmg|sh|zsh|bash|"
+                                    r"csh|ksh|py|rb|pl|jar|osax|saver|prefpane|shortcut)$")
+RACINES_DE_CONFIANCE = ("/usr", "/bin", "/sbin", "/opt", "/nix", "/System", "/Library", "/Applications", "/Developer")
+DOSSIERS_PAQUETS_PERSO = (".local/bin", ".local/share", ".cargo", ".rustup", ".pub-cache", "development/flutter",
+                          ".nvm", ".bun", ".deno", ".pyenv", ".rbenv", ".volta", ".gem", "go/bin", "Library/pnpm",
+                          ".asdf", ".mise", ".fvm", "Library/Android", "Library/Developer", ".npm", ".yarn", ".claude")
+
+
+RE_CONFIG_PUSH = re.compile(r"^(remote\..*\.push|remote\.pushdefault|push\..*|branch\..*\.(merge|remote|pushremote))$")
+
+
+def destination_du_push(dossier: Optional[str]) -> str:
+    """Où un push sans refspec enverrait la branche courante, d'après la configuration réelle de git."""
+    try:
+        res = subprocess.run(["git", "rev-parse", "--symbolic-full-name", "@{push}"], cwd=dossier or None,
+                             capture_output=True, text=True, timeout=5, env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return res.stdout.strip() if res.returncode == 0 else ""
+
+
+def de_confiance(chemin_reel: str) -> bool:
+    """Dossier système ou de paquets connu : on y lance un binaire sans le lire. Les écritures y sont refusées."""
+    k = cle(chemin_reel)
+    if any(est_dans(k, cle(r)) for r in RACINES_DE_CONFIANCE):
+        return True
+    if "/node_modules/" in k:
+        return True
+    if any(est_dans(k, cle(d)) for d in dossiers_du_path()):
+        return True  # dossier du PATH : l'agent n'y écrit jamais (écritures refusées), donc rien n'y vient de lui
+    for h in dossiers_perso():
+        if any(est_dans(k, cle(os.path.join(h, rel))) for rel in DOSSIERS_PAQUETS_PERSO):
+            return True
+    return False
 
 
 class Refus(Exception):
@@ -853,7 +1018,7 @@ class Verificateur:
             self.executer(list(cmd.mots), cmd)
 
     def variable_permise(self, nom: str) -> None:
-        if nom in VARIABLES_DANGEREUSES:
+        if nom in VARIABLES_DANGEREUSES or nom.startswith("GIT_CONFIG"):
             self.refuser(None, f"Pas de modification de la variable {nom} depuis un agent.")
 
     def memoriser_contenu(self, cmd: Commande) -> None:
@@ -873,7 +1038,7 @@ class Verificateur:
             return
         if cible.dynamique or not self.connu:
             for texte in textes_du_mot(cible):
-                if ecriture and RE_GARDE_FOU.search(cle(texte)):
+                if ecriture and est_garde_fou_texte(cle(texte)):
                     raise Refus(REFUS_GARDE_FOU)
                 if RE_SECRET_TEXTE.search(texte):
                     self.refuser("secrets", MSG_SECRETS)
@@ -910,13 +1075,29 @@ class Verificateur:
     def executer(self, mots: List[Mot], cmd: Optional[Commande], plus_args: bool = False) -> None:
         if len(mots) > 2 and mots[0].texte == "function" and not mots[0].cite:
             mots = mots[2:]  # « function nom { corps » : le corps s'exécute comme une commande
-        while mots and (mots[0].texte in MOTS_RESERVES and not mots[0].dynamique and not mots[0].cite):
-            mots = mots[1:]
+        while mots:
+            premier = mots[0]
+            if premier.cite or premier.dynamique:
+                break
+            if premier.texte in MOTS_RESERVES:
+                mots = mots[1:]
+            elif premier.texte == "repeat" and len(mots) >= 2:  # zsh : repeat N commande
+                mots = mots[2:]
+            else:
+                break
         if not mots:
             return
+        for k in range(1, len(mots)):  # zsh : « if cond { commande } » sans point-virgule
+            if mots[k].texte == "{" and not mots[k].cite and not mots[k].dynamique:
+                self.executer(mots[k + 1:], cmd)
+                break
         if plus_args:
             mots = mots + [mot_dynamique()]
         tete = mots[0]
+        if tete.texte.startswith("=") and len(tete.texte) > 1 and not tete.cite and not tete.glob:
+            tete = mot_litteral(tete.texte[1:])  # zsh : =nom vaut le chemin de la commande « nom »
+            tete.dynamique = mots[0].dynamique
+            mots = [tete] + mots[1:]
         if not mots[0].cite and tete.texte in ENTETES_SANS_COMMANDE:
             return
         if tete.texte == "case" and not tete.dynamique:
@@ -936,12 +1117,25 @@ class Verificateur:
 
         if AFFECTATION.match(brut) and not tete.cite:
             return
-        if "/" in brut or brut.startswith("."):
-            self.script_fichier(brut, direct=True)
+        nom_reel = self.fichier_lance(brut)
         self.controle_commune(nom, args, cmd)
         self.dispatcher(nom, args, cmd, tete)
+        if nom_reel and nom_reel != nom:  # un lien `sb` vers la CLI : on juge aussi sous le vrai nom
+            self.controle_commune(nom_reel, args, cmd)
+            self.dispatcher(nom_reel, args, cmd, tete)
 
     def dispatcher(self, nom: str, args: List[Mot], cmd: Optional[Commande], tete: Mot) -> None:
+        if nom == "printf":
+            for a, valeur in zip(args, args[1:]):
+                if a.texte == "-v":
+                    if valeur.dynamique:
+                        self.opaque("variable dynamique de « printf -v »")
+                    self.variable_permise(valeur.texte.split("[")[0])
+        elif nom in ("read", "vared", "declare", "typeset", "local", "readonly", "export"):
+            for a in args:
+                if a.dynamique and not a.texte.startswith("-") and nom in ("read", "vared"):
+                    self.opaque("variable dynamique de « %s »" % nom)
+                self.variable_permise(re.split(r"[=?\[]", a.texte, 1)[0])
         if nom in ENVELOPPES:
             valeurs, assigne = ENVELOPPES[nom]
             if nom == "command" and any(a.texte in ("-v", "-V") for a in args[:2]):
@@ -958,7 +1152,27 @@ class Verificateur:
             self.executer(args[i + 1:], cmd)
         elif nom == "xargs":
             i = self.apres_options(args, {"-I", "-J", "-L", "-n", "-P", "-s", "-E", "-d", "-a", "-R", "-S"})
-            self.executer(args[i:], cmd, plus_args=True)
+            commande = list(args[i:])
+            remplacement = self.remplacement_xargs(args[:i])
+            if remplacement:  # la chaîne de remplacement est remplacée par l'entrée : inconnue à l'analyse
+                for k, mot in enumerate(commande):
+                    if remplacement in mot.texte:
+                        copie = Mot()
+                        copie.texte, copie.cite, copie.glob = mot.texte, mot.cite, mot.glob
+                        copie.marquer()
+                        commande[k] = copie
+            self.executer(commande, cmd, plus_args=True)
+        elif nom == "trap":
+            positionnels = [a for a in args if not (a.texte.startswith("-") and len(a.texte) > 1)]
+            if positionnels and (positionnels[0].dynamique or positionnels[0].texte not in ("-", "")):
+                self.texte_de_commande(positionnels[:1])
+        elif nom == "autoload":
+            if any("/" in a.texte or a.dynamique for a in args):
+                self.refuser(None, "« autoload » d'un fichier hors des dossiers de fonctions : refusé.")
+        elif nom == "open":
+            self.ouvrir(args)
+        elif nom in ("shortcuts", "automator"):
+            self.refuser(None, f"« {nom} » lance des actions hors de portée du garde-fou : lance les commandes directement.")
         elif nom in ENVELOPPES_AVEC_SOUS_COMMANDE:
             i = self.apres_options(args)
             if i < len(args) and args[i].texte in ENVELOPPES_AVEC_SOUS_COMMANDE[nom]:
@@ -1006,7 +1220,7 @@ class Verificateur:
         elif nom in ("make", "just", "rake", "task", "gradle", "gradlew", "ninja", "cmake"):
             self.opaque(f"{nom} exécute des recettes qu'on ne peut pas lire")
         elif nom in CLIENTS_RESEAU:
-            self.reseau(nom, args)
+            self.reseau(nom, args, cmd)
         elif nom in CLIENTS_BAS_NIVEAU:
             self.reseau_bas_niveau(nom, args)
         elif RE_INTERPRETE_CODE.match(nom):
@@ -1063,7 +1277,7 @@ class Verificateur:
             avec_blancs = any(c.isspace() for c in mot.texte)
             if mot.dynamique or not self.connu:
                 for texte in textes_du_mot(mot):
-                    if not lecture_seule and not avec_blancs and RE_GARDE_FOU.search(cle(texte)):
+                    if not lecture_seule and not avec_blancs and est_garde_fou_texte(cle(texte)):
                         raise Refus(REFUS_GARDE_FOU)
                     if RE_SECRET_TEXTE.search(texte) and not avec_blancs:
                         self.refuser("secrets", MSG_SECRETS)
@@ -1093,6 +1307,26 @@ class Verificateur:
             self.opaque("commande construite avec une variable ou une substitution")
             return
         self.sous().verifier_shell(" ".join(a.texte for a in args))
+
+    @staticmethod
+    def remplacement_xargs(options: List[Mot]) -> Optional[str]:
+        remplacement = None
+        j = 0
+        while j < len(options):
+            t = options[j].texte
+            if t in ("-I", "-J") and j + 1 < len(options):
+                remplacement = options[j + 1].texte
+                j += 1
+            elif t.startswith(("-I", "-J")) and len(t) > 2:
+                remplacement = t[2:]
+            elif t in ("-i", "--replace"):
+                remplacement = "{}"
+            elif t.startswith("--replace="):
+                remplacement = t.split("=", 1)[1]
+            elif t.startswith("-i") and len(t) > 2 and not t.startswith("--"):
+                remplacement = t[2:]
+            j += 1
+        return remplacement or None
 
     def entree_connue(self, cmd: Optional[Commande]) -> Optional[str]:
         """Le texte lu sur l'entrée standard, s'il est connu (heredoc, echo/printf/cat en tube)."""
@@ -1139,7 +1373,62 @@ class Verificateur:
             return
         self.lire_stdin(cmd, "shell")
 
-    def lire_stdin(self, cmd: Optional[Commande], genre: str) -> None:
+    def fichier_lance(self, brut: str) -> Optional[str]:
+        """Le fichier que le shell lancerait : résolu par le PATH réel, lien suivi. Renvoie son vrai nom."""
+        if "/" in brut or brut.startswith("."):
+            chemin = chemin_sans_liens(brut, self.dossier)
+            avec_chemin = True
+        else:
+            trouve = shutil.which(brut, path=os.environ.get("PATH"))
+            if not trouve:
+                return None
+            chemin = os.path.abspath(trouve)
+            avec_chemin = False
+        reel = os.path.realpath(chemin)
+        nom_reel = os.path.basename(reel).casefold()
+        if nom_reel.endswith(".exe"):
+            nom_reel = nom_reel[:-4]
+        if RE_SCRIPT_PROD.search(nom_reel) or RE_SCRIPT_PROD.search(os.path.basename(chemin).casefold()):
+            self.refuser("scripts_prod", "Ce script écrit dans la vraie base Supabase. " + A_POUSSER)
+        if not os.path.exists(reel):
+            if avec_chemin and cle(reel) not in self.contenus:
+                self.opaque("exécutable absent au moment du contrôle (écrit ou compilé pendant la ligne ?)")
+            elif cle(reel) in self.contenus:
+                self.script_fichier(reel, direct=True)
+            return nom_reel
+        if not de_confiance(reel):
+            self.script_fichier(reel, direct=True)
+        return nom_reel
+
+    def ouvrir(self, args: List[Mot]) -> None:
+        """`open` lance les scripts .command, les applications, les automatisations : hors de tout hook."""
+        saute = False
+        for mot in args:
+            if saute:
+                saute = False
+                continue
+            texte = mot.texte
+            if texte in ("-a", "-b"):
+                saute = True
+                continue
+            if texte == "--args":
+                self.refuser(None, "« open --args » lance une application avec des arguments : refusé.")
+            if mot.dynamique:
+                self.opaque("argument dynamique de « open »")
+                continue
+            if texte.startswith("-") or "://" in texte:
+                continue
+            if RE_EXECUTABLE_OUVRABLE.search(texte.casefold().rstrip("/")):
+                self.refuser(None, "« open » d'un script ou d'une application : refusé (il s'exécute hors du "
+                                   "garde-fou).")
+            try:
+                absolu = chemin_absolu(texte, self.dossier)
+                if os.path.isfile(absolu) and os.access(absolu, os.X_OK):
+                    self.refuser(None, "« open » d'un fichier exécutable : refusé (il s'exécute hors du garde-fou).")
+            except OSError:
+                pass
+
+    def lire_stdin(self, cmd: Optional[Commande], genre: str, langage: str = "") -> None:
         texte = self.entree_connue(cmd)
         if texte is None:
             self.opaque("programme lu sur l'entrée standard, dont on ne connaît pas le contenu")
@@ -1147,7 +1436,7 @@ class Verificateur:
         if genre == "shell":
             self.sous().verifier_shell(texte)
         else:
-            self.verifier_code(texte, inline=True)
+            self.verifier_code(texte, inline=True, langage=langage)
 
     def source(self, args: List[Mot]) -> None:
         if not args:
@@ -1157,7 +1446,8 @@ class Verificateur:
             return
         self.script_fichier(args[0].texte, direct=False, type_script="shell")
 
-    def script_fichier(self, chemin: str, direct: bool, type_script: Optional[str] = None) -> None:
+    def script_fichier(self, chemin: str, direct: bool, type_script: Optional[str] = None,
+                       langage: str = "") -> None:
         base = os.path.basename(chemin).casefold()
         if RE_SCRIPT_PROD.search(base):
             self.refuser("scripts_prod", "Ce script écrit dans la vraie base Supabase. " + A_POUSSER)
@@ -1179,6 +1469,8 @@ class Verificateur:
                 self.opaque("script illisible")
                 return
             if b"\0" in brut[:4096]:
+                if direct and not de_confiance(absolu):
+                    self.opaque("programme compilé hors des dossiers système et de paquets : impossible à vérifier")
                 return  # binaire : hors de portée
             if len(brut) > TAILLE_SCRIPT_MAX:
                 self.opaque("script trop gros pour être vérifié")
@@ -1199,11 +1491,24 @@ class Verificateur:
         if type_script == "shell":
             self.sous().verifier_shell(contenu)
         else:
-            self.sous().verifier_code(contenu, inline=False)
+            if not langage:
+                if premiere.startswith("#!") and premiere[2:].split():
+                    langage = os.path.basename(premiere[2:].split()[-1])
+                else:
+                    langage = base.rsplit(".", 1)[-1]
+            hors_depot = not any(est_dans(k, cle(d)) for d in dossiers_du_projet()) and not de_confiance(absolu)
+            self.sous().verifier_code(contenu, inline=False, langage=langage, hors_depot=hors_depot)
 
-    def verifier_code(self, texte: str, inline: bool) -> None:
+    def verifier_code(self, texte: str, inline: bool, langage: str = "", hors_depot: bool = False) -> None:
         """Code Python/Node/Ruby… : on cherche ce qu'il pourrait lancer, quotes et « + » ignorés."""
         compact = re.sub(r"[\s'\"+,()\[\]{}\\`]", "", texte.casefold())
+        if inline or hors_depot:  # code qu'on ne peut pas relire dans le dépôt : aucun lancement de processus
+            if RE_PROCESSUS.search(texte) or RE_PROCESSUS_COMPACT.search(compact):
+                raise Refus(MSG_PROCESSUS)
+            if langage in LANGAGES_A_ACCENTS and RE_PROCESSUS_ACCENTS.search(texte):
+                raise Refus(MSG_PROCESSUS)
+            if langage in ("awk", "gawk", "nawk") and RE_PROCESSUS_AWK.search(texte):
+                raise Refus(MSG_PROCESSUS)
         if RE_CODE_OFFUSQUE.search(texte) or (inline and RE_CODE_DYNAMIQUE.search(texte)):
             self.opaque("code qui reconstruit ses commandes (base64, exec, eval…)")
         for garde_fou, motif, message in CODE_INTERDIT:
@@ -1221,13 +1526,13 @@ class Verificateur:
             if any(a.texte == "-f" for a in args):
                 for a, suivant in zip(args, args[1:]):
                     if a.texte == "-f":
-                        self.script_fichier(suivant.texte, direct=False, type_script="code")
+                        self.script_fichier(suivant.texte, direct=False, type_script="code", langage="awk")
                 return
             if i < len(args):
                 if args[i].dynamique:
                     self.opaque("programme awk dynamique")
                 else:
-                    self.verifier_code(args[i].texte, inline=True)
+                    self.verifier_code(args[i].texte, inline=True, langage="awk")
             return
         i = 0
         while i < len(args):
@@ -1243,14 +1548,14 @@ class Verificateur:
                 if args[i + 1].dynamique:
                     self.opaque("code passé en argument, construit dynamiquement")
                     return
-                self.verifier_code(args[i + 1].texte, inline=True)
+                self.verifier_code(args[i + 1].texte, inline=True, langage=nom)
                 return
             if texte in ("--eval", "--print"):
                 if i + 1 < len(args):
                     if args[i + 1].dynamique:
                         self.opaque("code passé en argument, construit dynamiquement")
                         return
-                    self.verifier_code(args[i + 1].texte, inline=True)
+                    self.verifier_code(args[i + 1].texte, inline=True, langage=nom)
                 return
             if texte == "-m" or texte == "-mrun":
                 if i + 1 < len(args):
@@ -1264,7 +1569,7 @@ class Verificateur:
                 i += 2
                 continue
             if texte == "-" and i + 1 >= len(args):
-                self.lire_stdin(cmd, "code")
+                self.lire_stdin(cmd, "code", nom)
                 return
             if texte.startswith("-") and len(texte) > 1:
                 i += 1
@@ -1280,9 +1585,9 @@ class Verificateur:
                     i += 1
                 if i >= len(args):
                     return
-            self.script_fichier(args[i].texte, direct=False, type_script="code")
+            self.script_fichier(args[i].texte, direct=False, type_script="code", langage=nom)
         elif cmd is not None and (cmd.heredoc is not None or cmd.producteur is not None):
-            self.lire_stdin(cmd, "code")
+            self.lire_stdin(cmd, "code", nom)
 
     def changer_de_dossier(self, args: List[Mot]) -> None:
         cibles = [a for a in args if not a.texte.startswith("-") or a.dynamique]
@@ -1354,17 +1659,81 @@ class Verificateur:
         if sous_commande in ("apply", "am"):
             self.opaque("git apply/am applique un patch qu'on ne peut pas lire")
         elif sous_commande == "config":
-            if any(re.match(r"^(alias\.|core\.(sshcommand|hookspath|fsmonitor|editor|pager)|credential\.|url\.|"
-                            r"include|filter\.|diff\..*(command|textconv)|gpg\.program)", a.texte.casefold().lstrip("-"))
-                   for a in reste if not a.texte.startswith("--")):
-                self.refuser(None, "Pas de modification de la configuration git qui lance des commandes (alias, "
-                                   "hooks, credential…).")
+            self.git_config(reste)
+        elif sous_commande == "branch":
+            self.git_branch(reste)
+        elif sous_commande in ("checkout", "switch"):
+            self.git_suivi(reste)
         elif sous_commande == "push":
             self.git_push(reste, dossier)
         elif sous_commande in ("remote", "submodule", "worktree", "bundle", "archive", "maintenance", "mergetool",
                                "difftool", "citool", "gui", "lfs", "cvsimport"):
             if sous_commande in ("mergetool", "difftool", "citool", "gui", "cvsimport"):
                 self.opaque(f"git {sous_commande} lance un programme externe")
+
+    def git_config(self, reste: List[Mot]) -> None:
+        if any(re.match(r"^(alias\.|core\.(sshcommand|hookspath|fsmonitor|editor|pager)|credential\.|url\.|"
+                        r"include|filter\.|diff\..*(command|textconv)|gpg\.program)", a.texte.casefold().lstrip("-"))
+               for a in reste if not a.texte.startswith("--")):
+            self.refuser(None, "Pas de modification de la configuration git qui lance des commandes (alias, "
+                               "hooks, credential…).")
+        lecture = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--list", "-l", "--unset", "--unset-all",
+                   "--remove-section", "--rename-section", "--show-origin", "--show-scope", "--name-only"}
+        if any(a.texte in lecture for a in reste if not a.dynamique):
+            return
+        for a in reste:
+            if a.texte.startswith("-") and not a.dynamique:
+                continue
+            if a.dynamique:
+                self.opaque("clé de configuration git dynamique")
+                return
+            if RE_CONFIG_PUSH.match(a.texte.casefold()):
+                self.refuser("push_main", "Pas de réglage git qui change la destination d'un push (remote.*.push, "
+                                          "push.*, branch.*.merge/remote) : travaille sur une branche.")
+            break
+
+    @staticmethod
+    def branche_protegee(nom: str) -> bool:
+        nom = re.sub(r"^refs/(heads|remotes)/", "", nom.casefold())
+        nom = re.sub(r"^remotes/", "", nom)
+        return nom in BRANCHES_PROTEGEES or ("/" in nom and nom.split("/", 1)[1] in BRANCHES_PROTEGEES)
+
+    def git_amont(self, mot: Mot) -> None:
+        if mot.dynamique or mot.glob or mot.accolades:
+            self.opaque("branche amont dynamique")
+        elif self.branche_protegee(mot.texte):
+            self.refuser("push_main", "Pas de branche suivant main/master : un push y enverrait tes commits.")
+
+    def git_branch(self, reste: List[Mot]) -> None:
+        saute = False
+        positionnels: List[Mot] = []
+        suivi = False
+        for k, mot in enumerate(reste):
+            if saute:
+                saute = False
+                continue
+            texte = mot.texte
+            if texte in ("-u", "--set-upstream-to"):
+                if k + 1 < len(reste):
+                    self.git_amont(reste[k + 1])
+                saute = True
+            elif texte.startswith("--set-upstream-to="):
+                self.git_amont(mot_litteral(texte.split("=", 1)[1]))
+            elif re.match(r"^-u.", texte) and not texte.startswith("--"):
+                self.git_amont(mot_litteral(texte[2:]))
+            elif texte in ("-t", "--track") or texte.startswith("--track="):
+                suivi = True
+            elif not texte.startswith("-") or mot.dynamique:
+                positionnels.append(mot)
+        if suivi:
+            for mot in positionnels[1:]:
+                self.git_amont(mot)
+
+    def git_suivi(self, reste: List[Mot]) -> None:
+        if any(a.texte in ("-t", "--track") or a.texte.startswith("--track=") for a in reste):
+            for mot in reste:
+                if not mot.texte.startswith("-") or mot.dynamique:
+                    self.git_amont(mot)
 
     def analyse_git(self, args: List[Mot]) -> Tuple[int, Optional[str], str]:
         """Saute les options globales de git ; renvoie (indice de la sous-commande, nom, dossier)."""
@@ -1433,6 +1802,10 @@ class Verificateur:
         if not refspecs:
             if branche in BRANCHES_PROTEGEES or not branche:
                 raise Refus("Tu es sur main/master : pas de push depuis cette branche. Travaille sur une branche à toi.")
+            destination = destination_du_push(dossier)
+            if destination and self.branche_protegee(destination):
+                raise Refus("La configuration git enverrait ce push sur main/master : refusé. Travaille sur une "
+                            "branche à toi.")
             return
         for mot in refspecs:
             if mot.dynamique or mot.glob or mot.accolades:
@@ -1497,7 +1870,44 @@ class Verificateur:
                     self.refuser("push_main", "« gh api » en écriture peut fusionner ou modifier main : refusé. "
                                               "Seuls les commentaires et tickets passent.")
 
-    def reseau(self, nom: str, args: List[Mot]) -> None:
+    def hote_dans_valeur(self, mot: Mot) -> None:
+        if mot.dynamique and not mot.texte:
+            self.opaque("valeur d'option réseau construite dynamiquement")
+        elif RE_HOTE_DANS_TEXTE.search(mot.texte):
+            self.refuser("api_supabase", "Pas d'appel direct aux serveurs Supabase (prod) depuis un agent. " + A_POUSSER)
+
+    def fichier_d_adresses(self, nom_fichier: Mot, cmd: Optional[Commande]) -> None:
+        """wget -i : chaque ligne du fichier est une adresse à télécharger."""
+        if nom_fichier.dynamique or nom_fichier.glob or nom_fichier.accolades:
+            self.opaque("fichier d'adresses dont le nom est dynamique")
+            return
+        if nom_fichier.texte == "-":
+            texte = self.entree_connue(cmd)
+            if texte is None:
+                self.opaque("liste d'adresses lue sur l'entrée standard, dont on ne connaît pas le contenu")
+                return
+        else:
+            absolu = chemin_absolu(nom_fichier.texte, self.dossier)
+            texte = self.contenus.get(cle(absolu))
+            if texte is None:
+                if cle(absolu) in self.ecrits:
+                    self.opaque("liste d'adresses écrite dans la même commande")
+                    return
+                try:
+                    with open(absolu, "r", encoding="utf-8", errors="replace") as f:
+                        texte = f.read(TAILLE_SCRIPT_MAX + 1)
+                except OSError:
+                    self.opaque("liste d'adresses illisible ou absente")
+                    return
+                if len(texte) > TAILLE_SCRIPT_MAX:
+                    self.opaque("liste d'adresses trop grosse pour être vérifiée")
+                    return
+        for ligne in texte.splitlines():
+            ligne = ligne.strip()
+            if ligne and not ligne.startswith("#"):
+                self.verifier_url(mot_litteral(ligne))
+
+    def reseau(self, nom: str, args: List[Mot], cmd: Optional[Commande] = None) -> None:
         avec_valeur = {"-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--data-ascii", "--json",
                        "-F", "--form", "--form-string", "-H", "--header", "-A", "--user-agent", "-u", "--user",
                        "-X", "--request", "-o", "--output", "-T", "--upload-file", "-e", "--referer", "-b",
@@ -1508,15 +1918,49 @@ class Verificateur:
         urls_reelles: List[Mot] = []
         saute = False
         prochain_est_url = False
+        prochain_est_hote = False
+        prochain_est_liste = False
+        prochain_est_sortie = False
+        if nom == "wget":
+            options_hote = ("--header", "-e", "--execute", "--referer", "--bind-address")
+            courtes_hote = "e"
+        else:
+            options_hote = ("-H", "--header", "--resolve", "--connect-to", "-x", "--proxy", "--preproxy",
+                            "--proxy-header", "--doh-url", "--referer", "-e")
+            courtes_hote = "Hxe"
         for a in args:
             if saute:
                 saute = False
                 if prochain_est_url:
                     urls_reelles.append(a)
                     prochain_est_url = False
+                if prochain_est_hote:
+                    self.hote_dans_valeur(a)
+                    prochain_est_hote = False
+                if prochain_est_liste:
+                    self.fichier_d_adresses(a, cmd)
+                    prochain_est_liste = False
+                if prochain_est_sortie:
+                    for chemin in chemins_du_mot(a, self.dossier):
+                        self.ecrits.add(cle(chemin))
+                    prochain_est_sortie = False
                 continue
             if a.texte == "--url":
                 saute = prochain_est_url = True
+            elif a.texte in options_hote:
+                saute = prochain_est_hote = True
+            elif a.texte.startswith("--") and a.texte.split("=", 1)[0] in options_hote and "=" in a.texte:
+                self.hote_dans_valeur(mot_litteral(a.texte.split("=", 1)[1]))
+            elif re.match(r"^-[%s]." % courtes_hote, a.texte) and not a.texte.startswith("--"):
+                self.hote_dans_valeur(mot_litteral(a.texte[2:]))
+            elif nom in ("wget", "aria2c") and a.texte in ("-i", "--input-file"):
+                saute = prochain_est_liste = True
+            elif nom in ("wget", "aria2c") and a.texte.startswith("--input-file="):
+                self.fichier_d_adresses(mot_litteral(a.texte.split("=", 1)[1]), cmd)
+            elif nom in ("wget", "aria2c") and re.match(r"^-i.", a.texte) and not a.texte.startswith("--"):
+                self.fichier_d_adresses(mot_litteral(a.texte[2:]), cmd)
+            elif a.texte in ("-o", "--output") or (nom == "wget" and a.texte in ("-O", "--output-document")):
+                saute = prochain_est_sortie = True
             elif a.texte in avec_valeur:
                 saute = True
             elif a.texte.startswith("--url="):
@@ -1610,6 +2054,9 @@ class Verificateur:
         self.executer([nouveau] + list(args[i + 1:]), None)
 
     def gestionnaire(self, nom: str, args: List[Mot], cmd: Optional[Commande]) -> None:
+        if nom == "bun" and any(a.texte in ("-e", "--eval", "-p", "--print") for a in args):
+            self.interprete("bun", args, cmd)
+            return
         i = self.apres_options(args, {"--prefix", "--cwd", "-C", "--dir", "--filter", "-w", "--workspace", "-F"})
         if i >= len(args):
             return
@@ -1708,7 +2155,7 @@ def verifier_chemin_fichier(chemin: str, dossier: Optional[str], ecriture: bool,
     if not chemin:
         return None
     absolu = chemin_absolu(chemin, dossier)
-    if ecriture and est_garde_fou(absolu):
+    if ecriture and (est_garde_fou(absolu) or est_garde_fou(chemin_sans_liens(chemin, dossier))):
         return REFUS_GARDE_FOU
     if "secrets" in actifs and est_secret(absolu):
         return MSG_SECRETS

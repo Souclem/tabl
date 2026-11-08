@@ -33,9 +33,11 @@ Pour revenir en arrière : `git revert` du commit.
 python3 scripts/garde_fou_proposition/test_garde_fou.py
 ```
 
-`cas.json` contient plus de 350 cas (outil, entrée, verdict attendu, section du
+`cas.json` contient plus de 600 cas (outil, entrée, verdict attendu, section du
 rapport) : un cas par contournement et par faux positif de TAB-9, plus les gestes
-légitimes qui doivent passer (git, flutter, Paperclip API, lecture du hook…). Les
+légitimes qui doivent passer (git, flutter, Paperclip API, lecture du hook…), puis un
+cas par contournement relevé à la revue de sécurité de TAB-32 (sections « revue
+sécurité TAB-32 §1 … §12 »). Les
 chaînes réservées sont dans le JSON et non dans le `.py`, pour ne pas faire refuser
 le fichier de test à l'ancien hook. `test_garde_fou.py` ajoute les tests de
 l'interface (`main()` : sortie, message, entrée illisible), des réglages (décoché,
@@ -80,12 +82,39 @@ les lance dans son terminal.
    la branche courante réelle, `--all`, `--mirror`, `--delete`, push forcé, alias git,
    `git config alias.*`, `-c alias.*`). `gh pr merge`, `gh auth token` et `gh api` en
    écriture (hors commentaires et tickets) sont refusés.
-8. **Le garde-fou se protège toujours**, même tout décoché : toute écriture sur `.claude/hooks`,
-   `.claude/settings*.json`, `garde_fous.json` (éditeur, redirection, `sed -i`, `cp`/`mv`/`rm`,
-   `tee`, `git apply`, code `python -c`/`node -e`…) est refusée. Également refusés :
-   modifier `PATH`, `HOME`, `BASH_ENV`… (`export`, `env`, préfixe), définir un alias, lancer
+8. **Zones protégées en écriture, réglage décoché ou non** (éditeur, redirection, `sed -i`,
+   `cp`/`mv`/`rm`, `tee`, `git apply`, code `python -c`/`node -e`…) : `.claude/hooks`,
+   `.claude/settings*.json` et `garde_fous.json` ; `$CLAUDE_CONFIG_DIR/settings*.json` et
+   `shell-snapshots/` ; les fichiers de démarrage du shell (`.zshenv`, `.zprofile`, `.zshrc`,
+   `.zlogin`, `.bashrc`, `.bash_profile`, `.profile`, pour le HOME réel et celui de
+   l'environnement) ; la configuration git (`.git/hooks`, `.git/config`, `config.worktree`,
+   `~/.gitconfig`, `~/.config/git`) ; les dossiers du `PATH` (`~/bin`, `~/.local/bin`,
+   `/opt/homebrew/bin`, `node_modules/.bin`…) ; les tâches différées (`~/Library/LaunchAgents`,
+   fichiers `.pth`, `sitecustomize.py`). Également refusés : modifier `PATH`, `HOME`, `IFS`,
+   `FPATH`, les variables d'invite (`PS1`–`PS4`, `PROMPT`, `PROMPT_COMMAND`…), `BASH_ENV`…
+   (`export`, `env`, préfixe, `printf -v`, `read`), poser un `trap`, définir un alias, lancer
    une session d'agent imbriquée (`claude -p`, `codex`…), et les lanceurs différés
-   (`crontab`, `at`, `launchctl`, `tmux`, `script`…).
+   (`crontab`, `at`, `launchctl`, `tmux`, `script`, `shortcuts`, `automator`…).
+9. **Push sur `main` par la configuration git** : `git config` sur `remote.*.push`, `push.*`,
+   `branch.*.merge|remote|pushremote`, `remote.pushdefault` refusé ; `git branch -u`,
+   `--set-upstream-to`, `--track` vers `main`/`master`/`mac-mini` refusés ; un push sans
+   refspec est jugé sur sa vraie destination (`git rev-parse --symbolic-full-name @{push}`).
+10. **Code inline et scripts hors dépôt** (`-c`, `-e`, stdin, heredoc, script qui n'est ni dans
+    le dépôt ni dans un dossier système ou de paquets) : tout lancement de processus est
+    refusé (`subprocess`, `os.system`, `exec*`, `spawn*`, `popen`, `pty`, `child_process`,
+    `Deno.Command`, `Bun.spawn`, accents graves en ruby/perl/php, `Process`/`NSTask`,
+    `do shell script`, `system`/`getline`/`|` d'awk), ainsi que les accès dynamiques
+    (`getattr`, `ctypes`, `require` non littéral…).
+11. **Quel fichier est réellement lancé** : la commande est résolue avec le vrai `PATH` puis
+    `realpath` (un lien `sb` vers la CLI Supabase est jugé sous les deux noms) ; un script
+    résolu hors des dossiers de confiance est lu ; un exécutable absent au moment du
+    contrôle (compilé ou téléchargé dans la même ligne) est refusé, sauf s'il est écrit avec
+    un contenu connu ; un binaire hors des dossiers système, de paquets et du `PATH` est
+    refusé. `open` d'un exécutable, d'un `.command`/`.app`/`.workflow`/`.terminal`, ou avec
+    `--args` est refusé.
+12. **Réseau** : `wget -i` / `--input-file` lit le fichier d'adresses (ou refuse s'il est
+    illisible ou sur stdin) ; les hôtes cachés dans `-H`, `--header`, `--resolve`,
+    `--connect-to`, `-x`, `--proxy` sont refusés comme les URL.
 
 ## Limites assumées (à connaître)
 
@@ -97,6 +126,14 @@ peut pas voir :
 - les effets d'un `npm install` / `pip install` (scripts d'installation), ou de
   `npx <paquet arbitraire>` ;
 - un alias ou une fonction déjà définis dans le shell de l'utilisateur ;
+- le shell zsh (celui de l'outil Bash) a des règles propres (`=cmd`, `noglob`, `repeat`,
+  `{ … }` sans `;`, options `setopt`…) : les cas connus sont couverts, pas toutes les
+  options de zsh ;
+- les dossiers inscriptibles du `PATH` : le script protège ceux qu'il connaît (le `PATH`
+  réel au lancement, `~/bin`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
+  `node_modules/.bin`), mais un dossier ajouté au `PATH` plus tard par l'utilisateur, ou un
+  dossier inscriptible hors de ces emplacements, laisse un faux `git` ou `supabase`
+  s'y cacher ;
 - `version:` de `pubspec.yaml` modifié par un `sed` ordinaire : reste détecté seulement
   à la relecture de la branche (ça n'ouvre pas de geste de prod à lui seul).
 
