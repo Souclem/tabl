@@ -564,17 +564,30 @@ def analyser_commande(texte: str, variables: Optional[Dict[str, Optional[str]]] 
 SECRETS_RELATIFS = (".config/tabl", ".supabase", ".config/supabase", ".ssh", ".aws", ".gnupg", ".netrc",
                     ".config/gh", "Library/Keychains", ".docker/config.json")
 
-# Le garde-fou lui-même et les réglages de Claude Code : protégés quel que soit le réglage.
-RE_GARDE_FOU = re.compile(
-    r"(^|/)\.claude/(hooks(/|$)|settings[^/]*\.json$)|(^|/)garde_fous\.json$|(^|/)\.claude\.json$")
-# Zones où une écriture se déclenche plus tard, hors de portée du garde-fou : démarrage du shell, configuration et
-# hooks de git, instantanés de shell de Claude Code, lancement à la connexion, démarrage de Python.
+# Le garde-fou lui-même, les réglages de Claude Code, tout ce que Claude Code, git ou le shell lancent plus tard :
+# protégés en écriture quel que soit le réglage.
+RE_GARDE_FOU = re.compile(r"(^|/)garde_fous\.json$|(^|/)\.claude\.json$|(^|/)\.mcp\.json$")
+# .claude/ en entier (skills, agents, commandes « !… », hooks, réglages, plugins) : seule la mémoire des agents en sort.
+RE_DOSSIER_CLAUDE_TEXTE = re.compile(r"(^|/)\.claude(/|$)")
+RE_MEMOIRE_AGENT = re.compile(r"^/?projects/[^/]+/memory(/|$)")
+# Zones où une écriture se déclenche plus tard, hors de portée du garde-fou : démarrage du shell, dossier .git (hooks,
+# configuration, références, attributs), instantanés de shell de Claude Code, lancement à la connexion, démarrage de
+# Python, direnv/mise.
 RE_ZONES_DIFFEREES = re.compile(
-    r"(^|/)\.git/(.*/)?(hooks(/|$)|config(\.worktree)?$)|(^|/)\.gitconfig$|(^|/)\.config/git(/|$)"
-    r"|(^|/)shell-snapshots(/|$)|(^|/)node_modules(/|$)"
+    r"(^|/)\.git(/|$)|(^|/)\.gitconfig$|(^|/)\.config/git(/|$)|(^|/)\.config/fish(/|$)"
+    r"|(^|/)shell-snapshots(/|$)|(^|/)node_modules(/|$)|(^|/)\.envrc$|(^|/)\.?mise\.toml$"
     r"|(^|/)\.(zshenv|zprofile|zshrc|zlogin|zlogout|bashrc|bash_profile|bash_login|bash_logout|profile)$"
-    r"|(^|/)library/launch(agents|daemons)(/|$)|\.pth$|(^|/)(site|user)customize\.py$")
+    r"|(^|/)library/(launchagents|launchdaemons|services|scripts|workflows)(/|$)|\.pth$|(^|/)(site|user)customize\.py$")
 RE_DOSSIER_CLAUDE = re.compile(r"(^|/)\.claude/?$")
+# Dossiers dont un fichier se lance sans être lu (binaires système, paquets) : une seule liste pour la confiance ET
+# pour la protection en écriture (un dossier de confiance où l'agent peut écrire ne l'est plus).
+RACINES_DE_CONFIANCE = ("/usr", "/bin", "/sbin", "/opt", "/nix", "/System", "/Library", "/Applications", "/Developer")
+DOSSIERS_PAQUETS_PERSO = (".local/bin", ".local/share", ".cargo", ".rustup", ".pub-cache", "development/flutter",
+                          ".nvm", ".bun", ".deno", ".pyenv", ".rbenv", ".volta", ".gem", "go/bin", "Library/pnpm",
+                          ".asdf", ".mise", ".fvm", "Library/Android", "Library/Developer", ".npm", ".yarn")
+RE_ZONES_CONFIANCE_TEXTE = re.compile(
+    r"^(" + "|".join(re.escape(r.casefold()) for r in RACINES_DE_CONFIANCE) + r")(/|$)"
+    r"|(^|/)(" + "|".join(re.escape(d.casefold()) for d in DOSSIERS_PAQUETS_PERSO) + r")(/|$)")
 RE_SECRET_TEXTE = re.compile(r"\.config/tabl|(^|/)\.supabase(/|$)|(^|/)\.ssh(/|$)|(^|/)\.aws(/|$)|(^|/)\.netrc$"
                              r"|\.config/gh(/|$)|Library/Keychains|\.config/supabase", re.I)
 
@@ -667,8 +680,19 @@ def dossiers_du_path() -> List[str]:
     return sorties
 
 
+def _dans_dossier_claude(k: str) -> bool:
+    """Un chemin sous un dossier `.claude` (projet ou personnel), hors la mémoire des agents."""
+    m = RE_DOSSIER_CLAUDE_TEXTE.search(k)
+    if not m:
+        return False
+    reste = k[m.end():]
+    return not (RE_MEMOIRE_AGENT.match(reste) and ".." not in reste.split("/"))
+
+
 def est_garde_fou_texte(k: str) -> bool:
-    return bool(RE_GARDE_FOU.search(k) or RE_ZONES_DIFFEREES.search(k))
+    """Zone où un agent n'écrit jamais : garde-fou, réglages, dossiers lancés plus tard, dossiers de confiance."""
+    return bool(RE_GARDE_FOU.search(k) or RE_ZONES_DIFFEREES.search(k) or RE_ZONES_CONFIANCE_TEXTE.search(k)
+                or _dans_dossier_claude(k))
 
 
 def est_garde_fou(chemin: str) -> bool:
@@ -677,10 +701,10 @@ def est_garde_fou(chemin: str) -> bool:
         return True
     for dossier in dossiers_config_claude():
         for forme in _formes(dossier):
-            if est_dans(k, forme) and re.match(
-                    r"/?(settings[^/]*\.json|\.claude\.json|hooks(/|$)|plugins(/|$)|shell-snapshots(/|$))",
-                    k[len(forme):].lstrip("/")):
-                return True
+            if est_dans(k, forme):
+                reste = k[len(forme):].lstrip("/")
+                if not (RE_MEMOIRE_AGENT.match(reste) and ".." not in reste.split("/")):
+                    return True
     return any(est_dans(k, d) for d in dossiers_du_path())
 
 
@@ -897,7 +921,18 @@ VARIABLES_DANGEREUSES = {"PATH", "BASH_ENV", "ENV", "LD_PRELOAD", "LD_LIBRARY_PA
                          "SHELLOPTS", "PROMPT_COMMAND", "HOME", "XDG_CONFIG_HOME", "GIT_DIR", "GIT_WORK_TREE",
                          "CLAUDE_PROJECT_DIR", "CLAUDE_CONFIG_DIR", "IFS", "PS0", "PS1", "PS2", "PS3", "PS4",
                          "PROMPT", "PROMPT2", "PROMPT3", "PROMPT4", "RPROMPT", "RPS1", "RPS2", "RPROMPT2",
-                         "FPATH", "fpath", "path", "module_path", "MAILPATH"}
+                         "FPATH", "fpath", "path", "module_path", "MAILPATH",
+                         # lancent une commande ou chargent du code de l'agent à la place de celui de l'outil
+                         "GIT_EXTERNAL_DIFF", "GIT_PAGER", "PAGER", "GIT_EDITOR", "GIT_SEQUENCE_EDITOR", "EDITOR",
+                         "VISUAL", "SSH_ASKPASS", "SUDO_ASKPASS", "MANPAGER", "LESSOPEN", "LESSCLOSE", "SHELL",
+                         "BROWSER", "GIT_TEMPLATE_DIR",
+                         "PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONBREAKPOINT", "PERL5OPT", "PERL5LIB",
+                         "PERLLIB", "PERL5DB", "RUBYOPT", "RUBYLIB", "NODE_PATH", "DENO_DIR", "GEM_HOME", "GEM_PATH",
+                         "BUNDLE_GEMFILE"}
+# Familles entières : une variable DYLD_/LD_/BASH_FUNC_ change le chargement du code ; GIT_* sauf l'identité du commit.
+PREFIXES_DANGEREUX = ("DYLD_", "LD_", "BASH_FUNC_", "GIT_CONFIG", "NPM_CONFIG_", "npm_config_")
+RE_VARIABLE_GIT_PERMISE = re.compile(r"^GIT_(AUTHOR|COMMITTER)_(NAME|EMAIL|DATE)$|^GIT_TERMINAL_PROMPT$"
+                                     r"|^GIT_OPTIONAL_LOCKS$")
 
 ENVELOPPES = {  # nom: (options qui prennent une valeur, NOM=valeur permis)
     "env": ({"-u", "-C", "-P", "--unset", "--chdir"}, True),
@@ -919,10 +954,6 @@ ENVELOPPES_AVEC_SOUS_COMMANDE = {  # nom: mots à sauter après les options
 
 RE_EXECUTABLE_OUVRABLE = re.compile(r"\.(command|app|workflow|terminal|tool|scpt|scptd|action|pkg|mpkg|dmg|sh|zsh|bash|"
                                     r"csh|ksh|py|rb|pl|jar|osax|saver|prefpane|shortcut)$")
-RACINES_DE_CONFIANCE = ("/usr", "/bin", "/sbin", "/opt", "/nix", "/System", "/Library", "/Applications", "/Developer")
-DOSSIERS_PAQUETS_PERSO = (".local/bin", ".local/share", ".cargo", ".rustup", ".pub-cache", "development/flutter",
-                          ".nvm", ".bun", ".deno", ".pyenv", ".rbenv", ".volta", ".gem", "go/bin", "Library/pnpm",
-                          ".asdf", ".mise", ".fvm", "Library/Android", "Library/Developer", ".npm", ".yarn", ".claude")
 
 
 RE_CONFIG_PUSH = re.compile(r"^(remote\..*\.push|remote\.pushdefault|push\..*|branch\..*\.(merge|remote|pushremote))$")
@@ -939,18 +970,12 @@ def destination_du_push(dossier: Optional[str]) -> str:
 
 
 def de_confiance(chemin_reel: str) -> bool:
-    """Dossier système ou de paquets connu : on y lance un binaire sans le lire. Les écritures y sont refusées."""
+    """Dossier système ou de paquets connu : on y lance un binaire sans le lire. Tout le dossier est protégé en
+    écriture (est_garde_fou), donc rien n'y vient d'un agent : la confiance et la protection ont la même liste."""
     k = cle(chemin_reel)
-    if any(est_dans(k, cle(r)) for r in RACINES_DE_CONFIANCE):
+    if RE_ZONES_CONFIANCE_TEXTE.search(k) or "/node_modules/" in k:
         return True
-    if "/node_modules/" in k:
-        return True
-    if any(est_dans(k, cle(d)) for d in dossiers_du_path()):
-        return True  # dossier du PATH : l'agent n'y écrit jamais (écritures refusées), donc rien n'y vient de lui
-    for h in dossiers_perso():
-        if any(est_dans(k, cle(os.path.join(h, rel))) for rel in DOSSIERS_PAQUETS_PERSO):
-            return True
-    return False
+    return any(est_dans(k, d) for d in dossiers_du_path())
 
 
 class Refus(Exception):
@@ -1018,7 +1043,8 @@ class Verificateur:
             self.executer(list(cmd.mots), cmd)
 
     def variable_permise(self, nom: str) -> None:
-        if nom in VARIABLES_DANGEREUSES or nom.startswith("GIT_CONFIG"):
+        if nom in VARIABLES_DANGEREUSES or nom.startswith(PREFIXES_DANGEREUX) \
+                or (nom.startswith("GIT_") and not RE_VARIABLE_GIT_PERMISE.match(nom)):
             self.refuser(None, f"Pas de modification de la variable {nom} depuis un agent.")
 
     def memoriser_contenu(self, cmd: Commande) -> None:

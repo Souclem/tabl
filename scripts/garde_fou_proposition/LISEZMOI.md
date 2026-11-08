@@ -116,26 +116,73 @@ les lance dans son terminal.
     illisible ou sur stdin) ; les hôtes cachés dans `-H`, `--header`, `--resolve`,
     `--connect-to`, `-x`, `--proxy` sont refusés comme les URL.
 
-## Limites assumées (à connaître)
+## Limites connues
 
-Le garde-fou reste un filet contre les accidents et les contournements courants. Il ne
-peut pas voir :
+Décision du propriétaire (8 novembre) : le garde-fou vise les **erreurs de bonne foi**, un
+agent qui lance par mégarde une commande réservée. Il ne vise pas un agent qui chercherait à
+le tromper. Les commandes réservées écrites normalement sont refusées ; les contournements
+volontaires ci-dessous restent possibles et ne seront pas corrigés ici.
+
+Ce que le script ne voit pas, par nature :
 
 - du code compilé ou téléchargé, une chaîne reconstruite à l'exécution (le code lisible
   qui s'en approche — `base64`, `exec`, `__import__`… — est refusé) ;
-- les effets d'un `npm install` / `pip install` (scripts d'installation), ou de
-  `npx <paquet arbitraire>` ;
+- les effets d'un `npm install` / `pip install` (scripts d'installation), de
+  `npx <paquet arbitraire>`, et de `flutter test` / `dart run`, qui exécutent du Dart écrit
+  par l'agent ;
 - un alias ou une fonction déjà définis dans le shell de l'utilisateur ;
 - le shell zsh (celui de l'outil Bash) a des règles propres (`=cmd`, `noglob`, `repeat`,
   `{ … }` sans `;`, options `setopt`…) : les cas connus sont couverts, pas toutes les
   options de zsh ;
 - les dossiers inscriptibles du `PATH` : le script protège ceux qu'il connaît (le `PATH`
   réel au lancement, `~/bin`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`,
-  `node_modules/.bin`), mais un dossier ajouté au `PATH` plus tard par l'utilisateur, ou un
-  dossier inscriptible hors de ces emplacements, laisse un faux `git` ou `supabase`
-  s'y cacher ;
-- `version:` de `pubspec.yaml` modifié par un `sed` ordinaire : reste détecté seulement
-  à la relecture de la branche (ça n'ouvre pas de geste de prod à lui seul).
+  `node_modules/.bin`), mais un dossier ajouté au `PATH` plus tard, ou un dossier
+  inscriptible hors de ces emplacements, laisse un faux `git` ou `supabase` s'y cacher ;
+- `version:` de `pubspec.yaml` modifié par un `sed` ordinaire : détecté seulement à la
+  relecture de la branche.
+
+Contournements volontaires relevés à la 2e relecture (Chef de la sécurité), laissés ouverts :
+
+- **A. Dossiers « de confiance » inscriptibles.** Un script écrit dans un dossier que le
+  script traite comme sûr (`/opt/homebrew/share`, `/Applications`, `~/.cargo`, `~/.npm`…)
+  puis lancé n'est pas lu. Atténuation faite : ces dossiers sont maintenant protégés en
+  écriture par la même liste (Write, Edit et écritures Bash). Reste ouvert : une écriture
+  par un moyen que le script ne reconnaît pas comme une écriture ; un fichier texte n'est
+  pas lu quand il est dans un de ces dossiers ; la confiance ne regarde pas
+  `os.access(…, W_OK)`.
+- **B. Script du dépôt qui lance un processus.** `python3 scripts/a.py`, avec `a.py` qui
+  contient `subprocess.run(['esabapus'[::-1], 'db', 'push'])`, n'est pas contrôlé (de même
+  `python3 -m scripts.a`, `os.execvp`). Le contrôle du lancement de processus ne vaut que
+  pour le code inline et les scripts hors du dépôt, sans comparaison avec `main`.
+- **C. Lanceurs peu courants.** Une commande lancée par un outil qui n'est pas dans la liste
+  des enveloppes passe : `taskpolicy`, `flock`, `gtimeout`, `ssh-agent`, `lldb --`, `entr`,
+  `watchexec`, `nodemon --exec` ; les éditeurs (`vi`/`vim`/`ex -c '!…'`,
+  `nvim --headless +'!…'`, `emacs --batch --eval`) ; git (`rebase -x`, `bisect run`,
+  `submodule foreach`) ; `rg --pre`, `fd -x`, `sort --compress-program`, `man -P`,
+  `zip -TT`, `rsync -e`, `tar --to-command` ; `open -a Terminal <fichier>`,
+  `open -b com.apple.Terminal`, `osascript <fichier compilé>`.
+- **D. Configuration de git par liste noire.** `git -c diff.external=…`, `diff.*.textconv`,
+  `pager.*`, et `git config` pour `diff.external`, `merge.*.driver`, `sequence.editor`,
+  `core.askPass`, `remote.*.uploadpack`, `remote.*.url` (`ext::…`), `core.gitProxy`,
+  `submodule.*.update`, `uploadpack.packObjectsHook` ; `.gitattributes` et
+  `.git/info/attributes` (`diff=x`, `filter=x`). Les variables d'environnement qui lancent
+  un programme (`GIT_EXTERNAL_DIFF`, `GIT_PAGER`, `PAGER`, `GIT_EDITOR`, `EDITOR`,
+  `SSH_ASKPASS`, `MANPAGER`, `LESSOPEN`…) sont déjà refusées en tête de commande ; la
+  configuration par `git config` / `git -c` reste en liste noire au lieu d'une liste
+  blanche.
+- **E. Variables lues par les interpréteurs.** `PYTHONPATH`, `PERL5OPT`, `RUBYOPT`,
+  `NODE_PATH`… sont refusées quand elles sont posées dans la commande ; une valeur posée
+  autrement (fichier de démarrage, outil externe) n'est pas vue.
+- **F. `hash` de zsh / `enable -f`.** `hash ls=/tmp/x; ls` redirige un nom de commande vers un
+  fichier jamais lu ; `hash -p` et `enable -f` (bash) aussi.
+- **G. Fichiers de Claude Code qui lancent des commandes hors du garde-fou.** Un skill, un
+  sous-agent ou une commande personnalisée peut déclarer des `hooks` ou des lignes `!…` ;
+  `.mcp.json` déclare des serveurs MCP. Atténuation faite : `.claude/` du projet, `.mcp.json`
+  et `$CLAUDE_CONFIG_DIR` sont protégés en écriture (hors la mémoire des agents). Reste
+  ouvert : une écriture hors des outils d'écriture et des commandes reconnues.
+
+La liste de commandes refusées ne sera jamais complète : chaque nouveau lanceur oublié rouvre
+le même trou. D'où la section suivante, qui reste indispensable.
 
 ## Constats de TAB-9 qui ne se corrigent pas dans le script
 
