@@ -27,6 +27,7 @@ class TablChoixProche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       selected: choisi,
@@ -39,13 +40,13 @@ class TablChoixProche extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
           decoration: BoxDecoration(
             color: choisi
-                ? TablTokens.primaire.withValues(alpha: 0.08)
-                : TablTokens.texte.withValues(alpha: 0.03),
+                ? c.primaire.withValues(alpha: 0.08)
+                : c.texte.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(TablTokens.arrondiM),
             border: Border.all(
               color: choisi
-                  ? TablTokens.primaire.withValues(alpha: 0.55)
-                  : TablTokens.texte.withValues(alpha: 0.08),
+                  ? c.primaire.withValues(alpha: 0.55)
+                  : c.texte.withValues(alpha: 0.08),
             ),
           ),
           child: Row(
@@ -58,15 +59,12 @@ class TablChoixProche extends StatelessWidget {
                   children: [
                     Text(
                       pseudo,
-                      style: TablTokens.corps.copyWith(
+                      style: c.corps.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: TablTokens.texte,
+                        color: c.texte,
                       ),
                     ),
-                    Text(
-                      detail,
-                      style: TablTokens.legende.copyWith(fontSize: 12),
-                    ),
+                    Text(detail, style: c.legende.copyWith(fontSize: 12)),
                   ],
                 ),
               ),
@@ -80,17 +78,17 @@ class TablChoixProche extends StatelessWidget {
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: choisi ? TablTokens.primaire : Colors.transparent,
+                  color: choisi ? c.primaire : Colors.transparent,
                   border: Border.all(
-                    color: choisi ? TablTokens.primaire : TablTokens.bordure,
+                    color: choisi ? c.primaire : c.bordure,
                     width: 1.5,
                   ),
                 ),
                 child: choisi
-                    ? const Icon(
+                    ? Icon(
                         Icons.check_rounded,
                         size: 14,
-                        color: TablTokens.texteSurPrimaire,
+                        color: c.texteSurPrimaire,
                       )
                     : null,
               ),
@@ -120,6 +118,7 @@ class TablChoixReponse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       selected: choisie,
@@ -133,13 +132,13 @@ class TablChoixReponse extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             color: choisie
-                ? TablTokens.primaire.withValues(alpha: 0.12)
-                : const Color(0xFF14161B),
+                ? c.primaire.withValues(alpha: 0.12)
+                : c.surfaceBasse,
             borderRadius: BorderRadius.circular(TablTokens.arrondiM),
             border: Border.all(
               color: choisie
-                  ? TablTokens.primaire.withValues(alpha: 0.7)
-                  : TablTokens.texte.withValues(alpha: 0.08),
+                  ? c.primaire.withValues(alpha: 0.7)
+                  : c.texte.withValues(alpha: 0.08),
             ),
           ),
           child: Row(
@@ -148,10 +147,10 @@ class TablChoixReponse extends StatelessWidget {
               const SizedBox(width: 14),
               Text(
                 libelle,
-                style: TablTokens.corps.copyWith(
+                style: c.corps.copyWith(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: choisie ? TablTokens.primaire : TablTokens.texte,
+                  color: choisie ? c.primaire : c.texte,
                 ),
               ),
             ],

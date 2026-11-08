@@ -58,6 +58,7 @@ class _TablBoutonReactionState extends State<TablBoutonReaction>
   @override
   Widget build(BuildContext context) {
     final libelle = widget.actif ? 'Aimé' : "J'aime";
+    final couleurs = TablCouleurs.of(context);
     return Tooltip(
       message: libelle,
       child: Semantics(
@@ -93,6 +94,8 @@ class _TablBoutonReactionState extends State<TablBoutonReaction>
                             : 0,
                         remplissage: remplissage,
                         actif: widget.actif,
+                        couleurActive: couleurs.primaire,
+                        couleurRepos: couleurs.texteDoux,
                       ),
                     );
                   },
@@ -113,6 +116,8 @@ class _PeintreVerres extends CustomPainter {
     required this.eclats,
     required this.remplissage,
     required this.actif,
+    required this.couleurActive,
+    required this.couleurRepos,
   });
 
   /// 0 → 1 : les verres se penchent jusqu'au choc.
@@ -127,6 +132,12 @@ class _PeintreVerres extends CustomPainter {
   /// 0 → 1 : le vin doré monte dans les verres.
   final double remplissage;
   final bool actif;
+
+  /// Les verres qui trinquent, le vin, les éclats.
+  final Color couleurActive;
+
+  /// Les verres au repos.
+  final Color couleurRepos;
 
   // Inclinaison (radians) : au repos, en pleine trinque.
   static const _repos = 10 * math.pi / 180;
@@ -145,15 +156,13 @@ class _PeintreVerres extends CustomPainter {
         ? repos + (_choc - repos) * approche
         : _choc + (repos - _choc) * rebond;
 
-    final couleur = actif || approche > 0
-        ? TablTokens.primaire
-        : TablTokens.texteDoux;
+    final couleur = actif || approche > 0 ? couleurActive : couleurRepos;
     _verre(canvas, const Offset(8, 28), -angle, couleur);
     _verre(canvas, const Offset(22, 28), angle, couleur);
 
     if (eclats > 0) {
       final pinceau = Paint()
-        ..color = TablTokens.primaire.withValues(alpha: 1 - eclats)
+        ..color = couleurActive.withValues(alpha: 1 - eclats)
         ..strokeWidth = 1.4
         ..strokeCap = StrokeCap.round;
       const centre = Offset(15, 6);
@@ -189,7 +198,7 @@ class _PeintreVerres extends CustomPainter {
       final niveau = -12.5 - 9.5 * remplissage;
       canvas.drawRect(
         Rect.fromLTRB(-6, niveau, 6, -12),
-        Paint()..color = TablTokens.primaire.withValues(alpha: 0.85),
+        Paint()..color = couleurActive.withValues(alpha: 0.85),
       );
       canvas.restore();
     }
@@ -212,5 +221,7 @@ class _PeintreVerres extends CustomPainter {
       ancien.rebond != rebond ||
       ancien.eclats != eclats ||
       ancien.remplissage != remplissage ||
-      ancien.actif != actif;
+      ancien.actif != actif ||
+      ancien.couleurActive != couleurActive ||
+      ancien.couleurRepos != couleurRepos;
 }

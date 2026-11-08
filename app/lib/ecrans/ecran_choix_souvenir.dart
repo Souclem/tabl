@@ -82,8 +82,9 @@ class EcranChoixSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -104,16 +105,13 @@ class EcranChoixSouvenir extends StatelessWidget {
             const SizedBox(height: TablTokens.espaceS),
             Text(
               'Comment retrouver vos souvenirs ?',
-              style: TablTokens.titreAffichage.copyWith(
-                fontSize: 32,
-                height: 1.12,
-              ),
+              style: c.titreAffichage.copyWith(fontSize: 32, height: 1.12),
             ),
             const SizedBox(height: TablTokens.espaceS),
             Text(
               'Vos repas passés se rangent à leur date sur votre profil, '
               'jamais dans le Feed.',
-              style: TablTokens.legende.copyWith(fontSize: 14),
+              style: c.legende.copyWith(fontSize: 14),
             ),
             const SizedBox(height: TablTokens.espaceL),
             TablCarteAjoutSouvenir(
@@ -137,16 +135,12 @@ class EcranChoixSouvenir extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.lock_outline_rounded,
-                  size: 13,
-                  color: TablTokens.texteDoux,
-                ),
+                Icon(Icons.lock_outline_rounded, size: 13, color: c.texteDoux),
                 const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     'Tabl ne lit que la date et le lieu des photos choisies.',
-                    style: TablTokens.legende.copyWith(fontSize: 12),
+                    style: c.legende.copyWith(fontSize: 12),
                   ),
                 ),
               ],

@@ -53,13 +53,14 @@ class _EcranGererTableState extends State<EcranGererTable> {
   }
 
   Future<void> _inviter() async {
+    final c = TablCouleurs.of(context);
     final amis = await widget.abonnementService.mesRelations();
     if (!mounted) return;
     final dejaMembres = _table.membres.map((m) => m.profilId).toSet();
     final candidats = amis.where((a) => !dejaMembres.contains(a.id)).toList();
     final choisi = await showModalBottomSheet<ProfilPublic>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       builder: (_) => _SheetChoixAmi(candidats: candidats),
     );
     if (choisi == null || !mounted) return;
@@ -131,12 +132,13 @@ class _EcranGererTableState extends State<EcranGererTable> {
     required String message,
     required String libelleAction,
   }) async {
+    final c = TablCouleurs.of(context);
     final confirme = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: TablTokens.surface,
-        title: Text(titre, style: TablTokens.sousTitre),
-        content: Text(message, style: TablTokens.corps),
+        backgroundColor: c.surface,
+        title: Text(titre, style: c.sousTitre),
+        content: Text(message, style: c.corps),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -144,10 +146,7 @@ class _EcranGererTableState extends State<EcranGererTable> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              libelleAction,
-              style: const TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text(libelleAction, style: TextStyle(color: c.erreur)),
           ),
         ],
       ),
@@ -157,9 +156,10 @@ class _EcranGererTableState extends State<EcranGererTable> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final estAdmin = _table.jeSuisAdmin;
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,9 +173,11 @@ class _EcranGererTableState extends State<EcranGererTable> {
               ),
               child: Row(
                 children: [
-                  TablBoutonRetour(onPresse: () => Navigator.of(context).pop(false)),
+                  TablBoutonRetour(
+                    onPresse: () => Navigator.of(context).pop(false),
+                  ),
                   const SizedBox(width: TablTokens.espaceM),
-                  Text('Gérer la Table', style: TablTokens.titre),
+                  Text('Gérer la Table', style: c.titre),
                 ],
               ),
             ),
@@ -198,9 +200,10 @@ class _EcranGererTableState extends State<EcranGererTable> {
                         libelle: 'Renommer',
                         enCours: _renommageEnCours,
                         onPresse:
-                            _nom.text.trim().isNotEmpty && _nom.text.trim() != _table.nom
-                                ? _renommer
-                                : null,
+                            _nom.text.trim().isNotEmpty &&
+                                _nom.text.trim() != _table.nom
+                            ? _renommer
+                            : null,
                       ),
                     ),
                   ],
@@ -208,37 +211,43 @@ class _EcranGererTableState extends State<EcranGererTable> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Membres', style: TablTokens.sousTitre),
+                      Text('Membres', style: c.sousTitre),
                       if (estAdmin)
-                        TextButton(onPressed: _inviter, child: const Text('Inviter')),
+                        TextButton(
+                          onPressed: _inviter,
+                          child: const Text('Inviter'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: TablTokens.espaceXs),
                   for (final membre in _table.membres)
                     ListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(membre.pseudo, style: TablTokens.corps),
+                      title: Text(membre.pseudo, style: c.corps),
                       subtitle: Text(
                         _libelleStatut(membre),
-                        style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                        style: c.legende.copyWith(color: c.texteDoux),
                       ),
                       trailing: estAdmin && !membre.estAdmin
                           ? IconButton(
-                              icon: const Icon(Icons.close, color: TablTokens.texteDoux),
+                              icon: Icon(Icons.close, color: c.texteDoux),
                               tooltip: 'Retirer',
                               onPressed: () => _retirer(membre),
                             )
                           : null,
                     ),
                   const SizedBox(height: TablTokens.espaceXl),
-                  OutlinedButton(onPressed: _quitter, child: const Text('Quitter la Table')),
+                  OutlinedButton(
+                    onPressed: _quitter,
+                    child: const Text('Quitter la Table'),
+                  ),
                   if (estAdmin) ...[
                     const SizedBox(height: TablTokens.espaceS),
                     OutlinedButton(
                       onPressed: _supprimer,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: TablTokens.erreur,
-                        side: const BorderSide(color: TablTokens.erreur),
+                        foregroundColor: c.erreur,
+                        side: BorderSide(color: c.erreur),
                       ),
                       child: const Text('Supprimer la Table'),
                     ),
@@ -270,6 +279,7 @@ class _SheetChoixAmi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(TablTokens.espaceL),
@@ -277,21 +287,23 @@ class _SheetChoixAmi extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Inviter', style: TablTokens.sousTitre),
+            Text('Inviter', style: c.sousTitre),
             const SizedBox(height: TablTokens.espaceS),
             if (candidats.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
+                padding: const EdgeInsets.symmetric(
+                  vertical: TablTokens.espaceM,
+                ),
                 child: Text(
                   'Toutes vos relations sont déjà dans cette Table.',
-                  style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                  style: c.legende.copyWith(color: c.texteDoux),
                 ),
               )
             else
               for (final ami in candidats)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(ami.pseudo, style: TablTokens.corps),
+                  title: Text(ami.pseudo, style: c.corps),
                   onTap: () => Navigator.of(context).pop(ami),
                 ),
           ],

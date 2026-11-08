@@ -61,6 +61,7 @@ class TablCarteSuggestions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -72,10 +73,7 @@ class TablCarteSuggestions extends StatelessWidget {
             TablTokens.espaceL - 4,
             TablTokens.espaceS + 4,
           ),
-          child: Text(
-            titre,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 19),
-          ),
+          child: Text(titre, style: c.titreAffichage.copyWith(fontSize: 19)),
         ),
         SizedBox(
           height: _hauteurVignette,
@@ -105,11 +103,12 @@ class _Vignette extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = suggestion;
+    final c = TablCouleurs.of(context);
     return Material(
-      color: TablTokens.surface,
+      color: c.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(TablTokens.arrondiM),
-        side: const BorderSide(color: TablTokens.bordure),
+        side: BorderSide(color: c.bordure),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -126,7 +125,7 @@ class _Vignette extends StatelessWidget {
                     s.pseudo,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.corps.copyWith(
+                    style: c.corps.copyWith(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -137,10 +136,7 @@ class _Vignette extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: TablTokens.legende.copyWith(
-                      fontSize: 12,
-                      height: 1.3,
-                    ),
+                    style: c.legende.copyWith(fontSize: 12, height: 1.3),
                   ),
                   const Spacer(),
                   SizedBox(
@@ -162,11 +158,7 @@ class _Vignette extends StatelessWidget {
                   tooltip: 'Ne plus suggérer',
                   visualDensity: VisualDensity.compact,
                   onPressed: s.onEcarter,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: TablTokens.texteDoux,
-                  ),
+                  icon: Icon(Icons.close_rounded, size: 16, color: c.texteDoux),
                 ),
               ),
           ],

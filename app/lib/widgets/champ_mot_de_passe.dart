@@ -39,6 +39,7 @@ class TablChampMotDePasse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return TablChampTexte(
       libelle: libelle,
       controleur: controleur,
@@ -54,7 +55,7 @@ class TablChampMotDePasse extends StatelessWidget {
         icon: Icon(
           visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
           size: 20,
-          color: TablTokens.texteDoux,
+          color: c.texteDoux,
         ),
         onPressed: onToggleVisible,
       ),

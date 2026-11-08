@@ -103,6 +103,7 @@ class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
   @override
   Widget build(BuildContext context) {
     final v = widget;
+    final c = TablCouleurs.of(context);
     final taille = MediaQuery.sizeOf(context);
     final hauteurPhoto = math.min(taille.width * 1.08, taille.height * 0.56);
     final animation =
@@ -113,7 +114,7 @@ class _TablVisionneuseMomentState extends State<TablVisionneuseMoment> {
     );
 
     return Material(
-      color: TablTokens.fond,
+      color: c.fond,
       child: Stack(
         children: [
           SingleChildScrollView(
@@ -227,6 +228,7 @@ class _Panneau extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = visionneuse;
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -240,15 +242,11 @@ class _Panneau extends StatelessWidget {
           if (v.estSouvenir) ...[
             Row(
               children: [
-                const Icon(
-                  Icons.nightlight_round,
-                  size: 13,
-                  color: TablTokens.texteDoux,
-                ),
+                Icon(Icons.nightlight_round, size: 13, color: c.texteDoux),
                 const SizedBox(width: 6),
                 Text(
                   'SOUVENIR',
-                  style: TablTokens.legende.copyWith(
+                  style: c.legende.copyWith(
                     fontSize: 11,
                     letterSpacing: 1.6,
                     fontWeight: FontWeight.w600,
@@ -270,7 +268,7 @@ class _Panneau extends StatelessWidget {
                     onTap: v.onOuvrirLieu,
                     child: Text(
                       v.restaurantNom,
-                      style: TablTokens.titreAffichage.copyWith(
+                      style: c.titreAffichage.copyWith(
                         fontSize: 30,
                         height: 1.1,
                       ),
@@ -286,9 +284,9 @@ class _Panneau extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: TablTokens.surfaceBasse,
+                    color: c.surfaceBasse,
                     border: Border.all(
-                      color: TablTokens.primaire.withValues(alpha: 0.25),
+                      color: c.primaire.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Text(
@@ -303,18 +301,11 @@ class _Panneau extends StatelessWidget {
           Row(
             children: [
               if (v.audienceRestreinte) ...[
-                const Icon(
-                  Icons.lock_outline_rounded,
-                  size: 13,
-                  color: TablTokens.texteDoux,
-                ),
+                Icon(Icons.lock_outline_rounded, size: 13, color: c.texteDoux),
                 const SizedBox(width: 5),
               ],
               Expanded(
-                child: Text(
-                  v.details,
-                  style: TablTokens.legende.copyWith(fontSize: 14),
-                ),
+                child: Text(v.details, style: c.legende.copyWith(fontSize: 14)),
               ),
             ],
           ),
@@ -328,9 +319,9 @@ class _Panneau extends StatelessWidget {
                   Expanded(
                     child: Text(
                       v.avecQui!,
-                      style: TablTokens.corps.copyWith(
+                      style: c.corps.copyWith(
                         fontSize: 14,
-                        color: TablTokens.texte.withValues(alpha: 0.82),
+                        color: c.texte.withValues(alpha: 0.82),
                       ),
                     ),
                   ),
@@ -341,12 +332,12 @@ class _Panneau extends StatelessWidget {
             const SizedBox(height: 18),
             Text(
               v.legende!,
-              style: TablTokens.titreAffichage.copyWith(
+              style: c.titreAffichage.copyWith(
                 fontSize: 20,
                 fontStyle: FontStyle.italic,
                 fontWeight: FontWeight.w400,
                 height: 1.4,
-                color: TablTokens.texte.withValues(alpha: 0.92),
+                color: c.texte.withValues(alpha: 0.92),
               ),
             ),
           ],
@@ -362,7 +353,7 @@ class _Panneau extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 18),
-          const Divider(height: 1, color: TablTokens.surface),
+          Divider(height: 1, color: c.surface),
           const SizedBox(height: 10),
           TablActionsPublication(
             jaiReagi: v.jaiReagi,

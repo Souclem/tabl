@@ -20,7 +20,9 @@ Future<FiltresCarte?> ouvrirFiltresExplorer(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: TablTokens.papier,
+    // Toujours ivoire : les lignes du carnet (widgets/carte/carnet_filtres.dart)
+    // sont en encre, quelle que soit l'apparence.
+    backgroundColor: TablCouleurs.clair.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
@@ -329,12 +331,13 @@ Future<Object?> ouvrirOuChercher(
   return showModalBottomSheet<Object>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF111216),
+    backgroundColor: TablCouleurs.of(context).surfaceBasse,
     showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (contexte) {
+      final c = TablCouleurs.of(contexte);
       Widget ligne({
         required IconData icone,
         required String titre,
@@ -346,14 +349,14 @@ Future<Object?> ouvrirOuChercher(
           padding: const EdgeInsets.only(bottom: 8),
           child: Material(
             color: actuelle
-                ? TablTokens.primaire.withValues(alpha: 0.1)
-                : TablTokens.texte.withValues(alpha: 0.035),
+                ? c.primaire.withValues(alpha: 0.1)
+                : c.texte.withValues(alpha: 0.035),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(TablTokens.arrondiM),
               side: BorderSide(
                 color: actuelle
-                    ? TablTokens.primaire.withValues(alpha: 0.5)
-                    : TablTokens.texte.withValues(alpha: 0.07),
+                    ? c.primaire.withValues(alpha: 0.5)
+                    : c.texte.withValues(alpha: 0.07),
               ),
             ),
             child: ListTile(
@@ -365,23 +368,23 @@ Future<Object?> ouvrirOuChercher(
                 height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.texte.withValues(alpha: 0.06),
+                  color: c.texte.withValues(alpha: 0.06),
                 ),
-                child: Icon(icone, size: 17, color: TablTokens.texte),
+                child: Icon(icone, size: 17, color: c.texte),
               ),
               title: Text(
                 titre,
-                style: TablTokens.corps.copyWith(
+                style: c.corps.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: actuelle ? TablTokens.primaire : TablTokens.texte,
+                  color: actuelle ? c.primaire : c.texte,
                 ),
               ),
               subtitle: Text(
                 sousTitre,
-                style: TablTokens.legende.copyWith(fontSize: 12.5),
+                style: c.legende.copyWith(fontSize: 12.5),
               ),
               trailing: actuelle
-                  ? const Icon(Icons.check_rounded, color: TablTokens.primaire)
+                  ? Icon(Icons.check_rounded, color: c.primaire)
                   : null,
               onTap: () => Navigator.of(contexte).pop(valeur),
             ),
@@ -405,11 +408,11 @@ Future<Object?> ouvrirOuChercher(
             children: [
               Text(
                 'OÙ CHERCHEZ-VOUS ?',
-                style: TablTokens.legende.copyWith(
+                style: c.legende.copyWith(
                   fontSize: 11,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w700,
-                  color: TablTokens.primaire,
+                  color: c.primaire,
                 ),
               ),
               const SizedBox(height: TablTokens.espaceM),
@@ -434,10 +437,7 @@ Future<Object?> ouvrirOuChercher(
                   padding: const EdgeInsets.symmetric(
                     vertical: TablTokens.espaceM,
                   ),
-                  child: Text(
-                    'Pas encore de ville ici.',
-                    style: TablTokens.legende,
-                  ),
+                  child: Text('Pas encore de ville ici.', style: c.legende),
                 ),
             ],
           ),

@@ -25,6 +25,7 @@ class TablBulleMessageOrganisation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Align(
       alignment: parMoi ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
@@ -37,7 +38,7 @@ class TablBulleMessageOrganisation extends StatelessWidget {
           ),
           constraints: const BoxConstraints(maxWidth: 260),
           decoration: BoxDecoration(
-            color: parMoi ? TablTokens.primaire.withValues(alpha: 0.16) : TablTokens.surface,
+            color: parMoi ? c.primaire.withValues(alpha: 0.16) : c.surface,
             borderRadius: BorderRadius.circular(TablTokens.arrondiM),
           ),
           child: Column(
@@ -46,9 +47,9 @@ class TablBulleMessageOrganisation extends StatelessWidget {
               if (!parMoi)
                 Text(
                   auteurPseudo,
-                  style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                  style: c.legende.copyWith(color: c.texteDoux),
                 ),
-              Text(contenu, style: TablTokens.corps),
+              Text(contenu, style: c.corps),
             ],
           ),
         ),

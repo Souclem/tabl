@@ -14,6 +14,11 @@ class TablTokens {
   // Thème sombre, accent doré — valeurs exactes reprises du prototype
   // fonctionnel `instruction/Clément (2)/Tabl.dc.html` (source de vérité
   // pour l'écran Feed), pas d'une approximation à l'œil.
+  //
+  // Ces constantes sont les couleurs du SOMBRE, rien d'autre. Un écran qui
+  // doit suivre l'apparence (clair/sombre) lit ses couleurs par
+  // `TablCouleurs.of(context)` (plus bas) ; les écrans pas encore migrés
+  // continuent de les lire ici, donc restent sombres.
 
   /// Couleur d'accent : boutons principaux, liens, éléments actifs.
   static const Color primaire = Color(0xFFD9AC67);
@@ -108,10 +113,8 @@ class TablTokens {
   /// (`instruction/Clément (2)/Tabl.dc.html`, ex. le nom d'un restaurant
   /// dans le Feed, "Tabl." en en-tête). Un getter, pas un `const`, car
   /// `google_fonts` construit le `TextStyle` à l'exécution.
-  static TextStyle get titreAffichage => GoogleFonts.playfairDisplay(
-    color: texte,
-    fontWeight: FontWeight.w500,
-  );
+  static TextStyle get titreAffichage =>
+      GoogleFonts.playfairDisplay(color: texte, fontWeight: FontWeight.w500);
 
   /// Les noms et les titres de l'Explorer : une grotesque très grasse et
   /// serrée (Bricolage Grotesque, maquette de Martin), embarquée dans
@@ -186,4 +189,149 @@ class TablTokens {
   // --- Indicateur de page -----------------------------------------------
   static const double tailleIndicateurPage = 6;
   static const double tailleIndicateurPageActif = 20;
+}
+
+/// Les couleurs de l'apparence en cours, clair ou sombre.
+///
+/// Posée dans le [ThemeData] de l'application (voir `TablTheme`) : un
+/// écran ou un composant fait `final c = TablCouleurs.of(context)` puis
+/// `c.fond`, `c.texte`, `c.corps`… et suit tout seul le réglage Apparence.
+/// Pour changer une teinte du clair ou du sombre, c'est ici.
+///
+/// Le sombre reprend les [TablTokens] à l'identique ; le clair reprend la
+/// palette de l'Explorer (fond de lin, braise, ivoire, encre). Hors thème
+/// Tabl (tests avec un `MaterialApp` nu), on obtient le sombre.
+@immutable
+class TablCouleurs extends ThemeExtension<TablCouleurs> {
+  const TablCouleurs({
+    required this.primaire,
+    required this.primaireFoncee,
+    required this.fond,
+    required this.surface,
+    required this.surfaceBasse,
+    required this.texte,
+    required this.texteDoux,
+    required this.texteSurPrimaire,
+    required this.bordure,
+    required this.erreur,
+  });
+
+  /// Accent : boutons principaux, liens, éléments actifs.
+  final Color primaire;
+
+  /// Variante foncée de l'accent, pour les états pressés.
+  final Color primaireFoncee;
+
+  /// Fond des écrans.
+  final Color fond;
+
+  /// Cartes, champs et feuilles posés sur le fond.
+  final Color surface;
+
+  /// Cartes posées à même le fond, plus discrètes que [surface].
+  final Color surfaceBasse;
+
+  final Color texte;
+
+  /// Légendes, aides de saisie.
+  final Color texteDoux;
+
+  /// Texte posé sur [primaire].
+  final Color texteSurPrimaire;
+
+  /// Traits de séparation et contours au repos.
+  final Color bordure;
+
+  final Color erreur;
+
+  static const sombre = TablCouleurs(
+    primaire: TablTokens.primaire,
+    primaireFoncee: TablTokens.primaireFoncee,
+    fond: TablTokens.fond,
+    surface: TablTokens.surface,
+    surfaceBasse: TablTokens.surfaceBasse,
+    texte: TablTokens.texte,
+    texteDoux: TablTokens.texteDoux,
+    texteSurPrimaire: TablTokens.texteSurPrimaire,
+    bordure: TablTokens.bordure,
+    erreur: TablTokens.erreur,
+  );
+
+  static const clair = TablCouleurs(
+    // La braise de l'Explorer.
+    primaire: Color(0xFFAF4A2C),
+    primaireFoncee: Color(0xFF8C3A21),
+    // Le fond de lin de l'Explorer, et l'ivoire des feuilles.
+    fond: Color(0xFFEEE8DD),
+    surface: TablTokens.papier,
+    surfaceBasse: Color(0xFFF5F0E6),
+    texte: TablTokens.encre,
+    texteDoux: TablTokens.encreDouce,
+    texteSurPrimaire: TablTokens.papier,
+    bordure: Color(0xFFD9D0BF),
+    erreur: Color(0xFFB3392E),
+  );
+
+  /// Les couleurs de l'apparence en cours pour ce [context].
+  static TablCouleurs of(BuildContext context) =>
+      Theme.of(context).extension<TablCouleurs>() ?? sombre;
+
+  // --- Styles de texte, dans la couleur de l'apparence -----------------
+
+  TextStyle get titreAffichage =>
+      TablTokens.titreAffichage.copyWith(color: texte);
+  TextStyle get titreSerre => TablTokens.titreSerre.copyWith(color: texte);
+  TextStyle get grandTitre => TablTokens.grandTitre.copyWith(color: texte);
+  TextStyle get titre => TablTokens.titre.copyWith(color: texte);
+  TextStyle get sousTitre => TablTokens.sousTitre.copyWith(color: texte);
+  TextStyle get corps => TablTokens.corps.copyWith(color: texte);
+  TextStyle get legende => TablTokens.legende.copyWith(color: texteDoux);
+  TextStyle get logo => TablTokens.logo.copyWith(color: primaire);
+
+  @override
+  TablCouleurs copyWith({
+    Color? primaire,
+    Color? primaireFoncee,
+    Color? fond,
+    Color? surface,
+    Color? surfaceBasse,
+    Color? texte,
+    Color? texteDoux,
+    Color? texteSurPrimaire,
+    Color? bordure,
+    Color? erreur,
+  }) => TablCouleurs(
+    primaire: primaire ?? this.primaire,
+    primaireFoncee: primaireFoncee ?? this.primaireFoncee,
+    fond: fond ?? this.fond,
+    surface: surface ?? this.surface,
+    surfaceBasse: surfaceBasse ?? this.surfaceBasse,
+    texte: texte ?? this.texte,
+    texteDoux: texteDoux ?? this.texteDoux,
+    texteSurPrimaire: texteSurPrimaire ?? this.texteSurPrimaire,
+    bordure: bordure ?? this.bordure,
+    erreur: erreur ?? this.erreur,
+  );
+
+  /// Le fondu d'un thème à l'autre quand on change d'apparence.
+  @override
+  TablCouleurs lerp(TablCouleurs? autre, double t) {
+    if (autre == null) return this;
+    return TablCouleurs(
+      primaire: Color.lerp(primaire, autre.primaire, t)!,
+      primaireFoncee: Color.lerp(primaireFoncee, autre.primaireFoncee, t)!,
+      fond: Color.lerp(fond, autre.fond, t)!,
+      surface: Color.lerp(surface, autre.surface, t)!,
+      surfaceBasse: Color.lerp(surfaceBasse, autre.surfaceBasse, t)!,
+      texte: Color.lerp(texte, autre.texte, t)!,
+      texteDoux: Color.lerp(texteDoux, autre.texteDoux, t)!,
+      texteSurPrimaire: Color.lerp(
+        texteSurPrimaire,
+        autre.texteSurPrimaire,
+        t,
+      )!,
+      bordure: Color.lerp(bordure, autre.bordure, t)!,
+      erreur: Color.lerp(erreur, autre.erreur, t)!,
+    );
+  }
 }

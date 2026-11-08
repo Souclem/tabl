@@ -47,10 +47,11 @@ class TablLigneNotification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TablTokens.corps.copyWith(
+    final c = TablCouleurs.of(context);
+    final style = c.corps.copyWith(
       fontSize: 14,
       height: 1.35,
-      color: TablTokens.texte.withValues(alpha: 0.86),
+      color: c.texte.withValues(alpha: 0.86),
     );
     return InkWell(
       onTap: onPresse,
@@ -98,16 +99,13 @@ class TablLigneNotification extends StatelessWidget {
                         style: m.gras
                             ? style.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: TablTokens.texte,
+                                color: c.texte,
                               )
                             : null,
                       ),
                     TextSpan(
                       text: '  $quand',
-                      style: style.copyWith(
-                        fontSize: 12.5,
-                        color: TablTokens.texteDoux,
-                      ),
+                      style: style.copyWith(fontSize: 12.5, color: c.texteDoux),
                     ),
                   ],
                 ),
@@ -121,9 +119,9 @@ class TablLigneNotification extends StatelessWidget {
               Container(
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.primaire,
+                  color: c.primaire,
                 ),
               ),
             ],

@@ -107,11 +107,12 @@ class _RoueState extends State<_Roue> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return CupertinoPicker(
       scrollController: _controleur,
       itemExtent: 38,
       selectionOverlay: CupertinoPickerDefaultSelectionOverlay(
-        background: TablTokens.primaire.withValues(alpha: 0.13),
+        background: c.primaire.withValues(alpha: 0.13),
         capStartEdge: widget.arrondiDebut,
         capEndEdge: widget.arrondiFin,
       ),
@@ -119,10 +120,7 @@ class _RoueState extends State<_Roue> {
       children: [
         for (final libelle in widget.libelles)
           Center(
-            child: Text(
-              libelle,
-              style: TablTokens.corps.copyWith(color: TablTokens.texte),
-            ),
+            child: Text(libelle, style: c.corps.copyWith(color: c.texte)),
           ),
       ],
     );

@@ -16,15 +16,16 @@ class TablTitreSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         texte.toUpperCase(),
-        style: TablTokens.legende.copyWith(
+        style: c.legende.copyWith(
           fontSize: 11,
           letterSpacing: 1.8,
           fontWeight: FontWeight.w700,
-          color: TablTokens.primaire,
+          color: c.primaire,
         ),
       ),
     );
@@ -53,6 +54,7 @@ class TablCarteBinome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return _Carte(
       onPresse: onPresse,
       child: Row(
@@ -61,7 +63,7 @@ class TablCarteBinome extends StatelessWidget {
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: TablTokens.primaire, width: 1.5),
+              border: Border.all(color: c.primaire, width: 1.5),
             ),
             child: TablAvatar(pseudo: nom, photoUrl: photoUrl, rayon: 36),
           ),
@@ -72,28 +74,22 @@ class TablCarteBinome extends StatelessWidget {
               children: [
                 Text(
                   role.toUpperCase(),
-                  style: TablTokens.legende.copyWith(
+                  style: c.legende.copyWith(
                     fontSize: 11,
                     letterSpacing: 1.5,
                     fontWeight: FontWeight.w700,
-                    color: TablTokens.primaire,
+                    color: c.primaire,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  nom,
-                  style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-                ),
+                Text(nom, style: c.titreAffichage.copyWith(fontSize: 26)),
                 const SizedBox(height: 2),
-                Text(detail, style: TablTokens.legende),
+                Text(detail, style: c.legende),
               ],
             ),
           ),
           if (onPresse != null)
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: TablTokens.texteDoux,
-            ),
+            Icon(Icons.chevron_right_rounded, color: c.texteDoux),
         ],
       ),
     );
@@ -119,6 +115,7 @@ class TablCarteProche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return _Carte(
       onPresse: onPresse,
       padding: const EdgeInsets.fromLTRB(6, 16, 6, 14),
@@ -130,9 +127,9 @@ class TablCarteProche extends StatelessWidget {
             nom,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TablTokens.corps.copyWith(fontWeight: FontWeight.w500),
+            style: c.corps.copyWith(fontWeight: FontWeight.w500),
           ),
-          Text(detail, style: TablTokens.legende.copyWith(fontSize: 12)),
+          Text(detail, style: c.legende.copyWith(fontSize: 12)),
         ],
       ),
     );
@@ -163,6 +160,7 @@ class TablCarteRetour extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(TablTokens.arrondiL),
       child: SizedBox(
@@ -170,7 +168,7 @@ class TablCarteRetour extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            const ColoredBox(color: TablTokens.surface),
+            ColoredBox(color: c.surface),
             if (photoUrl != null)
               Image.network(
                 photoUrl!,
@@ -183,8 +181,8 @@ class TablCarteRetour extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    TablTokens.fond.withValues(alpha: 0.88),
-                    TablTokens.fond.withValues(alpha: 0.3),
+                    c.fond.withValues(alpha: 0.88),
+                    c.fond.withValues(alpha: 0.3),
                   ],
                 ),
               ),
@@ -205,15 +203,13 @@ class TablCarteRetour extends StatelessWidget {
                               nom,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TablTokens.titreAffichage.copyWith(
-                                fontSize: 24,
-                              ),
+                              style: c.titreAffichage.copyWith(fontSize: 24),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               lieu,
-                              style: TablTokens.legende.copyWith(
-                                color: TablTokens.texte.withValues(alpha: 0.8),
+                              style: c.legende.copyWith(
+                                color: c.texte.withValues(alpha: 0.8),
                               ),
                             ),
                           ],
@@ -221,9 +217,9 @@ class TablCarteRetour extends StatelessWidget {
                       ),
                       Text(
                         '×$nombreVisites',
-                        style: TablTokens.titreAffichage.copyWith(
+                        style: c.titreAffichage.copyWith(
                           fontSize: 30,
-                          color: TablTokens.primaire,
+                          color: c.primaire,
                           height: 1,
                         ),
                       ),
@@ -237,17 +233,17 @@ class TablCarteRetour extends StatelessWidget {
                           width: 7,
                           height: 7,
                           margin: const EdgeInsets.only(right: 5),
-                          decoration: const BoxDecoration(
-                            color: TablTokens.primaire,
+                          decoration: BoxDecoration(
+                            color: c.primaire,
                             shape: BoxShape.circle,
                           ),
                         ),
                       const SizedBox(width: 4),
                       Text(
                         total,
-                        style: TablTokens.legende.copyWith(
+                        style: c.legende.copyWith(
                           fontSize: 12,
-                          color: TablTokens.texte.withValues(alpha: 0.8),
+                          color: c.texte.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -285,6 +281,7 @@ class TablBarreVille extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final retard = 250 + rang * 100;
     final duree = retard + 900;
     return Padding(
@@ -296,12 +293,9 @@ class TablBarreVille extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                nom,
-                style: TablTokens.titreAffichage.copyWith(fontSize: 19),
-              ),
+              Text(nom, style: c.titreAffichage.copyWith(fontSize: 19)),
               const Spacer(),
-              Text(compte, style: TablTokens.legende),
+              Text(compte, style: c.legende),
             ],
           ),
           const SizedBox(height: 8),
@@ -311,9 +305,7 @@ class TablBarreVille extends StatelessWidget {
               height: 6,
               child: Stack(
                 children: [
-                  const Positioned.fill(
-                    child: ColoredBox(color: TablTokens.surface),
-                  ),
+                  Positioned.fill(child: ColoredBox(color: c.surface)),
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: part),
                     duration: Duration(milliseconds: duree),
@@ -324,7 +316,7 @@ class TablBarreVille extends StatelessWidget {
                     ),
                     builder: (context, v, _) => FractionallySizedBox(
                       widthFactor: v,
-                      child: const ColoredBox(color: TablTokens.primaire),
+                      child: ColoredBox(color: c.primaire),
                     ),
                   ),
                 ],
@@ -367,14 +359,10 @@ class TablAnneauMoments extends StatelessWidget {
   final List<PartAnneau> parts;
   final int total;
 
-  static const _couleurs = [
-    TablTokens.primaire,
-    TablTokens.primaireFoncee,
-    TablTokens.texte,
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
+    final couleurs = [c.primaire, c.primaireFoncee, c.texte];
     return _Carte(
       child: Row(
         children: [
@@ -392,7 +380,8 @@ class TablAnneauMoments extends StatelessWidget {
                     size: const Size.square(132),
                     painter: _PeintreAnneau(
                       parts: [for (final p in parts) p.part],
-                      couleurs: _couleurs,
+                      couleurs: couleurs,
+                      fond: c.surface,
                       avancee: v,
                     ),
                   ),
@@ -402,15 +391,12 @@ class TablAnneauMoments extends StatelessWidget {
                   children: [
                     Text(
                       '$total',
-                      style: TablTokens.titreAffichage.copyWith(
-                        fontSize: 32,
-                        height: 1,
-                      ),
+                      style: c.titreAffichage.copyWith(fontSize: 32, height: 1),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       total > 1 ? 'MOMENTS' : 'MOMENT',
-                      style: TablTokens.legende.copyWith(
+                      style: c.legende.copyWith(
                         fontSize: 10.5,
                         letterSpacing: 1.3,
                       ),
@@ -434,7 +420,7 @@ class TablAnneauMoments extends StatelessWidget {
                           width: 10,
                           height: 10,
                           decoration: BoxDecoration(
-                            color: _couleurs[i % _couleurs.length],
+                            color: couleurs[i % couleurs.length],
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -442,10 +428,10 @@ class TablAnneauMoments extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(parts[i].libelle, style: TablTokens.corps),
+                            Text(parts[i].libelle, style: c.corps),
                             Text(
                               parts[i].detail,
-                              style: TablTokens.legende.copyWith(fontSize: 12),
+                              style: c.legende.copyWith(fontSize: 12),
                             ),
                           ],
                         ),
@@ -465,11 +451,13 @@ class _PeintreAnneau extends CustomPainter {
   _PeintreAnneau({
     required this.parts,
     required this.couleurs,
+    required this.fond,
     required this.avancee,
   });
 
   final List<double> parts;
   final List<Color> couleurs;
+  final Color fond;
   final double avancee;
 
   @override
@@ -482,13 +470,7 @@ class _PeintreAnneau extends CustomPainter {
     final pinceau = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = epaisseur;
-    canvas.drawArc(
-      rect,
-      0,
-      2 * math.pi,
-      false,
-      pinceau..color = TablTokens.surface,
-    );
+    canvas.drawArc(rect, 0, 2 * math.pi, false, pinceau..color = fond);
     // Un petit espace entre les parts, et chacune se dessine à son tour.
     const ecart = 0.05;
     var debut = -math.pi / 2;
@@ -511,7 +493,10 @@ class _PeintreAnneau extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_PeintreAnneau ancien) => ancien.avancee != avancee;
+  bool shouldRepaint(_PeintreAnneau ancien) =>
+      ancien.avancee != avancee ||
+      ancien.fond != fond ||
+      ancien.couleurs != couleurs;
 }
 
 /// Une cuisine ("Italien · 3") ; la plus fréquente est mise en avant.
@@ -527,24 +512,21 @@ class TablPastilleCuisine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
         color: enAvant
-            ? TablTokens.primaire.withValues(alpha: 0.14)
+            ? c.primaire.withValues(alpha: 0.14)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-        border: Border.all(
-          color: enAvant ? TablTokens.primaire : TablTokens.bordure,
-        ),
+        border: Border.all(color: enAvant ? c.primaire : c.bordure),
       ),
       child: Text(
         texte,
-        style: TablTokens.corps.copyWith(
+        style: c.corps.copyWith(
           fontSize: 14,
-          color: enAvant
-              ? TablTokens.primaire
-              : TablTokens.texte.withValues(alpha: 0.85),
+          color: enAvant ? c.primaire : c.texte.withValues(alpha: 0.85),
         ),
       ),
     );
@@ -579,12 +561,10 @@ class TablCarteDuo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     Widget tete(String pseudo, String? photo) => Container(
       padding: const EdgeInsets.all(2),
-      decoration: const BoxDecoration(
-        color: TablTokens.surfaceBasse,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: c.surfaceBasse, shape: BoxShape.circle),
       child: TablAvatar(pseudo: pseudo, photoUrl: photo, rayon: 22),
     );
     return _Carte(
@@ -611,10 +591,10 @@ class TablCarteDuo extends StatelessWidget {
                   children: [
                     Text(
                       'Toi & $sonPseudo',
-                      style: TablTokens.titreAffichage.copyWith(fontSize: 21),
+                      style: c.titreAffichage.copyWith(fontSize: 21),
                     ),
                     const SizedBox(height: 2),
-                    Text(depuis, style: TablTokens.legende),
+                    Text(depuis, style: c.legende),
                   ],
                 ),
               ),
@@ -623,15 +603,15 @@ class TablCarteDuo extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             resume,
-            style: TablTokens.corps.copyWith(
+            style: c.corps.copyWith(
               fontSize: 14,
-              color: TablTokens.texte.withValues(alpha: 0.82),
+              color: c.texte.withValues(alpha: 0.82),
             ),
           ),
           TextButton.icon(
             onPressed: onRevoir,
             style: TextButton.styleFrom(
-              foregroundColor: TablTokens.primaire,
+              foregroundColor: c.primaire,
               padding: EdgeInsets.zero,
             ),
             iconAlignment: IconAlignment.end,
@@ -658,11 +638,12 @@ class _Carte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Material(
-      color: TablTokens.surfaceBasse,
+      color: c.surfaceBasse,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-        side: const BorderSide(color: TablTokens.surface),
+        side: BorderSide(color: c.surface),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

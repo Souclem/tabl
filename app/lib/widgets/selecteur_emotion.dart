@@ -54,6 +54,7 @@ class _BoutonEmotion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return GestureDetector(
       onTap: onPresse,
       behavior: HitTestBehavior.opaque,
@@ -67,7 +68,7 @@ class _BoutonEmotion extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: actif
-                ? TablTokens.primaire.withValues(alpha: 0.14)
+                ? c.primaire.withValues(alpha: 0.14)
                 : Colors.transparent,
           ),
           child: Text(emoji, style: const TextStyle(fontSize: 32)),

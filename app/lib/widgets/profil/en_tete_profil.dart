@@ -91,6 +91,7 @@ class TablEnTeteProfil extends StatelessWidget {
     // 0 : déplié, 1 : rangé en barre compacte.
     final t = max <= min ? 0.0 : (replie / (max - min)).clamp(0.0, 1.0);
     final haut = MediaQuery.paddingOf(context).top;
+    final c = TablCouleurs.of(context);
 
     return Stack(
       fit: StackFit.expand,
@@ -109,7 +110,7 @@ class TablEnTeteProfil extends StatelessWidget {
         Positioned.fill(
           child: IgnorePointer(
             child: ColoredBox(
-              color: TablTokens.fond.withValues(
+              color: c.fond.withValues(
                 alpha: ((t - 0.6) / 0.4).clamp(0.0, 1.0),
               ),
             ),
@@ -146,7 +147,7 @@ class TablEnTeteProfil extends StatelessWidget {
                   DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: TablTokens.primaire),
+                      border: Border.all(color: c.primaire),
                     ),
                     child: TablAvatar(
                       pseudo: pseudo,
@@ -159,7 +160,7 @@ class TablEnTeteProfil extends StatelessWidget {
                     child: Text(
                       pseudo,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.titreAffichage.copyWith(fontSize: 19),
+                      style: c.titreAffichage.copyWith(fontSize: 19),
                     ),
                   ),
                 ],
@@ -179,10 +180,11 @@ class _Couverture extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Stack(
       fit: StackFit.expand,
       children: [
-        const ColoredBox(color: TablTokens.surface),
+        ColoredBox(color: c.surface),
         if (url != null)
           Image.network(
             url!,
@@ -197,10 +199,10 @@ class _Couverture extends StatelessWidget {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                TablTokens.fond.withValues(alpha: 0.45),
-                TablTokens.fond.withValues(alpha: 0.05),
-                TablTokens.fond.withValues(alpha: 0.8),
-                TablTokens.fond,
+                c.fond.withValues(alpha: 0.45),
+                c.fond.withValues(alpha: 0.05),
+                c.fond.withValues(alpha: 0.8),
+                c.fond,
               ],
               stops: const [0, 0.3, 0.72, 0.96],
             ),
@@ -228,7 +230,8 @@ class _Identite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trait = BorderSide(color: TablTokens.bordure.withValues(alpha: 0.7));
+    final c = TablCouleurs.of(context);
+    final trait = BorderSide(color: c.bordure.withValues(alpha: 0.7));
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -249,7 +252,7 @@ class _Identite extends StatelessWidget {
                   pseudo,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TablTokens.titreAffichage.copyWith(
+                  style: c.titreAffichage.copyWith(
                     fontSize: 40,
                     height: 1.05,
                     letterSpacing: -0.4,
@@ -285,6 +288,7 @@ class _Compteur extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final nombre = compteur.nombre;
     final contenu = Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -298,10 +302,7 @@ class _Compteur extends StatelessWidget {
             curve: Curves.easeOutCubic,
             builder: (context, valeur, _) => Text(
               nombre == null ? '—' : '${valeur.round()}',
-              style: TablTokens.titreAffichage.copyWith(
-                fontSize: 26,
-                height: 1.1,
-              ),
+              style: c.titreAffichage.copyWith(fontSize: 26, height: 1.1),
             ),
           ),
           const SizedBox(height: 3),
@@ -311,10 +312,7 @@ class _Compteur extends StatelessWidget {
                 child: Text(
                   compteur.libelle.toUpperCase(),
                   overflow: TextOverflow.ellipsis,
-                  style: TablTokens.legende.copyWith(
-                    fontSize: 11,
-                    letterSpacing: 1.3,
-                  ),
+                  style: c.legende.copyWith(fontSize: 11, letterSpacing: 1.3),
                 ),
               ),
               if (compteur.pastille) ...[
@@ -322,8 +320,8 @@ class _Compteur extends StatelessWidget {
                 Container(
                   width: 7,
                   height: 7,
-                  decoration: const BoxDecoration(
-                    color: TablTokens.primaire,
+                  decoration: BoxDecoration(
+                    color: c.primaire,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -368,6 +366,7 @@ class _PhotoCerclee extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return SizedBox(
       width: 96,
       height: 96,
@@ -380,7 +379,7 @@ class _PhotoCerclee extends StatelessWidget {
               duration: const Duration(milliseconds: 1300),
               curve: Curves.easeInOutCubic,
               builder: (context, avancee, _) =>
-                  CustomPaint(painter: _PeintreAnneau(avancee)),
+                  CustomPaint(painter: _PeintreAnneau(avancee, c.primaire)),
             ),
           ),
           Center(
@@ -395,20 +394,20 @@ class _PhotoCerclee extends StatelessWidget {
                 label: 'Modifier le profil',
                 excludeSemantics: true,
                 child: Material(
-                  color: TablTokens.primaire,
-                  shape: const CircleBorder(
-                    side: BorderSide(color: TablTokens.fond, width: 3),
+                  color: c.primaire,
+                  shape: CircleBorder(
+                    side: BorderSide(color: c.fond, width: 3),
                   ),
                   child: InkWell(
                     onTap: onModifier,
                     customBorder: const CircleBorder(),
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 38,
                       height: 38,
                       child: Icon(
                         Icons.edit_rounded,
                         size: 16,
-                        color: TablTokens.texteSurPrimaire,
+                        color: c.texteSurPrimaire,
                       ),
                     ),
                   ),
@@ -422,9 +421,10 @@ class _PhotoCerclee extends StatelessWidget {
 }
 
 class _PeintreAnneau extends CustomPainter {
-  _PeintreAnneau(this.avancee);
+  _PeintreAnneau(this.avancee, this.couleur);
 
   final double avancee;
+  final Color couleur;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -435,12 +435,13 @@ class _PeintreAnneau extends CustomPainter {
       2 * math.pi * avancee,
       false,
       Paint()
-        ..color = TablTokens.primaire
+        ..color = couleur
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.6,
     );
   }
 
   @override
-  bool shouldRepaint(_PeintreAnneau ancien) => ancien.avancee != avancee;
+  bool shouldRepaint(_PeintreAnneau ancien) =>
+      ancien.avancee != avancee || ancien.couleur != couleur;
 }

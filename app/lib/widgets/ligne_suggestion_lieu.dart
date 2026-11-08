@@ -19,6 +19,7 @@ class TablLigneSuggestionLieu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return InkWell(
       onTap: onSelection,
       borderRadius: BorderRadius.circular(TablTokens.arrondiM),
@@ -29,11 +30,7 @@ class TablLigneSuggestionLieu extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.location_on_outlined,
-              size: 20,
-              color: TablTokens.primaire,
-            ),
+            Icon(Icons.location_on_outlined, size: 20, color: c.primaire),
             const SizedBox(width: TablTokens.espaceM),
             Expanded(
               child: Column(
@@ -41,16 +38,14 @@ class TablLigneSuggestionLieu extends StatelessWidget {
                 children: [
                   Text(
                     nom,
-                    style: TablTokens.corps.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: c.corps.copyWith(fontWeight: FontWeight.w600),
                   ),
                   if (description.isNotEmpty)
                     Text(
                       description,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende,
+                      style: c.legende,
                     ),
                 ],
               ),

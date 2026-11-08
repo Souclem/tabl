@@ -20,6 +20,7 @@ class TablBouton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final actif = onPresse != null && !enCours;
 
     return SizedBox(
@@ -28,22 +29,22 @@ class TablBouton extends StatelessWidget {
       child: FilledButton(
         onPressed: actif ? onPresse : null,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.primaire,
-          foregroundColor: TablTokens.texteSurPrimaire,
-          disabledBackgroundColor: TablTokens.primaire.withValues(alpha: 0.4),
-          disabledForegroundColor: TablTokens.texteSurPrimaire,
+          backgroundColor: c.primaire,
+          foregroundColor: c.texteSurPrimaire,
+          disabledBackgroundColor: c.primaire.withValues(alpha: 0.4),
+          disabledForegroundColor: c.texteSurPrimaire,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
           ),
           textStyle: TablTokens.libelleBouton,
         ),
         child: enCours
-            ? const SizedBox(
+            ? SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: TablTokens.texteSurPrimaire,
+                  color: c.texteSurPrimaire,
                 ),
               )
             : Text(libelle),
@@ -61,10 +62,11 @@ enum TablBoutonSocialStyle {
   /// création de compte mise en avant sans être un bouton plein.
   contourAccent,
 
-  /// Fond clair, texte foncé — pour un bouton posé sur un fond sombre.
+  /// Fond de la couleur du texte, texte de la couleur du fond : le bouton
+  /// qui tranche sur la page (ivoire en sombre, encre en clair).
   clair,
 
-  /// Fond sombre plein, texte clair.
+  /// Fond de surface plein, texte de l'apparence.
   sombre,
 }
 
@@ -91,6 +93,7 @@ class TablBoutonSocial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final forme = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(
         pilule ? TablTokens.hauteurControle / 2 : TablTokens.arrondiS,
@@ -105,8 +108,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.texte,
-          foregroundColor: TablTokens.fond,
+          backgroundColor: c.texte,
+          foregroundColor: c.fond,
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -116,8 +119,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: FilledButton.styleFrom(
-          backgroundColor: TablTokens.surface,
-          foregroundColor: TablTokens.texte,
+          backgroundColor: c.surface,
+          foregroundColor: c.texte,
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -127,8 +130,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: OutlinedButton.styleFrom(
-          foregroundColor: TablTokens.primaire,
-          side: const BorderSide(color: TablTokens.primaire),
+          foregroundColor: c.primaire,
+          side: BorderSide(color: c.primaire),
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -138,8 +141,8 @@ class TablBoutonSocial extends StatelessWidget {
         icon: icone_,
         label: libelle_,
         style: OutlinedButton.styleFrom(
-          foregroundColor: TablTokens.texte,
-          side: const BorderSide(color: TablTokens.bordure),
+          foregroundColor: c.texte,
+          side: BorderSide(color: c.bordure),
           shape: forme,
           textStyle: TablTokens.libelleBouton,
         ),
@@ -156,21 +159,18 @@ class TablBoutonSocial extends StatelessWidget {
 
 /// Bouton discret, sans fond : liens de bas de page, actions secondaires.
 class TablBoutonTexte extends StatelessWidget {
-  const TablBoutonTexte({
-    super.key,
-    required this.libelle,
-    this.onPresse,
-  });
+  const TablBoutonTexte({super.key, required this.libelle, this.onPresse});
 
   final String libelle;
   final VoidCallback? onPresse;
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return TextButton(
       onPressed: onPresse,
       style: TextButton.styleFrom(
-        foregroundColor: TablTokens.primaire,
+        foregroundColor: c.primaire,
         textStyle: TablTokens.libelleBouton,
         padding: const EdgeInsets.symmetric(
           horizontal: TablTokens.espaceS,
@@ -201,6 +201,7 @@ class TablPetitBouton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       enabled: onPresse != null,
@@ -216,16 +217,16 @@ class TablPetitBouton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: plein ? TablTokens.primaire : Colors.transparent,
+              color: plein ? c.primaire : Colors.transparent,
               borderRadius: BorderRadius.circular(TablTokens.arrondiS + 2),
-              border: plein ? null : Border.all(color: TablTokens.bordure),
+              border: plein ? null : Border.all(color: c.bordure),
             ),
             child: Text(
               libelle,
-              style: TablTokens.legende.copyWith(
+              style: c.legende.copyWith(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w700,
-                color: plein ? TablTokens.texteSurPrimaire : TablTokens.texte,
+                color: plein ? c.texteSurPrimaire : c.texte,
               ),
             ),
           ),

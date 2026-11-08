@@ -84,6 +84,7 @@ class _CarteChoix extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     const duree = Duration(milliseconds: 220);
     return Semantics(
       button: true,
@@ -97,12 +98,10 @@ class _CarteChoix extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: choisie
-                ? TablTokens.primaire.withValues(alpha: 0.1)
-                : TablTokens.surfaceBasse,
+            color: choisie ? c.primaire.withValues(alpha: 0.1) : c.surfaceBasse,
             borderRadius: BorderRadius.circular(TablTokens.arrondiM),
             border: Border.all(
-              color: choisie ? TablTokens.primaire : TablTokens.bordure,
+              color: choisie ? c.primaire : c.bordure,
               width: choisie ? 1.5 : 1,
             ),
           ),
@@ -115,20 +114,18 @@ class _CarteChoix extends StatelessWidget {
                 height: 34,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: choisie ? TablTokens.primaire : TablTokens.surface,
+                  color: choisie ? c.primaire : c.surface,
                 ),
                 child: Icon(
                   option.icone,
                   size: 18,
-                  color: choisie
-                      ? TablTokens.texteSurPrimaire
-                      : TablTokens.primaire,
+                  color: choisie ? c.texteSurPrimaire : c.primaire,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
                 option.libelle,
-                style: TablTokens.corps.copyWith(
+                style: c.corps.copyWith(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
@@ -136,7 +133,7 @@ class _CarteChoix extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 option.description,
-                style: TablTokens.legende.copyWith(fontSize: 12.5),
+                style: c.legende.copyWith(fontSize: 12.5),
               ),
             ],
           ),
@@ -167,6 +164,7 @@ class TablVignettesCaptures extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final rayon = BorderRadius.circular(TablTokens.arrondiS + 4);
     return Wrap(
       spacing: 10,
@@ -197,10 +195,10 @@ class TablVignettesCaptures extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: Colors.black.withValues(alpha: 0.65),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.close_rounded,
                           size: 15,
-                          color: TablTokens.texte,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -220,21 +218,15 @@ class TablVignettesCaptures extends StatelessWidget {
                 height: _hauteur,
                 decoration: BoxDecoration(
                   borderRadius: rayon,
-                  color: TablTokens.surfaceBasse,
-                  border: Border.all(color: TablTokens.bordure),
+                  color: c.surfaceBasse,
+                  border: Border.all(color: c.bordure),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(
-                      Icons.add_photo_alternate_outlined,
-                      color: TablTokens.primaire,
-                    ),
+                    Icon(Icons.add_photo_alternate_outlined, color: c.primaire),
                     const SizedBox(height: 6),
-                    Text(
-                      'Ajouter',
-                      style: TablTokens.legende.copyWith(fontSize: 12),
-                    ),
+                    Text('Ajouter', style: c.legende.copyWith(fontSize: 12)),
                   ],
                 ),
               ),
@@ -263,6 +255,7 @@ class TablConfirmationEnvoi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Column(
@@ -277,14 +270,14 @@ class TablConfirmationEnvoi extends StatelessWidget {
             child: Container(
               width: 76,
               height: 76,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: TablTokens.primaire,
+                color: c.primaire,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check_rounded,
                 size: 40,
-                color: TablTokens.texteSurPrimaire,
+                color: c.texteSurPrimaire,
               ),
             ),
           ),
@@ -292,21 +285,21 @@ class TablConfirmationEnvoi extends StatelessWidget {
           Text(
             titre,
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 30),
+            style: c.titreAffichage.copyWith(fontSize: 30),
           ),
           const SizedBox(height: TablTokens.espaceS),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+            style: c.corps.copyWith(color: c.texteDoux),
           ),
           const SizedBox(height: TablTokens.espaceXl),
           TextButton(
             onPressed: onPresse,
             child: Text(
               libelleBouton,
-              style: TablTokens.corps.copyWith(
-                color: TablTokens.primaire,
+              style: c.corps.copyWith(
+                color: c.primaire,
                 fontWeight: FontWeight.w600,
               ),
             ),

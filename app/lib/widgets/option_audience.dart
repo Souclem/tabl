@@ -24,6 +24,7 @@ class TablOptionAudience extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -41,9 +42,7 @@ class TablOptionAudience extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: selectionnee
-                          ? TablTokens.primaire
-                          : TablTokens.texteDoux,
+                      color: selectionnee ? c.primaire : c.texteDoux,
                       width: selectionnee ? 6.5 : 1.5,
                     ),
                   ),
@@ -55,12 +54,9 @@ class TablOptionAudience extends StatelessWidget {
                     children: [
                       Text(
                         titre,
-                        style: TablTokens.corps.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: c.corps.copyWith(fontWeight: FontWeight.w600),
                       ),
-                      if (sousTitre != null)
-                        Text(sousTitre!, style: TablTokens.legende),
+                      if (sousTitre != null) Text(sousTitre!, style: c.legende),
                     ],
                   ),
                 ),
@@ -102,14 +98,15 @@ class TablPuceSelection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return FilterChip(
       label: Text(libelle),
       selected: selectionnee,
       onSelected: (_) => onBascule(),
-      backgroundColor: TablTokens.surface,
-      selectedColor: TablTokens.primaire.withValues(alpha: 0.2),
-      labelStyle: TablTokens.legende.copyWith(color: TablTokens.texte),
-      side: const BorderSide(color: TablTokens.bordure),
+      backgroundColor: c.surface,
+      selectedColor: c.primaire.withValues(alpha: 0.2),
+      labelStyle: c.legende.copyWith(color: c.texte),
+      side: BorderSide(color: c.bordure),
     );
   }
 }
@@ -133,11 +130,12 @@ class TablLigneAudience extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Material(
-      color: TablTokens.surface,
+      color: c.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(TablTokens.arrondiM),
-        side: const BorderSide(color: TablTokens.bordure),
+        side: BorderSide(color: c.bordure),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -154,26 +152,20 @@ class TablLigneAudience extends StatelessWidget {
                     ? Icons.lock_outline_rounded
                     : Icons.visibility_outlined,
                 size: 18,
-                color: TablTokens.primaire,
+                color: c.primaire,
               ),
               const SizedBox(width: TablTokens.espaceS),
-              Text('Qui peut voir', style: TablTokens.corps),
+              Text('Qui peut voir', style: c.corps),
               const SizedBox(width: TablTokens.espaceM),
               Expanded(
                 child: Text(
                   libelle,
                   textAlign: TextAlign.right,
                   overflow: TextOverflow.ellipsis,
-                  style: TablTokens.corps.copyWith(
-                    color: TablTokens.texteDoux,
-                  ),
+                  style: c.corps.copyWith(color: c.texteDoux),
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: TablTokens.texteDoux,
-              ),
+              Icon(Icons.chevron_right_rounded, size: 20, color: c.texteDoux),
             ],
           ),
         ),

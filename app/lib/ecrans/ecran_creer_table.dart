@@ -76,8 +76,9 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -91,9 +92,11 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
               ),
               child: Row(
                 children: [
-                  TablBoutonRetour(onPresse: () => Navigator.of(context).pop(false)),
+                  TablBoutonRetour(
+                    onPresse: () => Navigator.of(context).pop(false),
+                  ),
                   const SizedBox(width: TablTokens.espaceM),
-                  Text('Nouvelle Table', style: TablTokens.titre),
+                  Text('Nouvelle Table', style: c.titre),
                 ],
               ),
             ),
@@ -114,18 +117,20 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
                     indication: '☀️',
                   ),
                   const SizedBox(height: TablTokens.espaceL),
-                  Text('Membres', style: TablTokens.sousTitre),
+                  Text('Membres', style: c.sousTitre),
                   const SizedBox(height: TablTokens.espaceS),
                   if (_chargementAmis)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: TablTokens.espaceM),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: TablTokens.espaceM,
+                      ),
                       child: Center(
                         child: SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: TablTokens.primaire,
+                            color: c.primaire,
                           ),
                         ),
                       ),
@@ -133,7 +138,7 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
                   else if (_amis.isEmpty)
                     Text(
                       'Suivez des personnes pour pouvoir les inviter.',
-                      style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                      style: c.legende.copyWith(color: c.texteDoux),
                     )
                   else
                     for (final ami in _amis)
@@ -146,8 +151,8 @@ class _EcranCreerTableState extends State<EcranCreerTable> {
                             _membresSelectionnes.remove(ami.id);
                           }
                         }),
-                        title: Text(ami.pseudo, style: TablTokens.corps),
-                        activeColor: TablTokens.primaire,
+                        title: Text(ami.pseudo, style: c.corps),
+                        activeColor: c.primaire,
                         contentPadding: EdgeInsets.zero,
                         controlAffinity: ListTileControlAffinity.leading,
                       ),

@@ -61,12 +61,15 @@ class TablApp extends StatelessWidget {
     // Même raison : la cloche du Feed en a besoin dès son premier build.
     final notificationService = NotificationServiceSupabase(TablBackend.client);
 
-    return MaterialApp(
+    final reglage = apparence;
+
+    MaterialApp application(Apparence choix) => MaterialApp(
       title: 'Tabl',
       debugShowCheckedModeBanner: false,
-      theme: TablTheme.sombre(),
+      theme: TablTheme.clair(),
+      darkTheme: TablTheme.sombre(),
+      themeMode: TablTheme.mode(choix),
       builder: (context, ecran) {
-        final reglage = apparence;
         if (reglage == null || ecran == null) return ecran ?? const SizedBox();
         return TablApparence(reglage: reglage, child: ecran);
       },
@@ -78,6 +81,15 @@ class TablApp extends StatelessWidget {
         instantService: instantService,
         notificationService: notificationService,
       ),
+    );
+
+    if (reglage == null) return application(Apparence.sombre);
+    // Le thème suit le réglage Apparence : un changement ne rebâtit que le
+    // MaterialApp (le navigateur et ses écrans gardent leur état), et les
+    // couleurs fondent d'un thème à l'autre.
+    return ValueListenableBuilder<Apparence>(
+      valueListenable: reglage,
+      builder: (context, choix, _) => application(choix),
     );
   }
 }

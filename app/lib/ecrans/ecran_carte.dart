@@ -581,9 +581,10 @@ class _EcranCarteState extends State<EcranCarte> {
   Future<void> _proposer(LieuCarte lieu) async {
     final service = widget.tableService;
     if (service == null || _tables.isEmpty) return;
+    final c = TablCouleurs.of(context);
     final table = await showModalBottomSheet<ResumeTable>(
       context: context,
-      backgroundColor: const Color(0xFF111216),
+      backgroundColor: c.surfaceBasse,
       showDragHandle: true,
       builder: (contexte) => SafeArea(
         child: ListView(
@@ -597,12 +598,12 @@ class _EcranCarteState extends State<EcranCarte> {
           children: [
             Text(
               'Proposer ${lieu.nom}',
-              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+              style: c.titreAffichage.copyWith(fontSize: 24),
             ),
             const SizedBox(height: 4),
             Text(
               'À quelle Table ? Elle répondra GO ou non, puis on trouvera la date.',
-              style: TablTokens.legende,
+              style: c.legende,
             ),
             const SizedBox(height: TablTokens.espaceM),
             for (final t in _tables)
@@ -612,11 +613,8 @@ class _EcranCarteState extends State<EcranCarte> {
                   t.emoji ?? '🍽',
                   style: const TextStyle(fontSize: 22),
                 ),
-                title: Text(t.nom, style: TablTokens.corps),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: TablTokens.texteDoux,
-                ),
+                title: Text(t.nom, style: c.corps),
+                trailing: Icon(Icons.chevron_right_rounded, color: c.texteDoux),
                 onTap: () => Navigator.of(contexte).pop(t),
               ),
           ],
@@ -843,13 +841,21 @@ class _EcranCarteState extends State<EcranCarte> {
     // c'est un ciel d'étoiles.
     return TablNuitForcee(
       active: _mode == ModeExplorer.maCarte,
-      child: barreEtat,
+      // L'Explorer a sa propre palette (PaletteExplorer) : il garde le
+      // thème sombre de l'app, que le reste de l'app suive le clair ou non.
+      child: Theme(data: TablTheme.sombre(), child: barreEtat),
     );
   }
 
   PaletteExplorer get _palette => _mode == ModeExplorer.maCarte
       ? PaletteExplorer.sombre
       : PaletteExplorer.of(context);
+
+  /// Les couleurs de l'app qui vont avec [_palette] : l'Explorer garde le
+  /// thème sombre, ses feuilles et ses messages suivent sa palette.
+  TablCouleurs get _couleurs => _palette == PaletteExplorer.clair
+      ? TablCouleurs.clair
+      : TablCouleurs.sombre;
 
   /// La hauteur de la barre flottante et de sa marge : ce qui doit rester
   /// visible se pose au-dessus.
@@ -971,8 +977,8 @@ class _EcranCarteState extends State<EcranCarte> {
               SizedBox(
                 height: 2,
                 child: _chargement
-                    ? const LinearProgressIndicator(
-                        color: TablTokens.primaire,
+                    ? LinearProgressIndicator(
+                        color: _couleurs.primaire,
                         backgroundColor: Colors.transparent,
                       )
                     : null,
@@ -986,7 +992,7 @@ class _EcranCarteState extends State<EcranCarte> {
 
   Widget _carte() {
     if (!widget.afficherCarte) {
-      return const ColoredBox(color: TablTokens.surface);
+      return ColoredBox(color: _palette.surface);
     }
     final constellation = _mode == ModeExplorer.maCarte;
     return TablCarteMapbox(
@@ -1034,7 +1040,7 @@ class _EcranCarteState extends State<EcranCarte> {
           left: TablTokens.espaceL,
           right: TablTokens.espaceL,
           bottom: _margeBarreFlottante + 8,
-          child: _MessageCarte(texte: _rienDuTout),
+          child: _MessageCarte(texte: _rienDuTout, couleurs: _couleurs),
         ),
       if (selection == null &&
           _chargeUneFois &&
@@ -1046,6 +1052,7 @@ class _EcranCarteState extends State<EcranCarte> {
           right: TablTokens.espaceL,
           bottom: _margeBarreFlottante + 8,
           child: _MessageCarte(
+            couleurs: _couleurs,
             texte: _compte(0),
             action: 'Voir mes villes',
             onAction: _ouvrirOuChercher,
@@ -1173,9 +1180,12 @@ class _EcranCarteState extends State<EcranCarte> {
               ),
               if (_chargeUneFois && _lieux.isNotEmpty) ...[
                 const SizedBox(height: TablTokens.espaceM),
-                TablBoutonTexte(
-                  libelle: 'Voir mes villes',
-                  onPresse: _ouvrirOuChercher,
+                Theme(
+                  data: Theme.of(context).copyWith(extensions: [_couleurs]),
+                  child: TablBoutonTexte(
+                    libelle: 'Voir mes villes',
+                    onPresse: _ouvrirOuChercher,
+                  ),
                 ),
               ],
             ],
@@ -1250,9 +1260,15 @@ class _EcranCarteState extends State<EcranCarte> {
 
 /// Un message posé sur la carte, avec de quoi aller ailleurs.
 class _MessageCarte extends StatelessWidget {
-  const _MessageCarte({required this.texte, this.action, this.onAction});
+  const _MessageCarte({
+    required this.texte,
+    required this.couleurs,
+    this.action,
+    this.onAction,
+  });
 
   final String texte;
+  final TablCouleurs couleurs;
   final String? action;
   final VoidCallback? onAction;
 
@@ -1261,9 +1277,9 @@ class _MessageCarte extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
       decoration: BoxDecoration(
-        color: const Color(0xF20F1014),
+        color: couleurs.surfaceBasse.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.08)),
+        border: Border.all(color: couleurs.texte.withValues(alpha: 0.08)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1271,10 +1287,13 @@ class _MessageCarte extends StatelessWidget {
           Text(
             texte,
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 18),
+            style: couleurs.titreAffichage.copyWith(fontSize: 18),
           ),
           if (action != null)
-            TablBoutonTexte(libelle: action!, onPresse: onAction)
+            Theme(
+              data: Theme.of(context).copyWith(extensions: [couleurs]),
+              child: TablBoutonTexte(libelle: action!, onPresse: onAction),
+            )
           else
             const SizedBox(height: 10),
         ],
