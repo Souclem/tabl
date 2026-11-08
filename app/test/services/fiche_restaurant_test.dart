@@ -74,4 +74,70 @@ void main() {
     );
     expect(impressionLisible('Ambiance'), 'Ambiance');
   });
+
+  group('l\'éventail des proches', () {
+    final maintenant = DateTime(2026, 10, 27);
+    List<ProcheFiche> proches(int n) => [
+      for (var i = 0; i < n; i++)
+        (
+          id: 'p$i',
+          pseudo: 'Proche $i',
+          photoUrl: i == 0 ? 'photo' : null,
+          fois: i + 1,
+          derniere: DateTime(2026, 8, 27),
+          emoji: i == 0 ? '😍' : null,
+        ),
+    ];
+
+    test('aucun proche : aucune carte', () {
+      final e = eventailProches([], maintenant);
+      expect(e.cartes, isEmpty);
+      expect(e.autres, isNull);
+    });
+
+    test('jusqu\'à 4 proches : une carte chacun, sans « + »', () {
+      for (final n in [1, 3, 4]) {
+        final e = eventailProches(proches(n), maintenant);
+        expect(e.cartes, hasLength(n));
+        expect(e.autres, isNull);
+      }
+    });
+
+    test('5 proches : 3 cartes et « +2 »', () {
+      final e = eventailProches(proches(5), maintenant);
+      expect([for (final c in e.cartes) c.id], ['p0', 'p1', 'p2']);
+      expect(e.autres, (texte: '+2', nombreux: false));
+    });
+
+    test('« + » plafonné à 10, doré au-delà', () {
+      expect(eventailProches(proches(13), maintenant).autres, (
+        texte: '+10',
+        nombreux: false,
+      ));
+      expect(eventailProches(proches(14), maintenant).autres, (
+        texte: '+10',
+        nombreux: true,
+      ));
+    });
+
+    test('les textes d\'une carte sont prêts à afficher', () {
+      final c = eventailProches(proches(2), maintenant).cartes;
+      expect(c[0].pseudo, 'Proche 0');
+      expect(c[0].photoUrl, 'photo');
+      expect(c[0].ressenti, '😍');
+      expect(c[0].fois, '1 fois');
+      expect(c[1].fois, '2 fois');
+      expect(c[1].ressenti, isNull);
+      expect(c[0].derniereVisite, 'Il y a 2 mois');
+    });
+
+    test('la dernière visite', () {
+      String texte(DateTime d) => derniereVisiteLisible(d, maintenant);
+      expect(texte(DateTime(2026, 10, 27)), "Aujourd'hui");
+      expect(texte(DateTime(2026, 10, 26)), 'Hier');
+      expect(texte(DateTime(2026, 10, 24)), 'Il y a 3 jours');
+      expect(texte(DateTime(2026, 10, 6)), 'Il y a 3 semaines');
+      expect(texte(DateTime(2023, 1, 1)), 'Il y a 3 ans');
+    });
+  });
 }

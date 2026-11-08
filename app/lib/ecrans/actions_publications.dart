@@ -118,6 +118,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       estEnvie: souvenir.estEnvie,
       souvenirService: souvenirService,
       abonnementService: abonnementService,
+      tableService: _tables,
     );
     if (!mounted) return;
     recharger();

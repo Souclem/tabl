@@ -109,11 +109,18 @@ sont dans `docs/regles.md`.
 - **Recherche** : la pilule glisse vers le haut (jamais de téléportation) ;
   on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox),
   1er résultat = « Chercher les restaurants dont le nom est « … » ».
-- Reste à faire : (3) fiche « Éventail » (bandeau nuit, cartes des proches en
-  éventail, « On y va ? », Itinéraire, marque-page) + « Qui y est allé » ;
-  (4) « Où explorer » (rayon Automatique/1/3/10/25 km), titre « Autour de
-  moi · 1 km ». Visages : ≤ 4 proches → 4 visages, au-delà 3 visages +
-  « +min(n−3, 10) ».
+- **Fiche « Éventail » (faite)** : bandeau nuit (photo, nom, retour,
+  marque-page doré quand l'adresse est gardée, qui remplace « Garder »),
+  puis les proches qui y sont allés en cartes en éventail (≤ 4 proches → 4
+  cartes, au-delà 3 cartes + « +min(n−3, 10) » qui ouvre « Qui y est
+  allé » ; une carte ouvre le profil), « On y va ? » (propose à l'une de
+  ses Tables ; masqué sans Table) et Itinéraire (application de plans, via
+  `url_launcher` ; coordonnées si on les a, sinon nom + adresse), puis
+  Demander · Carte. Fiche sombre en dur (pas encore migrée au thème).
+  Depuis l'Explorer, elle se pose sur la carte en `opaque: false`.
+  Reste à faire : (4) « Où explorer » (rayon Automatique/1/3/10/25 km),
+  titre « Autour de moi · 1 km ». Visages : ≤ 4 proches → 4 visages, au-delà
+  3 visages + « +min(n−3, 10) ».
 - Note /5 calculée côté app à partir des ressentis, pas en SQL.
 - Réseau étendu, Premium, Créateurs/Pros : pas pour l'instant.
 

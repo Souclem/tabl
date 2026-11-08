@@ -19,6 +19,8 @@ class EcranNotifications extends StatefulWidget {
     required this.abonnementService,
     required this.souvenirService,
     this.avisService,
+    this.carteService,
+    this.tableService,
   });
 
   final NotificationService notificationService;
@@ -27,6 +29,13 @@ class EcranNotifications extends StatefulWidget {
 
   /// Pour répondre aux demandes d'avis. `null` : elles ouvrent le profil.
   final AvisService? avisService;
+
+  /// Pour remplir la fiche d'un restaurant (adresse, catégorie) ; `null` :
+  /// la fiche s'ouvre sans sous-titre.
+  final CarteService? carteService;
+
+  /// Pour « On y va ? » sur la fiche d'un restaurant.
+  final TableService? tableService;
 
   @override
   State<EcranNotifications> createState() => _EcranNotificationsState();
@@ -47,6 +56,9 @@ class _EcranNotificationsState extends State<EcranNotifications>
 
   @override
   AbonnementService? get abonnementService => widget.abonnementService;
+
+  @override
+  TableService? get tableService => widget.tableService;
 
   @override
   void initState() {
@@ -128,6 +140,17 @@ class _EcranNotificationsState extends State<EcranNotifications>
     if (repondu == true && mounted) recharger();
   }
 
+  /// Les mêmes données que sur l'Explorer ; la fiche s'ouvre quand même
+  /// sans elles.
+  Future<LieuCarte?> _lieu(String restaurantId) async {
+    try {
+      return await widget.carteService?.lieuDuRestaurant(restaurantId);
+    } catch (e) {
+      debugPrint('EcranNotifications: restaurant : $e');
+      return null;
+    }
+  }
+
   Future<void> _ouvrir(LigneNotification l) async {
     if (l.type == TypeNotification.demandeAvis && widget.avisService != null) {
       await _repondreAvis(l);
@@ -135,13 +158,18 @@ class _EcranNotificationsState extends State<EcranNotifications>
     }
     final restaurantId = l.restaurantId;
     if (l.type == TypeNotification.avisRecu && restaurantId != null) {
+      final lieu = await _lieu(restaurantId);
+      if (!mounted) return;
       await ouvrirFeuilleRestaurant(
         context,
-        nom: l.restaurantNom ?? '',
-        sousTitre: '',
+        nom: lieu?.nom ?? l.restaurantNom ?? '',
+        sousTitre: lieu?.description ?? '',
         restaurantId: restaurantId,
+        latitude: lieu?.latitude,
+        longitude: lieu?.longitude,
         souvenirService: widget.souvenirService,
         abonnementService: widget.abonnementService,
+        tableService: tableService,
         avisService: widget.avisService,
       );
       return;

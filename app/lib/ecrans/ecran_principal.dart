@@ -143,6 +143,17 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
           abonnementService: widget.abonnementService,
           souvenirService: widget.souvenirService,
           avisService: _avisService,
+          // Comme `_notificationsSysteme` : sans backend (tests), rien.
+          carteService:
+              widget.carteService ??
+              (TablBackend.estDemarre
+                  ? CarteServiceSupabase(TablBackend.client)
+                  : null),
+          tableService:
+              widget.tableService ??
+              (TablBackend.estDemarre
+                  ? TableServiceSupabase(TablBackend.client)
+                  : null),
         ),
       ),
     );

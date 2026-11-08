@@ -5,6 +5,7 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'package:app/ecrans/ecran_carte.dart';
+import 'package:app/ecrans/feuille_restaurant.dart';
 
 /// Faux service : applique quelques filtres comme le ferait la base, et
 /// garde les recherches reçues pour vérifier que l'écran recharge.
@@ -42,6 +43,10 @@ class _FauxCarteService implements CarteService {
 
   @override
   Future<Map<String, String>> photos(Iterable<String> chemins) async => {};
+
+  @override
+  Future<LieuCarte?> lieuDuRestaurant(String restaurantId) async =>
+      lieux.where((l) => l.restaurantId == restaurantId).firstOrNull;
 
   @override
   Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;
@@ -129,10 +134,20 @@ LieuCarte _lieu(
   ],
 );
 
+class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
+      const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 Future<_FauxCarteService> _ouvrir(
   WidgetTester tester,
   List<LieuCarte> lieux, {
   ValueChanged<bool>? onImmersion,
+  SouvenirService? souvenirService,
 }) async {
   tester.view.physicalSize = const Size(1000, 2200);
   tester.view.devicePixelRatio = 1.0;
@@ -148,6 +163,7 @@ Future<_FauxCarteService> _ouvrir(
         rechercheEndroit: _FausseRechercheEndroit(),
         afficherCarte: false,
         onImmersion: onImmersion,
+        souvenirService: souvenirService,
       ),
     ),
   );
@@ -407,6 +423,32 @@ void main() {
 
     expect(service.envies.single.envie, isTrue);
   });
+
+  testWidgets(
+    'une tuile ouvre la fiche, posée sur l\'Explorer sans le cacher',
+    (tester) async {
+      await _ouvrir(tester, [
+        _lieu('Bibo'),
+      ], souvenirService: _FauxSouvenirService());
+
+      await tester.tap(find.text('Bibo'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FicheRestaurant), findsOneWidget);
+      expect(find.byType(TablHerosFiche), findsOneWidget);
+      final route = ModalRoute.of(
+        tester.element(find.byType(FicheRestaurant)),
+      )!;
+      expect(route.opaque, isFalse);
+      // L'Explorer reste dessiné dessous : sa carte n'est pas recréée.
+      expect(find.byType(EcranCarte, skipOffstage: false), findsOneWidget);
+      expect(find.byType(EcranCarte), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Retour'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FicheRestaurant), findsNothing);
+    },
+  );
 
   testWidgets('la Constellation, en plein écran : son ciel, son titre, et '
       'rien d\'autre que le bouton pour en sortir', (tester) async {
