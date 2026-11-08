@@ -841,9 +841,14 @@ class _EcranCarteState extends State<EcranCarte> {
     // c'est un ciel d'étoiles.
     return TablNuitForcee(
       active: _mode == ModeExplorer.maCarte,
-      // L'Explorer a sa propre palette (PaletteExplorer) : il garde le
-      // thème sombre de l'app, que le reste de l'app suive le clair ou non.
-      child: Theme(data: TablTheme.sombre(), child: barreEtat),
+      // Le thème suit la palette de l'Explorer : clair avec elle, sombre
+      // dans la Constellation (la même instance, l'arbre ne change pas).
+      child: Theme(
+        data: _palette == PaletteExplorer.clair
+            ? TablTheme.clair()
+            : TablTheme.sombre(),
+        child: barreEtat,
+      ),
     );
   }
 
@@ -851,8 +856,8 @@ class _EcranCarteState extends State<EcranCarte> {
       ? PaletteExplorer.sombre
       : PaletteExplorer.of(context);
 
-  /// Les couleurs de l'app qui vont avec [_palette] : l'Explorer garde le
-  /// thème sombre, ses feuilles et ses messages suivent sa palette.
+  /// Les couleurs de l'app qui vont avec [_palette] (le thème de l'écran
+  /// les porte aussi, voir [build]).
   TablCouleurs get _couleurs => _palette == PaletteExplorer.clair
       ? TablCouleurs.clair
       : TablCouleurs.sombre;
@@ -1180,12 +1185,9 @@ class _EcranCarteState extends State<EcranCarte> {
               ),
               if (_chargeUneFois && _lieux.isNotEmpty) ...[
                 const SizedBox(height: TablTokens.espaceM),
-                Theme(
-                  data: Theme.of(context).copyWith(extensions: [_couleurs]),
-                  child: TablBoutonTexte(
-                    libelle: 'Voir mes villes',
-                    onPresse: _ouvrirOuChercher,
-                  ),
+                TablBoutonTexte(
+                  libelle: 'Voir mes villes',
+                  onPresse: _ouvrirOuChercher,
                 ),
               ],
             ],

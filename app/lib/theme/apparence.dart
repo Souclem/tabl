@@ -68,6 +68,9 @@ class PaletteExplorer {
     required this.etoile,
     required this.surface,
     required this.trait,
+    required this.apercu,
+    required this.action,
+    required this.repliBas,
   });
 
   /// Le fond de l'écran, et celui qui se voit dans l'encoche des tuiles.
@@ -93,6 +96,14 @@ class PaletteExplorer {
   final Color surface;
   final Color trait;
 
+  /// La carte d'aperçu d'un lieu, posée en bas de la carte.
+  final Color apercu;
+
+  /// Les boutons secondaires de cette carte, et le haut du dégradé d'une
+  /// photo absente ([repliBas] en est le bas).
+  final Color action;
+  final Color repliBas;
+
   /// Là où mes proches retournent : la même braise en clair et en sombre.
   Color get tuileRetour => const Color(0xFFAF4A2C);
 
@@ -108,6 +119,9 @@ class PaletteExplorer {
     etoile: Color(0xFFB07F2E),
     surface: TablTokens.papier,
     trait: Color(0x1407111F),
+    apercu: Color(0xF2FBF8F2),
+    action: Color(0xFFEFE8DB),
+    repliBas: Color(0xFFD9D0BF),
   );
 
   static const sombre = PaletteExplorer._(
@@ -122,6 +136,9 @@ class PaletteExplorer {
     etoile: TablTokens.primaire,
     surface: Color(0xFF16181E),
     trait: Color(0x1AF5F0E8),
+    apercu: Color(0xF20F1014),
+    action: Color(0xFF1A1C21),
+    repliBas: Color(0xFF0E1014),
   );
 
   static PaletteExplorer of(BuildContext context) =>

@@ -105,8 +105,8 @@ sont dans `docs/regles.md`.
   Automatique/Clair/Sombre ; le thème de l'app le suit, écran par écran :
   fait pour le Feed et l'Explorer, le reste est en cours de migration, voir
   « Apparence » ci-dessous). Les
-  modes Envies et Le cercle ont été supprimés. Filtres : feuille papier
-  claire, une ligne par filtre, une seule ouverte, compte en direct
+  modes Envies et Le cercle ont été supprimés. Filtres : feuille (papier
+  en clair), une ligne par filtre, une seule ouverte, compte en direct
   (« Voir N adresses »). Tri : menu « Trié par » avec descriptions.
 - **Recherche** : la pilule glisse vers le haut (jamais de téléportation) ;
   on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox),
@@ -167,8 +167,13 @@ monde entier, jamais de liste d'exclusion à la main.
   `theme/tokens.dart`), jamais par `TablTokens.fond` & co, qui sont les
   couleurs du sombre seul. Un écran qui lit encore `TablTokens.<couleur>`
   est illisible en clair tant qu'il n'est pas migré.
-- L'Explorer garde un thème sombre sous sa propre palette
-  (`PaletteExplorer`) ; ses messages sur la carte suivent cette palette, ses
-  feuilles (« Proposer », « Où cherchez-vous ? ») suivent le réglage. La
+- L'Explorer a sa propre palette (`PaletteExplorer`) et son thème la suit
+  (clair avec elle, sombre dans la Constellation). Ses composants lisent
+  `TablCouleurs.of(context)` ou la palette ; ses feuilles (filtres, tri,
+  « Proposer », « Où cherchez-vous ? ») suivent le réglage — la feuille des
+  filtres n'est plus « toujours papier » (décision réversible). Restent
+  volontairement fixes : la barre flottante et les tuiles de lieux (objets
+  sombres ou ivoire, encre propre à chaque type de tuile) et la pilule
+  « Rechercher » (ivoire, encre). La
   fiche d'un restaurant (`widgets/carte/fiche.dart`) suit le réglage ; seul
   le voile noir posé sur sa photo, derrière le bouton retour, reste noir.

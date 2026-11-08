@@ -153,10 +153,7 @@ class _EcranDemarrageState extends State<EcranDemarrage> {
       future: _futurEtat,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            backgroundColor: TablTokens.fond,
-            body: SizedBox.shrink(),
-          );
+          return const Scaffold(body: SizedBox.shrink());
         }
 
         // Une erreur inattendue au démarrage ne doit jamais se traduire

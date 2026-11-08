@@ -20,9 +20,7 @@ Future<FiltresCarte?> ouvrirFiltresExplorer(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    // Toujours ivoire : les lignes du carnet (widgets/carte/carnet_filtres.dart)
-    // sont en encre, quelle que soit l'apparence.
-    backgroundColor: TablCouleurs.clair.surface,
+    backgroundColor: TablCouleurs.of(context).surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),

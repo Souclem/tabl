@@ -21,13 +21,12 @@ class TablPuceFiltre extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final couleur = actif ? TablTokens.texteSurPrimaire : TablTokens.texte;
+    final c = TablCouleurs.of(context);
+    final couleur = actif ? c.texteSurPrimaire : c.texte;
     return Material(
-      color: actif ? TablTokens.primaire : TablTokens.surface,
+      color: actif ? c.primaire : c.surface,
       shape: StadiumBorder(
-        side: BorderSide(
-          color: actif ? TablTokens.primaire : TablTokens.bordure,
-        ),
+        side: BorderSide(color: actif ? c.primaire : c.bordure),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -39,7 +38,7 @@ class TablPuceFiltre extends StatelessWidget {
             children: [
               Text(
                 libelle,
-                style: TablTokens.legende.copyWith(
+                style: c.legende.copyWith(
                   color: couleur,
                   fontWeight: actif ? FontWeight.w600 : FontWeight.w500,
                 ),

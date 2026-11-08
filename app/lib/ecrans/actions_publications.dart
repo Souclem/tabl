@@ -302,10 +302,11 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   /// Après confirmation : c'est définitif.
   Future<void> supprimerPublication(SouvenirFeed souvenir) async {
     final quoi = souvenir.estSouvenir ? 'ce souvenir' : 'ce moment';
+    final c = TablCouleurs.of(context);
     final confirme = await showDialog<bool>(
       context: context,
       builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
+        backgroundColor: c.surface,
         title: Text('Supprimer $quoi ?'),
         content: const Text(
           'Il disparaîtra de votre profil, avec ses photos, ses réactions '
@@ -318,10 +319,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
           ),
           TextButton(
             onPressed: () => Navigator.of(contexteDialogue).pop(true),
-            child: const Text(
-              'Supprimer',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text('Supprimer', style: TextStyle(color: c.erreur)),
           ),
         ],
       ),
