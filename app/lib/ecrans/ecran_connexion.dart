@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:tabl_core/tabl_core.dart';
-import 'package:tabl_ui/tabl_ui.dart';
+import 'package:app/services/services.dart';
+import 'package:app/widgets/widgets.dart';
 
+import '../navigation/connexion_oauth.dart';
+import '../navigation/transitions.dart';
+import 'ecran_accueil.dart';
 import 'ecran_inscription.dart';
+import 'ecran_principal.dart';
 
 /// Écran de connexion.
 ///
 /// C'est ici que le métier et le visuel se rencontrent : on demande les
-/// règles à `tabl_core`, on affiche avec `tabl_ui`.
+/// règles à `services/`, on affiche avec `widgets/`.
 class EcranConnexion extends StatefulWidget {
-  const EcranConnexion({super.key, required this.authService});
+  const EcranConnexion({
+    super.key,
+    required this.authService,
+    required this.abonnementService,
+    required this.souvenirService,
+  });
 
   final AuthService authService;
+  final AbonnementService abonnementService;
+  final SouvenirService souvenirService;
 
   @override
   State<EcranConnexion> createState() => _EcranConnexionState();
@@ -34,7 +45,7 @@ class _EcranConnexionState extends State<EcranConnexion> {
   }
 
   Future<void> _seConnecter() async {
-    // Validation : les règles viennent de tabl_core.
+    // Validation : les règles viennent de services/auth/validation.dart.
     final erreurEmail = Validation.email(_email.text);
     final erreurMotDePasse = Validation.motDePasseRempli(_motDePasse.text);
 
@@ -47,30 +58,89 @@ class _EcranConnexionState extends State<EcranConnexion> {
 
     setState(() => _enCours = true);
     try {
-      await widget.authService.connexion(
+      final utilisateur = await widget.authService.connexion(
         email: _email.text.trim(),
         motDePasse: _motDePasse.text,
       );
       if (!mounted) return;
-      _afficherMessage('Connecté.');
+      Navigator.of(context).pushReplacement(
+        EcranPrincipal.route(
+          authService: widget.authService,
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+          utilisateur: utilisateur,
+        ),
+      );
     } on ErreurAuth catch (e) {
       if (!mounted) return;
-      _afficherMessage(e.message);
+      afficherMessage(context, e.message);
+    } catch (_) {
+      // Réseau, serveur... : pas une ErreurAuth, mais l'utilisateur doit
+      // quand même être prévenu plutôt que de voir le bouton s'arrêter
+      // sans explication.
+      if (!mounted) return;
+      afficherMessage(context, messageErreurGenerique);
     } finally {
       if (mounted) setState(() => _enCours = false);
     }
   }
 
   void _allerVersInscription() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EcranInscription(authService: widget.authService),
+    Navigator.of(context).pushReplacement(
+      remplacerFormulaire(
+        EcranInscription(
+          authService: widget.authService,
+          abonnementService: widget.abonnementService,
+          souvenirService: widget.souvenirService,
+        ),
       ),
     );
   }
 
-  void _afficherMessage(String texte) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texte)));
+  Future<void> _connexionApple() =>
+      _connexionOAuth(widget.authService.connexionApple);
+
+  Future<void> _connexionGoogle() =>
+      _connexionOAuth(widget.authService.connexionGoogle);
+
+  Future<void> _connexionOAuth(
+    Future<ResultatConnexionOAuth?> Function() connexion,
+  ) async {
+    setState(() => _enCours = true);
+    final resultat = await tenterConnexionOAuth(context, connexion);
+    if (mounted) setState(() => _enCours = false);
+    if (!mounted || resultat == null) return;
+
+    switch (resultat) {
+      case ConnexionOAuthReussie(:final utilisateur):
+        Navigator.of(context).pushReplacement(
+          EcranPrincipal.route(
+            authService: widget.authService,
+            abonnementService: widget.abonnementService,
+            souvenirService: widget.souvenirService,
+            utilisateur: utilisateur,
+          ),
+        );
+      // Pas de profil = pas encore de compte Tabl : la connexion ne crée
+      // pas de compte à la volée (contrairement à l'inscription), on
+      // renvoie explicitement vers l'inscription plutôt que de laisser
+      // entrer quelqu'un qui n'a jamais créé de compte.
+      case ProfilAConfigurer():
+        afficherMessage(
+          context,
+          "Aucun compte Tabl n'est associé à ce compte. Crée d'abord un "
+          'compte.',
+        );
+        Navigator.of(context).pushReplacement(
+          remplacerFormulaire(
+            EcranInscription(
+              authService: widget.authService,
+              abonnementService: widget.abonnementService,
+              souvenirService: widget.souvenirService,
+            ),
+          ),
+        );
+    }
   }
 
   @override
@@ -78,6 +148,12 @@ class _EcranConnexionState extends State<EcranConnexion> {
     return EnveloppeFormulaire(
       titre: 'Bon retour',
       sousTitre: 'Connecte-toi pour retrouver les tables de tes amis.',
+      onRetour: () => revenirVersAccueilOuSecours(
+        context,
+        widget.authService,
+        widget.abonnementService,
+        widget.souvenirService,
+      ),
       children: [
         TablChampTexte(
           libelle: 'E-mail',
@@ -93,25 +169,14 @@ class _EcranConnexionState extends State<EcranConnexion> {
           },
         ),
         const SizedBox(height: TablTokens.espaceL),
-        TablChampTexte(
+        TablChampMotDePasse(
           libelle: 'Mot de passe',
           controleur: _motDePasse,
           erreur: _erreurMotDePasse,
-          masque: !_motDePasseVisible,
-          actionClavier: TextInputAction.done,
-          iconePrefixe: Icons.lock_outline_rounded,
+          visible: _motDePasseVisible,
+          onToggleVisible: () =>
+              setState(() => _motDePasseVisible = !_motDePasseVisible),
           actif: !_enCours,
-          suffixe: IconButton(
-            icon: Icon(
-              _motDePasseVisible
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              size: 20,
-              color: TablTokens.texteDoux,
-            ),
-            onPressed: () =>
-                setState(() => _motDePasseVisible = !_motDePasseVisible),
-          ),
           onChanged: (_) {
             if (_erreurMotDePasse != null) {
               setState(() => _erreurMotDePasse = null);
@@ -126,15 +191,18 @@ class _EcranConnexionState extends State<EcranConnexion> {
           onPresse: _seConnecter,
         ),
         const SizedBox(height: TablTokens.espaceL),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Pas encore de compte ?', style: TablTokens.legende),
-            TablBoutonTexte(
-              libelle: "S'inscrire",
-              onPresse: _enCours ? null : _allerVersInscription,
-            ),
-          ],
+        const TablSeparateurTexte(texte: 'Ou'),
+        const SizedBox(height: TablTokens.espaceL),
+        TablBoutonsAuthTierce(
+          avecApple: connexionAppleProposee,
+          onPresseApple: _enCours ? null : _connexionApple,
+          onPresseGoogle: _enCours ? null : _connexionGoogle,
+        ),
+        const SizedBox(height: TablTokens.espaceL),
+        TablLienBasDePage(
+          question: 'Pas encore de compte ?',
+          libelleAction: "S'inscrire",
+          onAction: _enCours ? null : _allerVersInscription,
         ),
       ],
     );

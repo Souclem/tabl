@@ -1,25 +1,47 @@
 name: app
 description: "Tabl — application mobile."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.0+7
 
 environment:
   sdk: ^3.12.2
 
-# app/ est le SEUL endroit où l'UI et le métier se rencontrent :
-# on récupère les données via tabl_core, on les passe à tabl_ui.
 dependencies:
   flutter:
     sdk: flutter
-  tabl_ui:
-    path: ../packages/tabl_ui
-  tabl_core:
-    path: ../packages/tabl_core
+  supabase_flutter: ^2.17.1
+  shared_preferences: ^2.5.5
+  google_sign_in: ^7.0.0
+  sign_in_with_apple: ^6.1.0
+  crypto: ^3.0.3
+  image_picker: ^1.1.2
+  google_fonts: ^8.2.1
+  video_player: ^2.9.2
+  geolocator: ^14.1.1
+  mapbox_maps_flutter: ^3.33.0
+  exif: ^3.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
   flutter_lints: ^6.0.0
+  image_picker_platform_interface: ^2.11.1
+  network_image_mock: ^2.1.1
 
 flutter:
   uses-material-design: true
+
+  # Bricolage Grotesque (licence libre OFL, voir assets/polices/OFL.txt) :
+  # les noms et les titres de l'Explorer, serrés comme dans la maquette
+  # de Martin. Police variable : graisse et largeur se règlent à l'usage.
+  # Le fond de la Constellation : terres, frontières et grandes routes du
+  # monde (Natural Earth, domaine public), simplifiées.
+  assets:
+    - assets/carte/
+
+  fonts:
+    - family: BricolageGrotesque
+      fonts:
+        - asset: assets/polices/BricolageGrotesque.ttf
