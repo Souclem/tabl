@@ -712,7 +712,7 @@ class _EcranPublierState extends State<EcranPublier>
                         Text('Comment c\'était ?', style: c.legende),
                         const SizedBox(height: TablTokens.espaceS),
                         TablSelecteurEmotion(
-                          emojis: [for (final e in Emotion.values) e.emoji],
+                          emojis: [for (final e in Emotion.proposees) e.emoji],
                           selection: _emotion?.emoji,
                           onSelection: (emoji) => setState(() {
                             final choisie = Emotion.depuisEmoji(emoji);
