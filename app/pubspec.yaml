@@ -21,6 +21,7 @@ dependencies:
   mapbox_maps_flutter: ^3.33.0
   exif: ^3.3.0
   url_launcher: ^6.3.3
+  camera: ^0.12.2
 
 dev_dependencies:
   flutter_test:
