@@ -173,7 +173,7 @@ class _EcranProfilState extends State<EcranProfil>
       final confirme = await showDialog<bool>(
         context: context,
         builder: (contexteDialogue) => AlertDialog(
-          backgroundColor: TablTokens.surface,
+          backgroundColor: TablCouleurs.of(contexteDialogue).surface,
           title: const Text('Rendre votre profil public ?'),
           content: const Text(
             'Tous les utilisateurs de Tabl pourront voir vos moments '
@@ -233,51 +233,50 @@ class _EcranProfilState extends State<EcranProfil>
   // clignoter le badge à 0 le temps qu'elle reparte.
   late Future<int> _nombreDemandes = widget.abonnementService
       .nombreDemandesEnAttente();
-  /// Clair, sombre, ou comme le téléphone. Pour l'instant, seul
-  /// l'Explorer en tient compte.
+
+  /// Clair, sombre, ou comme le téléphone.
   void _choisirApparence() {
     final actuelle = TablApparence.of(context);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       showDragHandle: true,
-      builder: (contexteFeuille) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: TablTokens.espaceL,
-              ),
-              child: Text('Apparence', style: TablTokens.titre),
-            ),
-            const SizedBox(height: TablTokens.espaceS),
-            for (final apparence in Apparence.values)
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
+      builder: (contexteFeuille) {
+        final c = TablCouleurs.of(contexteFeuille);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
                   horizontal: TablTokens.espaceL,
                 ),
-                title: Text(apparence.libelle, style: TablTokens.corps),
-                subtitle: Text(apparence.detail, style: TablTokens.legende),
-                trailing: apparence == actuelle
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: TablTokens.primaire,
-                      )
-                    : null,
-                onTap: () {
-                  TablApparence.choisir(context, apparence);
-                  Navigator.of(contexteFeuille).pop();
-                },
+                child: Text('Apparence', style: c.titre),
               ),
-            const SizedBox(height: TablTokens.espaceS),
-          ],
-        ),
-      ),
+              const SizedBox(height: TablTokens.espaceS),
+              for (final apparence in Apparence.values)
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL,
+                  ),
+                  title: Text(apparence.libelle, style: c.corps),
+                  subtitle: Text(apparence.detail, style: c.legende),
+                  trailing: apparence == actuelle
+                      ? Icon(Icons.check_rounded, color: c.primaire)
+                      : null,
+                  onTap: () {
+                    TablApparence.choisir(context, apparence);
+                    Navigator.of(contexteFeuille).pop();
+                  },
+                ),
+              const SizedBox(height: TablTokens.espaceS),
+            ],
+          ),
+        );
+      },
     );
   }
-
 
   Future<void> _allerVersAbonnes({required bool ongletAbonnes}) async {
     await Navigator.of(context).push(
@@ -299,105 +298,102 @@ class _EcranProfilState extends State<EcranProfil>
   void _ouvrirReglages() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       showDragHandle: true,
       builder: (contexteFeuille) => StatefulBuilder(
-        builder: (contexteFeuille, redessiner) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL,
+        builder: (contexteFeuille, redessiner) {
+          final c = TablCouleurs.of(contexteFeuille);
+          return SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL,
+                  ),
+                  child: Text('Réglages', style: c.titre),
                 ),
-                child: Text('Réglages', style: TablTokens.titre),
-              ),
-              const SizedBox(height: TablTokens.espaceS),
-              if (_profilPrive != null)
-                _InterrupteurProfilPrive(
-                  prive: _profilPrive!,
-                  onChange: (prive) => _basculerProfilPrive(
-                    prive,
-                    rafraichir: () {
-                      if (contexteFeuille.mounted) redessiner(() {});
+                const SizedBox(height: TablTokens.espaceS),
+                if (_profilPrive != null)
+                  _InterrupteurProfilPrive(
+                    prive: _profilPrive!,
+                    onChange: (prive) => _basculerProfilPrive(
+                      prive,
+                      rafraichir: () {
+                        if (contexteFeuille.mounted) redessiner(() {});
+                      },
+                    ),
+                  ),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL,
+                  ),
+                  leading: Icon(Icons.contrast_rounded, color: c.primaire),
+                  title: Text('Apparence', style: c.corps),
+                  subtitle: Text(
+                    TablApparence.of(context).libelle,
+                    style: c.legende,
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: c.texteDoux,
+                  ),
+                  onTap: () {
+                    Navigator.of(contexteFeuille).pop();
+                    _choisirApparence();
+                  },
+                ),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: TablTokens.espaceL,
+                  ),
+                  leading: Icon(Icons.support_agent_rounded, color: c.primaire),
+                  title: Text('Aide et contact', style: c.corps),
+                  subtitle: Text(
+                    'Un bug, une idée, une question',
+                    style: c.legende,
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: c.texteDoux,
+                  ),
+                  onTap: () {
+                    Navigator.of(contexteFeuille).pop();
+                    _ouvrirAide();
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    TablTokens.espaceL,
+                    TablTokens.espaceL,
+                    TablTokens.espaceL,
+                    0,
+                  ),
+                  child: TablBouton(
+                    libelle: 'Se déconnecter',
+                    enCours: _enCours,
+                    onPresse: () {
+                      Navigator.of(contexteFeuille).pop();
+                      _seDeconnecter();
                     },
                   ),
                 ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL,
-                ),
-                leading: const Icon(
-                  Icons.contrast_rounded,
-                  color: TablTokens.primaire,
-                ),
-                title: Text('Apparence', style: TablTokens.corps),
-                subtitle: Text(
-                  '${TablApparence.of(context).libelle} · pour l’Explorer',
-                  style: TablTokens.legende,
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: TablTokens.texteDoux,
-                ),
-                onTap: () {
-                  Navigator.of(contexteFeuille).pop();
-                  _choisirApparence();
-                },
-              ),
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL,
-                ),
-                leading: const Icon(
-                  Icons.support_agent_rounded,
-                  color: TablTokens.primaire,
-                ),
-                title: Text('Aide et contact', style: TablTokens.corps),
-                subtitle: Text(
-                  'Un bug, une idée, une question',
-                  style: TablTokens.legende,
-                ),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: TablTokens.texteDoux,
-                ),
-                onTap: () {
-                  Navigator.of(contexteFeuille).pop();
-                  _ouvrirAide();
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL,
-                  TablTokens.espaceL,
-                  TablTokens.espaceL,
-                  0,
-                ),
-                child: TablBouton(
-                  libelle: 'Se déconnecter',
-                  enCours: _enCours,
-                  onPresse: () {
+                TextButton(
+                  onPressed: () {
                     Navigator.of(contexteFeuille).pop();
-                    _seDeconnecter();
+                    _supprimerCompte();
                   },
+                  child: Text(
+                    'Supprimer mon compte',
+                    style: c.legende.copyWith(color: c.erreur),
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(contexteFeuille).pop();
-                  _supprimerCompte();
-                },
-                child: Text(
-                  'Supprimer mon compte',
-                  style: TablTokens.legende.copyWith(color: TablTokens.erreur),
-                ),
-              ),
-              const SizedBox(height: TablTokens.espaceS),
-            ],
-          ),
-        ),
+                const SizedBox(height: TablTokens.espaceS),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -405,7 +401,7 @@ class _EcranProfilState extends State<EcranProfil>
   void _modifierProfil() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       showDragHandle: true,
       builder: (contexteFeuille) => SafeArea(
         child: Column(
@@ -495,8 +491,9 @@ class _EcranProfilState extends State<EcranProfil>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: FutureBuilder<List<SouvenirFeed>>(
         future: _futurSouvenirs,
         builder: (context, snapshot) {
@@ -510,7 +507,7 @@ class _EcranProfilState extends State<EcranProfil>
               ? (souvenirs ??= snapshot.data!)
               : null;
           return RefreshIndicator(
-            color: TablTokens.primaire,
+            color: c.primaire,
             edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
             onRefresh: () async {
               recharger();
@@ -552,13 +549,11 @@ class _EcranProfilState extends State<EcranProfil>
                   ),
                 ),
                 if (!termine)
-                  const SliverToBoxAdapter(
+                  SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.all(TablTokens.espaceXl),
+                      padding: const EdgeInsets.all(TablTokens.espaceXl),
                       child: Center(
-                        child: CircularProgressIndicator(
-                          color: TablTokens.primaire,
-                        ),
+                        child: CircularProgressIndicator(color: c.primaire),
                       ),
                     ),
                   )
@@ -670,19 +665,20 @@ class _InterrupteurProfilPrive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
       child: SwitchListTile.adaptive(
         value: prive,
         onChanged: onChange,
-        activeTrackColor: TablTokens.primaire,
-        title: Text('Profil privé', style: TablTokens.corps),
+        activeTrackColor: c.primaire,
+        title: Text('Profil privé', style: c.corps),
         subtitle: Text(
           prive
               ? 'Seules les personnes que vous acceptez voient vos moments.'
               : 'Tous les utilisateurs de Tabl peuvent voir vos moments '
                     'et vous suivre.',
-          style: TablTokens.legende,
+          style: c.legende,
         ),
       ),
     );
@@ -719,8 +715,9 @@ class _ConfirmationSuppressionCompteState
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return AlertDialog(
-      backgroundColor: TablTokens.surface,
+      backgroundColor: c.surface,
       title: const Text('Supprimer votre compte ?'),
       content: const Text(
         'Vos souvenirs, vos moments et leurs photos, vos abonnés, vos '
@@ -728,15 +725,15 @@ class _ConfirmationSuppressionCompteState
         'avec lui. C\'est définitif.',
       ),
       actions: _enCours
-          ? const [
+          ? [
               Padding(
-                padding: EdgeInsets.all(TablTokens.espaceS),
+                padding: const EdgeInsets.all(TablTokens.espaceS),
                 child: SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: TablTokens.erreur,
+                    color: c.erreur,
                   ),
                 ),
               ),
@@ -748,10 +745,7 @@ class _ConfirmationSuppressionCompteState
               ),
               TextButton(
                 onPressed: _supprimer,
-                child: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: TablTokens.erreur),
-                ),
+                child: Text('Supprimer', style: TextStyle(color: c.erreur)),
               ),
             ],
     );
@@ -765,12 +759,13 @@ class _MessageListe extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Text(
         texte,
         textAlign: TextAlign.center,
-        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+        style: c.corps.copyWith(color: c.texteDoux),
       ),
     );
   }

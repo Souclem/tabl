@@ -150,10 +150,11 @@ mixin GestionCommentaires<T extends StatefulWidget> on State<T> {
   }
 
   Future<bool> _confirmerSuppression() async {
+    final c = TablCouleurs.of(context);
     final confirme = await showDialog<bool>(
       context: context,
       builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
+        backgroundColor: c.surface,
         title: const Text('Supprimer ce commentaire ?'),
         content: const Text('Ses réponses partiront avec lui.'),
         actions: [
@@ -163,10 +164,7 @@ mixin GestionCommentaires<T extends StatefulWidget> on State<T> {
           ),
           TextButton(
             onPressed: () => Navigator.of(contexteDialogue).pop(true),
-            child: const Text(
-              'Supprimer',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text('Supprimer', style: TextStyle(color: c.erreur)),
           ),
         ],
       ),

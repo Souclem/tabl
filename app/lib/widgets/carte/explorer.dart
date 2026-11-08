@@ -89,6 +89,7 @@ class TablPuceRetirable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       label: 'Retirer le filtre $libelle',
@@ -99,11 +100,9 @@ class TablPuceRetirable extends StatelessWidget {
           height: 32,
           padding: const EdgeInsets.only(left: 12, right: 8),
           decoration: BoxDecoration(
-            color: TablTokens.primaire.withValues(alpha: 0.12),
+            color: c.primaire.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-            border: Border.all(
-              color: TablTokens.primaire.withValues(alpha: 0.4),
-            ),
+            border: Border.all(color: c.primaire.withValues(alpha: 0.4)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -117,11 +116,7 @@ class TablPuceRetirable extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(
-                Icons.close_rounded,
-                size: 14,
-                color: TablTokens.primaire,
-              ),
+              Icon(Icons.close_rounded, size: 14, color: c.primaire),
             ],
           ),
         ),
@@ -153,12 +148,13 @@ class TablPhotoLieu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lettre = nom.trim().isEmpty ? '·' : nom.trim()[0].toUpperCase();
+    final palette = PaletteExplorer.of(context);
     final repli = DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1C1F26), Color(0xFF0E1014)],
+          colors: [palette.action, palette.repliBas],
         ),
       ),
       child: Align(
@@ -167,7 +163,7 @@ class TablPhotoLieu extends StatelessWidget {
           lettre,
           style: TablTokens.titreAffichage.copyWith(
             fontSize: tailleLettre ?? (taille ?? 120) * 0.42,
-            color: TablTokens.texte.withValues(alpha: 0.12),
+            color: palette.texte.withValues(alpha: 0.12),
           ),
         ),
       ),
@@ -207,7 +203,8 @@ class _ActionLieu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final couleur = dore ? TablTokens.primaire : TablTokens.texte;
+    final c = TablCouleurs.of(context);
+    final couleur = dore ? c.primaire : c.texte;
     return Expanded(
       child: Semantics(
         button: true,
@@ -219,13 +216,13 @@ class _ActionLieu extends StatelessWidget {
             height: 42,
             decoration: BoxDecoration(
               color: dore
-                  ? TablTokens.primaire.withValues(alpha: 0.1)
-                  : const Color(0xFF1A1C21),
+                  ? c.primaire.withValues(alpha: 0.1)
+                  : PaletteExplorer.of(context).action,
               borderRadius: BorderRadius.circular(TablTokens.arrondiM - 4),
               border: Border.all(
                 color: dore
-                    ? TablTokens.primaire.withValues(alpha: 0.3)
-                    : TablTokens.texte.withValues(alpha: 0.06),
+                    ? c.primaire.withValues(alpha: 0.3)
+                    : c.texte.withValues(alpha: 0.06),
               ),
             ),
             child: Row(
@@ -326,6 +323,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
   Widget build(BuildContext context) {
     final w = widget;
     final aDesDetails = w.ressentis.isNotEmpty || w.dejaAlle != null;
+    final c = TablCouleurs.of(context);
     return GestureDetector(
       onHorizontalDragEnd: (fin) {
         final vitesse = fin.primaryVelocity ?? 0;
@@ -339,11 +337,9 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
             decoration: BoxDecoration(
-              color: const Color(0xF20F1014),
+              color: PaletteExplorer.of(context).apercu,
               borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-              border: Border.all(
-                color: TablTokens.texte.withValues(alpha: 0.08),
-              ),
+              border: Border.all(color: c.texte.withValues(alpha: 0.08)),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -363,7 +359,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                             w.nom,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TablTokens.titreAffichage.copyWith(
+                            style: c.titreAffichage.copyWith(
                               fontSize: 23,
                               height: 1.1,
                             ),
@@ -373,7 +369,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                             w.detail,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TablTokens.legende.copyWith(fontSize: 13),
+                            style: c.legende.copyWith(fontSize: 13),
                           ),
                         ],
                       ),
@@ -389,12 +385,12 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                           height: 30,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: TablTokens.texte.withValues(alpha: 0.06),
+                            color: c.texte.withValues(alpha: 0.06),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.close_rounded,
                             size: 16,
-                            color: TablTokens.texteDoux,
+                            color: c.texteDoux,
                           ),
                         ),
                       ),
@@ -411,10 +407,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                     Expanded(
                       child: Text(
                         w.quiLaConnait,
-                        style: TablTokens.corps.copyWith(
-                          fontSize: 14,
-                          color: TablTokens.texte,
-                        ),
+                        style: c.corps.copyWith(fontSize: 14),
                       ),
                     ),
                   ],
@@ -423,10 +416,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                   const SizedBox(height: 7),
                   Text(
                     '✦  ${w.signal}',
-                    style: TablTokens.legende.copyWith(
-                      fontSize: 13,
-                      color: TablTokens.primaire,
-                    ),
+                    style: c.legende.copyWith(fontSize: 13, color: c.primaire),
                   ),
                 ],
                 AnimatedSize(
@@ -440,17 +430,12 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Divider(
-                                height: 1,
-                                color: TablTokens.surface,
-                              ),
+                              Divider(height: 1, color: c.bordure),
                               if (w.dejaAlle != null) ...[
                                 const SizedBox(height: 12),
                                 Text(
                                   w.dejaAlle!,
-                                  style: TablTokens.corps.copyWith(
-                                    fontSize: 14,
-                                  ),
+                                  style: c.corps.copyWith(fontSize: 14),
                                 ),
                               ],
                               if (w.ressentis.isNotEmpty) ...[
@@ -464,9 +449,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                                     const SizedBox(width: 10),
                                     Text(
                                       'Ce qu\'ils en ont retenu',
-                                      style: TablTokens.legende.copyWith(
-                                        fontSize: 12.5,
-                                      ),
+                                      style: c.legende.copyWith(fontSize: 12.5),
                                     ),
                                   ],
                                 ),
@@ -487,9 +470,9 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                           children: [
                             Text(
                               _details ? 'Réduire' : 'Plus de détails',
-                              style: TablTokens.legende.copyWith(
+                              style: c.legende.copyWith(
                                 fontSize: 12.5,
-                                color: TablTokens.texte.withValues(alpha: 0.75),
+                                color: c.texte.withValues(alpha: 0.75),
                               ),
                             ),
                             Icon(
@@ -497,7 +480,7 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                                   ? Icons.keyboard_arrow_up_rounded
                                   : Icons.keyboard_arrow_down_rounded,
                               size: 16,
-                              color: TablTokens.texteDoux,
+                              color: c.texteDoux,
                             ),
                           ],
                         ),
@@ -516,12 +499,12 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                       height: 48,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: TablTokens.primaire,
+                        color: c.primaire,
                         borderRadius: BorderRadius.circular(
                           TablTokens.arrondiM - 2,
                         ),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
@@ -529,14 +512,14 @@ class _TablApercuLieuState extends State<TablApercuLieu> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
-                              color: TablTokens.texteSurPrimaire,
+                              color: c.texteSurPrimaire,
                             ),
                           ),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Icon(
                             Icons.arrow_forward_rounded,
                             size: 17,
-                            color: TablTokens.texteSurPrimaire,
+                            color: c.texteSurPrimaire,
                           ),
                         ],
                       ),
@@ -607,6 +590,7 @@ class TablLigneCercle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return InkWell(
       onTap: onPresse,
       child: Padding(
@@ -623,7 +607,7 @@ class TablLigneCercle extends StatelessWidget {
                     nom,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 19),
+                    style: c.titreAffichage.copyWith(fontSize: 19),
                   ),
                   if (raison != null) ...[
                     const SizedBox(height: 3),
@@ -631,10 +615,7 @@ class TablLigneCercle extends StatelessWidget {
                       raison!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.corps.copyWith(
-                        fontSize: 13,
-                        color: TablTokens.texte,
-                      ),
+                      style: c.corps.copyWith(fontSize: 13),
                     ),
                   ],
                   if (detail.isNotEmpty) ...[
@@ -643,7 +624,7 @@ class TablLigneCercle extends StatelessWidget {
                       detail,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende.copyWith(fontSize: 12.5),
+                      style: c.legende.copyWith(fontSize: 12.5),
                     ),
                   ],
                 ],
@@ -652,11 +633,7 @@ class TablLigneCercle extends StatelessWidget {
             IconButton(
               onPressed: onOptions,
               tooltip: 'Plus',
-              icon: const Icon(
-                Icons.more_vert_rounded,
-                size: 20,
-                color: TablTokens.texteDoux,
-              ),
+              icon: Icon(Icons.more_vert_rounded, size: 20, color: c.texteDoux),
             ),
           ],
         ),

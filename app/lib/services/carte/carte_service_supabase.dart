@@ -96,6 +96,30 @@ class CarteServiceSupabase implements CarteService {
       '${d.day.toString().padLeft(2, '0')}';
 
   @override
+  Future<LieuCarte?> lieuDuRestaurant(String restaurantId) async {
+    final l = await _client
+        .from('restaurants')
+        .select(
+          'nom, ville, quartier, adresse, latitude, longitude, categories',
+        )
+        .eq('id', restaurantId)
+        .maybeSingle();
+    final latitude = (l?['latitude'] as num?)?.toDouble();
+    final longitude = (l?['longitude'] as num?)?.toDouble();
+    if (l == null || latitude == null || longitude == null) return null;
+    return LieuCarte(
+      restaurantId: restaurantId,
+      nom: l['nom'] as String,
+      ville: l['ville'] as String? ?? '',
+      quartier: l['quartier'] as String?,
+      adresse: l['adresse'] as String?,
+      latitude: latitude,
+      longitude: longitude,
+      categories: (l['categories'] as List?)?.cast<String>() ?? const [],
+    );
+  }
+
+  @override
   Future<String> idRestaurant(LieuCarte lieu) async {
     return lieu.restaurantId ??
         await RegistreRestaurants(_client).idPour(

@@ -66,6 +66,7 @@ class _Tete extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const duree = Duration(milliseconds: 220);
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       selected: cochee,
@@ -90,9 +91,7 @@ class _Tete extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: cochee
-                              ? TablTokens.primaire
-                              : TablTokens.bordure,
+                          color: cochee ? c.primaire : c.bordure,
                           width: cochee ? 2 : 1,
                         ),
                       ),
@@ -117,17 +116,14 @@ class _Tete extends StatelessWidget {
                           width: 22,
                           height: 22,
                           decoration: BoxDecoration(
-                            color: TablTokens.primaire,
+                            color: c.primaire,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                              color: TablTokens.fond,
-                              width: 2,
-                            ),
+                            border: Border.all(color: c.fond, width: 2),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.check_rounded,
                             size: 13,
-                            color: TablTokens.texteSurPrimaire,
+                            color: c.texteSurPrimaire,
                           ),
                         ),
                       ),
@@ -141,9 +137,9 @@ class _Tete extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: TablTokens.legende.copyWith(
+                style: c.legende.copyWith(
                   fontSize: 12,
-                  color: cochee ? TablTokens.primaire : TablTokens.texte,
+                  color: cochee ? c.primaire : c.texte,
                 ),
               ),
             ],

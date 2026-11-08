@@ -33,6 +33,7 @@ class TablLigneLieu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return InkWell(
       onTap: onPresse,
       child: Padding(
@@ -50,8 +51,8 @@ class TablLigneLieu extends StatelessWidget {
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: duReseau ? TablTokens.primaire : Colors.transparent,
-                  border: Border.all(color: TablTokens.primaire, width: 2),
+                  color: duReseau ? c.primaire : Colors.transparent,
+                  border: Border.all(color: c.primaire, width: 2),
                 ),
               ),
             ),
@@ -65,13 +66,10 @@ class TablLigneLieu extends StatelessWidget {
                       Expanded(
                         child: Text(
                           nom,
-                          style: TablTokens.corps.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: c.corps.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      if (distance != null)
-                        Text(distance!, style: TablTokens.legende),
+                      if (distance != null) Text(distance!, style: c.legende),
                     ],
                   ),
                   if (description.isNotEmpty)
@@ -79,7 +77,7 @@ class TablLigneLieu extends StatelessWidget {
                       description,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende,
+                      style: c.legende,
                     ),
                   const SizedBox(height: 2),
                   Row(
@@ -87,18 +85,16 @@ class TablLigneLieu extends StatelessWidget {
                       Expanded(
                         child: Text(
                           resume,
-                          style: TablTokens.legende.copyWith(
-                            color: duReseau
-                                ? TablTokens.primaire
-                                : TablTokens.texteDoux,
+                          style: c.legende.copyWith(
+                            color: duReseau ? c.primaire : c.texteDoux,
                           ),
                         ),
                       ),
                       if (estEnvie)
-                        const Icon(
+                        Icon(
                           Icons.bookmark_rounded,
                           size: 16,
-                          color: TablTokens.primaire,
+                          color: c.primaire,
                         ),
                     ],
                   ),

@@ -13,6 +13,7 @@ class TablBoutonVerre extends StatelessWidget {
     required this.libelle,
     required this.onPresse,
     this.pastille = false,
+    this.doree = false,
   });
 
   final IconData icone;
@@ -24,8 +25,15 @@ class TablBoutonVerre extends StatelessWidget {
   /// Petit point doré : quelque chose attend derrière ce bouton.
   final bool pastille;
 
+  /// Icône dorée : le geste est déjà fait (marque-page gardé).
+  final bool doree;
+
   @override
   Widget build(BuildContext context) {
+    // Posé sur une photo : le verre reste sombre (icône claire) dans les
+    // deux apparences, seul l'accent de la pastille suit le thème.
+    const verre = TablCouleurs.sombre;
+    final c = TablCouleurs.of(context);
     return SizedBox(
       width: 44,
       height: 44,
@@ -36,16 +44,18 @@ class TablBoutonVerre extends StatelessWidget {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Material(
-                color: TablTokens.fond.withValues(alpha: 0.45),
+                color: verre.fond.withValues(alpha: 0.45),
                 shape: CircleBorder(
-                  side: BorderSide(
-                    color: TablTokens.texte.withValues(alpha: 0.14),
-                  ),
+                  side: BorderSide(color: verre.texte.withValues(alpha: 0.14)),
                 ),
                 child: IconButton(
                   onPressed: onPresse,
                   tooltip: libelle,
-                  icon: Icon(icone, size: 20, color: TablTokens.texte),
+                  icon: Icon(
+                    icone,
+                    size: 20,
+                    color: doree ? c.primaire : verre.texte,
+                  ),
                 ),
               ),
             ),
@@ -58,9 +68,9 @@ class TablBoutonVerre extends StatelessWidget {
                 width: 11,
                 height: 11,
                 decoration: BoxDecoration(
-                  color: TablTokens.primaire,
+                  color: c.primaire,
                   shape: BoxShape.circle,
-                  border: Border.all(color: TablTokens.fond, width: 2),
+                  border: Border.all(color: verre.fond, width: 2),
                 ),
               ),
             ),

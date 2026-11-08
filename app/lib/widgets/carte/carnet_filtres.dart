@@ -38,6 +38,7 @@ class TablFeuilleCarnet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compte = this.compte;
+    final c = TablCouleurs.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -48,7 +49,7 @@ class TablFeuilleCarnet extends StatelessWidget {
             width: 38,
             height: 5,
             decoration: BoxDecoration(
-              color: TablTokens.encre.withValues(alpha: 0.15),
+              color: c.texte.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -61,10 +62,7 @@ class TablFeuilleCarnet extends StatelessWidget {
             children: [
               Text(
                 'Filtres',
-                style: TablTokens.titreAffichage.copyWith(
-                  fontSize: 25,
-                  color: TablTokens.encre,
-                ),
+                style: c.titreAffichage.copyWith(fontSize: 25, color: c.texte),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -74,24 +72,22 @@ class TablFeuilleCarnet extends StatelessWidget {
                         compte,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TablTokens.titreAffichage.copyWith(
+                        style: c.titreAffichage.copyWith(
                           fontSize: 17,
                           fontStyle: FontStyle.italic,
-                          color: TablTokens.encreDouce,
+                          color: c.texteDoux,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
               ),
               TextButton(
                 onPressed: onFermer,
-                style: TextButton.styleFrom(
-                  foregroundColor: TablTokens.encreDouce,
-                ),
+                style: TextButton.styleFrom(foregroundColor: c.texteDoux),
                 child: Text(
                   'Fermer',
-                  style: TablTokens.corps.copyWith(
+                  style: c.corps.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: TablTokens.encreDouce,
+                    color: c.texteDoux,
                   ),
                 ),
               ),
@@ -106,10 +102,7 @@ class TablFeuilleCarnet extends StatelessWidget {
               children: [
                 for (var i = 0; i < lignes.length; i++) ...[
                   if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: TablTokens.encre.withValues(alpha: 0.08),
-                    ),
+                    Divider(height: 1, color: c.texte.withValues(alpha: 0.08)),
                   lignes[i],
                 ],
               ],
@@ -119,7 +112,7 @@ class TablFeuilleCarnet extends StatelessWidget {
         DecoratedBox(
           decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: TablTokens.encre.withValues(alpha: 0.08)),
+              top: BorderSide(color: c.texte.withValues(alpha: 0.08)),
             ),
           ),
           child: Padding(
@@ -128,14 +121,12 @@ class TablFeuilleCarnet extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: onToutEffacer,
-                  style: TextButton.styleFrom(
-                    foregroundColor: TablTokens.encreDouce,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: c.texteDoux),
                   child: Text(
                     'Tout effacer',
-                    style: TablTokens.corps.copyWith(
+                    style: c.corps.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: TablTokens.encreDouce.withValues(
+                      color: c.texteDoux.withValues(
                         alpha: onToutEffacer == null ? 0.35 : 1,
                       ),
                     ),
@@ -145,8 +136,8 @@ class TablFeuilleCarnet extends StatelessWidget {
                 FilledButton(
                   onPressed: onVoir,
                   style: FilledButton.styleFrom(
-                    backgroundColor: TablTokens.encre,
-                    foregroundColor: TablTokens.texte,
+                    backgroundColor: c.texte,
+                    foregroundColor: c.fond,
                     minimumSize: const Size(0, 52),
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     shape: const StadiumBorder(),
@@ -154,7 +145,7 @@ class TablFeuilleCarnet extends StatelessWidget {
                   child: Text(
                     libelleVoir,
                     style: TablTokens.libelleBouton.copyWith(
-                      color: TablTokens.texte,
+                      color: c.fond,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
@@ -197,6 +188,7 @@ class TablLigneCarnet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -211,10 +203,10 @@ class TablLigneCarnet extends StatelessWidget {
                 children: [
                   Text(
                     libelle,
-                    style: TablTokens.corps.copyWith(
+                    style: c.corps.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: TablTokens.encre,
+                      color: c.texte,
                     ),
                   ),
                   if (actif)
@@ -222,8 +214,8 @@ class TablLigneCarnet extends StatelessWidget {
                       margin: const EdgeInsets.only(left: 7, bottom: 2),
                       width: 6,
                       height: 6,
-                      decoration: const BoxDecoration(
-                        color: TablTokens.pointActif,
+                      decoration: BoxDecoration(
+                        color: c.primaire,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -234,10 +226,10 @@ class TablLigneCarnet extends StatelessWidget {
                       textAlign: TextAlign.right,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.corps.copyWith(
+                      style: c.corps.copyWith(
                         fontSize: 14.5,
                         fontWeight: actif ? FontWeight.w600 : FontWeight.w400,
-                        color: actif ? TablTokens.encre : TablTokens.encrePale,
+                        color: actif ? c.texte : c.texteDoux,
                       ),
                     ),
                   ),
@@ -246,10 +238,10 @@ class TablLigneCarnet extends StatelessWidget {
                     turns: ouverte ? 0.5 : 0,
                     duration: const Duration(milliseconds: 350),
                     curve: _courbe,
-                    child: const Icon(
+                    child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 20,
-                      color: TablTokens.encrePale,
+                      color: c.texteDoux,
                     ),
                   ),
                 ],
@@ -288,6 +280,7 @@ class TablInterrupteurCarnet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       toggled: actif,
       label: libelle,
@@ -301,10 +294,10 @@ class TablInterrupteurCarnet extends StatelessWidget {
               Expanded(
                 child: Text(
                   libelle,
-                  style: TablTokens.corps.copyWith(
+                  style: c.corps.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: TablTokens.encre,
+                    color: c.texte,
                   ),
                 ),
               ),
@@ -315,9 +308,7 @@ class TablInterrupteurCarnet extends StatelessWidget {
                 padding: const EdgeInsets.all(3),
                 alignment: actif ? Alignment.centerRight : Alignment.centerLeft,
                 decoration: BoxDecoration(
-                  color: actif
-                      ? TablTokens.encre
-                      : TablTokens.interrupteurEteint,
+                  color: actif ? c.texte : c.bordure,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Container(
@@ -356,10 +347,11 @@ class TablSegmentsCarnet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: TablTokens.lin,
+        color: c.fond,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -379,12 +371,12 @@ class TablSegmentsCarnet extends StatelessWidget {
                     height: 38,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: i == choisi ? Colors.white : Colors.transparent,
+                      color: i == choisi ? c.surface : Colors.transparent,
                       borderRadius: BorderRadius.circular(13),
                       boxShadow: i == choisi
                           ? [
                               BoxShadow(
-                                color: TablTokens.encre.withValues(alpha: 0.14),
+                                color: c.texte.withValues(alpha: 0.14),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
@@ -395,12 +387,10 @@ class TablSegmentsCarnet extends StatelessWidget {
                       options[i],
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende.copyWith(
+                      style: c.legende.copyWith(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: i == choisi
-                            ? TablTokens.encre
-                            : TablTokens.encreDouce,
+                        color: i == choisi ? c.texte : c.texteDoux,
                       ),
                     ),
                   ),
@@ -459,6 +449,7 @@ class TablTuilesCarnet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Row(
       children: [
         for (var i = 0; i < options.length; i++) ...[
@@ -474,22 +465,22 @@ class TablTuilesCarnet extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   height: 56,
-                  decoration: _fondChoix(choisies.contains(i), 14),
+                  decoration: _fondChoix(c, choisies.contains(i), 14),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         options[i].icone,
                         size: 20,
-                        color: _encreChoix(choisies.contains(i)),
+                        color: _encreChoix(c, choisies.contains(i)),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         options[i].libelle,
-                        style: TablTokens.legende.copyWith(
+                        style: c.legende.copyWith(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
-                          color: _encreChoix(choisies.contains(i)),
+                          color: _encreChoix(c, choisies.contains(i)),
                         ),
                       ),
                     ],
@@ -544,6 +535,7 @@ class TablRechercheProche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -551,28 +543,21 @@ class TablRechercheProche extends StatelessWidget {
           height: 44,
           padding: const EdgeInsets.only(left: 14, right: 4),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: c.surfaceBasse,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: TablTokens.encre.withValues(alpha: 0.12)),
+            border: Border.all(color: c.texte.withValues(alpha: 0.12)),
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.search_rounded,
-                size: 18,
-                color: TablTokens.encrePale,
-              ),
+              Icon(Icons.search_rounded, size: 18, color: c.texteDoux),
               const SizedBox(width: 9),
               Expanded(
                 child: TextField(
                   controller: controleur,
                   onChanged: onChanged,
                   autocorrect: false,
-                  cursorColor: TablTokens.encre,
-                  style: TablTokens.corps.copyWith(
-                    fontSize: 16,
-                    color: TablTokens.encre,
-                  ),
+                  cursorColor: c.texte,
+                  style: c.corps.copyWith(fontSize: 16, color: c.texte),
                   decoration: InputDecoration(
                     isDense: true,
                     filled: false,
@@ -580,9 +565,9 @@ class TablRechercheProche extends StatelessWidget {
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
                     hintText: 'Chercher un proche',
-                    hintStyle: TablTokens.corps.copyWith(
+                    hintStyle: c.corps.copyWith(
                       fontSize: 16,
-                      color: TablTokens.encrePale,
+                      color: c.texteDoux,
                     ),
                   ),
                 ),
@@ -595,11 +580,7 @@ class TablRechercheProche extends StatelessWidget {
                     controleur.clear();
                     onChanged('');
                   },
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    size: 16,
-                    color: TablTokens.encrePale,
-                  ),
+                  icon: Icon(Icons.close_rounded, size: 16, color: c.texteDoux),
                 ),
             ],
           ),
@@ -611,10 +592,7 @@ class TablRechercheProche extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(2, 8, 2, 2),
             child: Text(
               aide!,
-              style: TablTokens.legende.copyWith(
-                fontSize: 12.5,
-                color: TablTokens.encrePale,
-              ),
+              style: c.legende.copyWith(fontSize: 12.5, color: c.texteDoux),
             ),
           ),
       ],
@@ -630,10 +608,8 @@ class _LigneProche extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = proche;
-    final style = TablTokens.corps.copyWith(
-      fontWeight: FontWeight.w600,
-      color: TablTokens.encre,
-    );
+    final c = TablCouleurs.of(context);
+    final style = c.corps.copyWith(fontWeight: FontWeight.w600);
     final n = p.lettresSoulignees.clamp(0, p.pseudo.length);
     return Semantics(
       button: true,
@@ -655,9 +631,9 @@ class _LigneProche extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: p.pseudo.substring(0, n),
-                        style: const TextStyle(
+                        style: TextStyle(
                           decoration: TextDecoration.underline,
-                          decorationColor: TablTokens.primaire,
+                          decorationColor: c.primaire,
                           decorationThickness: 2,
                         ),
                       ),
@@ -668,12 +644,7 @@ class _LigneProche extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (p.choisi)
-                const Icon(
-                  Icons.check_rounded,
-                  size: 22,
-                  color: TablTokens.encre,
-                ),
+              if (p.choisi) Icon(Icons.check_rounded, size: 22, color: c.texte),
             ],
           ),
         ),
@@ -695,6 +666,7 @@ class _Pastille extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       selected: choisie,
@@ -706,7 +678,7 @@ class _Pastille extends StatelessWidget {
           duration: const Duration(milliseconds: 160),
           height: 36,
           padding: const EdgeInsets.symmetric(horizontal: 13),
-          decoration: _fondChoix(choisie, 18),
+          decoration: _fondChoix(c, choisie, 18),
           // Une Row plutôt qu'un alignement : la pastille garde la largeur
           // de son texte au lieu de prendre toute la ligne.
           child: Row(
@@ -714,10 +686,10 @@ class _Pastille extends StatelessWidget {
             children: [
               Text(
                 libelle,
-                style: TablTokens.legende.copyWith(
+                style: c.legende.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: choisie ? TablTokens.texte : TablTokens.encre,
+                  color: choisie ? c.fond : c.texte,
                 ),
               ),
             ],
@@ -728,13 +700,11 @@ class _Pastille extends StatelessWidget {
   }
 }
 
-BoxDecoration _fondChoix(bool choisi, double arrondi) => BoxDecoration(
-  color: choisi ? TablTokens.encre : Colors.white,
-  borderRadius: BorderRadius.circular(arrondi),
-  border: choisi
-      ? null
-      : Border.all(color: TablTokens.encre.withValues(alpha: 0.1)),
-);
+BoxDecoration _fondChoix(TablCouleurs c, bool choisi, double arrondi) =>
+    BoxDecoration(
+      color: choisi ? c.texte : c.surfaceBasse,
+      borderRadius: BorderRadius.circular(arrondi),
+      border: choisi ? null : Border.all(color: c.bordure),
+    );
 
-Color _encreChoix(bool choisi) =>
-    choisi ? TablTokens.texte : TablTokens.encreDouce;
+Color _encreChoix(TablCouleurs c, bool choisi) => choisi ? c.fond : c.texteDoux;

@@ -47,6 +47,7 @@ class TablLigneAvis extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return InkWell(
       onTap: onPresse,
       child: Padding(
@@ -63,15 +64,14 @@ class TablLigneAvis extends StatelessWidget {
                 width: cotePhoto,
                 height: cotePhoto,
                 child: photoUrl == null
-                    ? const ColoredBox(color: TablTokens.surface)
+                    ? ColoredBox(color: c.surface)
                     : Image.network(
                         photoUrl!,
                         fit: BoxFit.cover,
                         // Petite vignette : inutile de décoder la photo en
                         // pleine résolution.
                         cacheWidth: (cotePhoto * 3).round(),
-                        errorBuilder: (_, _, _) =>
-                            const ColoredBox(color: TablTokens.surface),
+                        errorBuilder: (_, _, _) => ColoredBox(color: c.surface),
                       ),
               ),
             ),
@@ -94,7 +94,7 @@ class TablLigneAvis extends StatelessWidget {
                         child: Text(
                           titre,
                           overflow: TextOverflow.ellipsis,
-                          style: TablTokens.corps.copyWith(
+                          style: c.corps.copyWith(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -106,7 +106,7 @@ class TablLigneAvis extends StatelessWidget {
                       ],
                       Text(
                         dateLisible,
-                        style: TablTokens.legende.copyWith(fontSize: 11),
+                        style: c.legende.copyWith(fontSize: 11),
                       ),
                     ],
                   ),
@@ -116,7 +116,7 @@ class TablLigneAvis extends StatelessWidget {
                       legende!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.corps.copyWith(fontSize: 14),
+                      style: c.corps.copyWith(fontSize: 14),
                     ),
                   ],
                   if (resumeReactions != null) ...[
@@ -125,7 +125,7 @@ class TablLigneAvis extends StatelessWidget {
                       resumeReactions!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende.copyWith(fontSize: 11),
+                      style: c.legende.copyWith(fontSize: 11),
                     ),
                   ],
                 ],

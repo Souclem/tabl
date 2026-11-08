@@ -19,6 +19,8 @@ class EcranNotifications extends StatefulWidget {
     required this.abonnementService,
     required this.souvenirService,
     this.avisService,
+    this.carteService,
+    this.tableService,
   });
 
   final NotificationService notificationService;
@@ -27,6 +29,13 @@ class EcranNotifications extends StatefulWidget {
 
   /// Pour répondre aux demandes d'avis. `null` : elles ouvrent le profil.
   final AvisService? avisService;
+
+  /// Pour remplir la fiche d'un restaurant (adresse, catégorie) ; `null` :
+  /// la fiche s'ouvre sans sous-titre.
+  final CarteService? carteService;
+
+  /// Pour « On y va ? » sur la fiche d'un restaurant.
+  final TableService? tableService;
 
   @override
   State<EcranNotifications> createState() => _EcranNotificationsState();
@@ -47,6 +56,9 @@ class _EcranNotificationsState extends State<EcranNotifications>
 
   @override
   AbonnementService? get abonnementService => widget.abonnementService;
+
+  @override
+  TableService? get tableService => widget.tableService;
 
   @override
   void initState() {
@@ -128,6 +140,17 @@ class _EcranNotificationsState extends State<EcranNotifications>
     if (repondu == true && mounted) recharger();
   }
 
+  /// Les mêmes données que sur l'Explorer ; la fiche s'ouvre quand même
+  /// sans elles.
+  Future<LieuCarte?> _lieu(String restaurantId) async {
+    try {
+      return await widget.carteService?.lieuDuRestaurant(restaurantId);
+    } catch (e) {
+      debugPrint('EcranNotifications: restaurant : $e');
+      return null;
+    }
+  }
+
   Future<void> _ouvrir(LigneNotification l) async {
     if (l.type == TypeNotification.demandeAvis && widget.avisService != null) {
       await _repondreAvis(l);
@@ -135,13 +158,18 @@ class _EcranNotificationsState extends State<EcranNotifications>
     }
     final restaurantId = l.restaurantId;
     if (l.type == TypeNotification.avisRecu && restaurantId != null) {
+      final lieu = await _lieu(restaurantId);
+      if (!mounted) return;
       await ouvrirFeuilleRestaurant(
         context,
-        nom: l.restaurantNom ?? '',
-        sousTitre: '',
+        nom: lieu?.nom ?? l.restaurantNom ?? '',
+        sousTitre: lieu?.description ?? '',
         restaurantId: restaurantId,
+        latitude: lieu?.latitude,
+        longitude: lieu?.longitude,
         souvenirService: widget.souvenirService,
         abonnementService: widget.abonnementService,
+        tableService: tableService,
         avisService: widget.avisService,
       );
       return;
@@ -200,26 +228,30 @@ class _EcranNotificationsState extends State<EcranNotifications>
     );
   }
 
-  Widget _section(String titre) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      TablTokens.espaceL - 4,
-      TablTokens.espaceL,
-      TablTokens.espaceL - 4,
-      TablTokens.espaceXs,
-    ),
-    child: Text(
-      titre.toUpperCase(),
-      style: TablTokens.legende.copyWith(
-        fontSize: 11,
-        letterSpacing: 1.5,
-        fontWeight: FontWeight.w700,
-        color: TablTokens.texte.withValues(alpha: 0.45),
+  Widget _section(BuildContext context, String titre) {
+    final c = TablCouleurs.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        TablTokens.espaceL - 4,
+        TablTokens.espaceL,
+        TablTokens.espaceL - 4,
+        TablTokens.espaceXs,
       ),
-    ),
-  );
+      child: Text(
+        titre.toUpperCase(),
+        style: c.legende.copyWith(
+          fontSize: 11,
+          letterSpacing: 1.5,
+          fontWeight: FontWeight.w700,
+          color: c.texte.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final demandes = [
       for (final d in _demandes ?? const <LigneNotification>[])
         if (!_repondues.contains(d.acteur.id)) d,
@@ -234,7 +266,7 @@ class _EcranNotificationsState extends State<EcranNotifications>
     ];
     final charge = _demandes != null;
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -253,14 +285,14 @@ class _EcranNotificationsState extends State<EcranNotifications>
                   const SizedBox(width: TablTokens.espaceS),
                   Text(
                     'Notifications',
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                    style: c.titreAffichage.copyWith(fontSize: 26),
                   ),
                 ],
               ),
             ),
             Expanded(
               child: RefreshIndicator(
-                color: TablTokens.primaire,
+                color: c.primaire,
                 onRefresh: recharger,
                 child: ListView(
                   padding: EdgeInsets.only(
@@ -272,12 +304,10 @@ class _EcranNotificationsState extends State<EcranNotifications>
                     if (_erreur && !charge)
                       const _Vide(texte: messageErreurGenerique)
                     else if (!charge)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.all(TablTokens.espaceXl),
                         child: Center(
-                          child: CircularProgressIndicator(
-                            color: TablTokens.primaire,
-                          ),
+                          child: CircularProgressIndicator(color: c.primaire),
                         ),
                       )
                     else if (demandes.isEmpty && _autres.isEmpty)
@@ -290,6 +320,7 @@ class _EcranNotificationsState extends State<EcranNotifications>
                     else ...[
                       if (demandes.isNotEmpty) ...[
                         _section(
+                          context,
                           demandes.every(
                                 (d) => d.type == TypeNotification.demandeSuivi,
                               )
@@ -303,11 +334,11 @@ class _EcranNotificationsState extends State<EcranNotifications>
                         for (final d in demandes) _ligne(d),
                       ],
                       if (nouvelles.isNotEmpty) ...[
-                        _section('Nouvelles'),
+                        _section(context, 'Nouvelles'),
                         for (final l in nouvelles) _ligne(l),
                       ],
                       if (avant.isNotEmpty) ...[
-                        _section('Plus tôt'),
+                        _section(context, 'Plus tôt'),
                         for (final l in avant) _ligne(l),
                       ],
                     ],
@@ -330,6 +361,7 @@ class _Vide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceXl,
@@ -339,23 +371,19 @@ class _Vide extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.notifications_none_rounded,
-            size: 36,
-            color: TablTokens.texteDoux,
-          ),
+          Icon(Icons.notifications_none_rounded, size: 36, color: c.texteDoux),
           const SizedBox(height: TablTokens.espaceM),
           Text(
             texte,
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 21),
+            style: c.titreAffichage.copyWith(fontSize: 21),
           ),
           if (detail != null) ...[
             const SizedBox(height: TablTokens.espaceS),
             Text(
               detail!,
               textAlign: TextAlign.center,
-              style: TablTokens.legende.copyWith(fontSize: 14),
+              style: c.legende.copyWith(fontSize: 14),
             ),
           ],
         ],

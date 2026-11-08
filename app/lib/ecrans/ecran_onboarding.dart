@@ -106,8 +106,9 @@ class _EcranOnboardingState extends State<EcranOnboarding> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           children: [

@@ -59,6 +59,7 @@ class TablChampTexte extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enErreur = erreur != null;
+    final c = TablCouleurs.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +67,7 @@ class TablChampTexte extends StatelessWidget {
         // Sans libellé (le titre autour dit déjà ce qu'on y tape) : pas
         // d'espace vide au-dessus du champ.
         if (libelle.isNotEmpty) ...[
-          Text(libelle, style: TablTokens.sousTitre),
+          Text(libelle, style: c.sousTitre),
           const SizedBox(height: TablTokens.espaceS),
         ],
         TextField(
@@ -75,32 +76,30 @@ class TablChampTexte extends StatelessWidget {
           keyboardType: typeClavier,
           textInputAction: actionClavier,
           enabled: actif,
-          style: TablTokens.corps,
+          style: c.corps,
           onChanged: onChanged,
           onSubmitted: onSoumis,
           maxLines: lignes,
           decoration: InputDecoration(
             hintText: indication,
-            hintStyle: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+            hintStyle: c.corps.copyWith(color: c.texteDoux),
             filled: true,
-            fillColor: TablTokens.surface,
+            fillColor: c.surface,
             prefixIcon: iconePrefixe != null
-                ? Icon(iconePrefixe, size: 20, color: TablTokens.texteDoux)
+                ? Icon(iconePrefixe, size: 20, color: c.texteDoux)
                 : null,
             suffixIcon: suffixe,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: TablTokens.espaceM,
               vertical: TablTokens.espaceM,
             ),
-            enabledBorder: _bordure(
-              enErreur ? TablTokens.erreur : TablTokens.bordure,
-            ),
+            enabledBorder: _bordure(enErreur ? c.erreur : c.bordure),
             focusedBorder: _bordure(
-              enErreur ? TablTokens.erreur : TablTokens.primaire,
+              enErreur ? c.erreur : c.primaire,
               epaisseur: 2,
             ),
-            disabledBorder: _bordure(TablTokens.bordure),
-            border: _bordure(TablTokens.bordure),
+            disabledBorder: _bordure(c.bordure),
+            border: _bordure(c.bordure),
             // On gère l'erreur nous-mêmes en dessous, pour maîtriser
             // l'espacement et le style.
             errorStyle: const TextStyle(height: 0, fontSize: 0),
@@ -111,16 +110,12 @@ class TablChampTexte extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                size: 14,
-                color: TablTokens.erreur,
-              ),
+              Icon(Icons.error_outline_rounded, size: 14, color: c.erreur),
               const SizedBox(width: TablTokens.espaceXs),
               Expanded(
                 child: Text(
                   erreur!,
-                  style: TablTokens.legende.copyWith(color: TablTokens.erreur),
+                  style: c.legende.copyWith(color: c.erreur),
                 ),
               ),
             ],

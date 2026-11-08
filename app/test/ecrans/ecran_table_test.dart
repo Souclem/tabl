@@ -139,6 +139,9 @@ class _FauxCarteService implements CarteService {
   Future<Map<String, String>> photos(Iterable<String> chemins) async => {};
 
   @override
+  Future<LieuCarte?> lieuDuRestaurant(String restaurantId) async => null;
+
+  @override
   Future<String> idRestaurant(LieuCarte lieu) async => lieu.restaurantId!;
 
   @override

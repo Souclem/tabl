@@ -19,20 +19,25 @@ class TablIndicateurPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(total, (i) {
         final actif = i == index;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: TablTokens.espaceXs / 2),
+          margin: const EdgeInsets.symmetric(
+            horizontal: TablTokens.espaceXs / 2,
+          ),
           width: actif
               ? TablTokens.tailleIndicateurPageActif
               : TablTokens.tailleIndicateurPage,
           height: TablTokens.tailleIndicateurPage,
           decoration: BoxDecoration(
-            color: actif ? TablTokens.primaire : TablTokens.bordure,
-            borderRadius: BorderRadius.circular(TablTokens.tailleIndicateurPage),
+            color: actif ? c.primaire : c.bordure,
+            borderRadius: BorderRadius.circular(
+              TablTokens.tailleIndicateurPage,
+            ),
           ),
         );
       }),

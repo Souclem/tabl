@@ -40,7 +40,9 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
 
   Future<void> _charger() async {
     setState(() => _chargement = true);
-    final messages = await widget.tableService.messagesOrganisation(widget.propositionId);
+    final messages = await widget.tableService.messagesOrganisation(
+      widget.propositionId,
+    );
     if (!mounted) return;
     setState(() {
       _messages = messages;
@@ -52,7 +54,10 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
     final texte = _controleur.text.trim();
     if (texte.isEmpty || _envoi) return;
     setState(() => _envoi = true);
-    await widget.tableService.envoyerMessageOrganisation(widget.propositionId, texte);
+    await widget.tableService.envoyerMessageOrganisation(
+      widget.propositionId,
+      texte,
+    );
     _controleur.clear();
     await _charger();
     if (!mounted) return;
@@ -66,8 +71,9 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -81,21 +87,19 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
                 children: [
                   TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
                   const SizedBox(width: TablTokens.espaceS),
-                  const Text('Organisation', style: TablTokens.sousTitre),
+                  Text('Organisation', style: c.sousTitre),
                 ],
               ),
             ),
-            const Divider(color: TablTokens.bordure, height: 1),
+            Divider(color: c.bordure, height: 1),
             Expanded(
               child: _chargement
-                  ? const Center(
-                      child: CircularProgressIndicator(color: TablTokens.primaire),
-                    )
+                  ? Center(child: CircularProgressIndicator(color: c.primaire))
                   : _messages.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         'Discutez des détails pratiques ici.',
-                        style: TablTokens.corps,
+                        style: c.corps,
                       ),
                     )
                   : ListView(
@@ -109,12 +113,14 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
                             auteurPseudo: m.auteurPseudo,
                             contenu: m.contenu,
                             parMoi: m.parMoi,
-                            onSupprimer: m.parMoi ? () => _supprimer(m.id) : null,
+                            onSupprimer: m.parMoi
+                                ? () => _supprimer(m.id)
+                                : null,
                           ),
                       ],
                     ),
             ),
-            const Divider(color: TablTokens.bordure, height: 1),
+            Divider(color: c.bordure, height: 1),
             Padding(
               padding: const EdgeInsets.all(TablTokens.espaceS),
               child: Row(
@@ -122,7 +128,7 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
                   Expanded(
                     child: TextField(
                       controller: _controleur,
-                      style: TablTokens.corps,
+                      style: c.corps,
                       maxLength: 500,
                       decoration: const InputDecoration(
                         hintText: 'Message...',
@@ -134,7 +140,7 @@ class _EcranOrganisationTableState extends State<EcranOrganisationTable> {
                   ),
                   IconButton(
                     onPressed: _envoi ? null : _envoyer,
-                    icon: const Icon(Icons.send, color: TablTokens.primaire),
+                    icon: Icon(Icons.send, color: c.primaire),
                   ),
                 ],
               ),

@@ -114,12 +114,13 @@ class _PageMomentState extends State<_PageMoment>
   @override
   Widget build(BuildContext context) {
     final s = _souvenir;
+    final c = TablCouleurs.of(context);
     final presents = s.presents;
     final ouvrirPersonne = widget.onOuvrirPersonne;
     // Un Scaffold à elle : les messages (« Audience mise à jour. »)
     // s'affichent par-dessus le moment agrandi, pas sous lui.
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: TablVisionneuseMoment(
         cleHero: widget.cleHero,
         photoUrl: s.photoUrl,

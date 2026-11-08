@@ -21,8 +21,10 @@ sont dans `docs/regles.md`.
 - **Explorer** : étapes 3 (fiche « Éventail ») et 4 (« Où explorer ») de la
   maquette pas encore faites (voir plus bas).
 - **Deep linking** (retour dans l'app depuis un e-mail) : pas fait.
-- Catégories Foursquare parfois en anglais (« Cupcake Shop ») : à traduire
-  un jour.
+- Catégories Foursquare : traduites côté app par `libelleCategorie`
+  (table de la taxonomie « Dining and Drinking » + adjectif de cuisine pour
+  « X Restaurant »). Une catégorie inconnue reste en anglais : compléter la
+  table au besoin.
 
 ## Social
 
@@ -102,18 +104,27 @@ sont dans `docs/regles.md`.
   valable partout dans le monde) ; de près, chaque resto.
 - **Explorer = la maquette « Carnet »** : grille de tuiles + barre flottante
   + recherche + thème clair et sombre (réglage Apparence
-  Automatique/Clair/Sombre ; seul l'Explorer le suit pour l'instant). Les
-  modes Envies et Le cercle ont été supprimés. Filtres : feuille papier
-  claire, une ligne par filtre, une seule ouverte, compte en direct
+  Automatique/Clair/Sombre ; le thème de l'app le suit, écran par écran :
+  fait pour le Feed et l'Explorer, le reste est en cours de migration, voir
+  « Apparence » ci-dessous). Les
+  modes Envies et Le cercle ont été supprimés. Filtres : feuille (papier
+  en clair), une ligne par filtre, une seule ouverte, compte en direct
   (« Voir N adresses »). Tri : menu « Trié par » avec descriptions.
 - **Recherche** : la pilule glisse vers le haut (jamais de téléportation) ;
   on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox),
   1er résultat = « Chercher les restaurants dont le nom est « … » ».
-- Reste à faire : (3) fiche « Éventail » (bandeau nuit, cartes des proches en
-  éventail, « On y va ? », Itinéraire, marque-page) + « Qui y est allé » ;
-  (4) « Où explorer » (rayon Automatique/1/3/10/25 km), titre « Autour de
-  moi · 1 km ». Visages : ≤ 4 proches → 4 visages, au-delà 3 visages +
-  « +min(n−3, 10) ».
+- **Fiche « Éventail » (faite)** : bandeau nuit (photo, nom, retour,
+  marque-page doré quand l'adresse est gardée, qui remplace « Garder »),
+  puis les proches qui y sont allés en cartes en éventail (≤ 4 proches → 4
+  cartes, au-delà 3 cartes + « +min(n−3, 10) » qui ouvre « Qui y est
+  allé » ; une carte ouvre le profil), « On y va ? » (propose à l'une de
+  ses Tables ; masqué sans Table) et Itinéraire (application de plans, via
+  `url_launcher` ; coordonnées si on les a, sinon nom + adresse), puis
+  Demander · Carte. Fiche sombre en dur (pas encore migrée au thème).
+  Depuis l'Explorer, elle se pose sur la carte en `opaque: false`.
+  Reste à faire : (4) « Où explorer » (rayon Automatique/1/3/10/25 km),
+  titre « Autour de moi · 1 km ». Visages : ≤ 4 proches → 4 visages, au-delà
+  3 visages + « +min(n−3, 10) ».
 - Note /5 calculée côté app à partir des ressentis, pas en SQL.
 - Réseau étendu, Premium, Créateurs/Pros : pas pour l'instant.
 
@@ -153,3 +164,25 @@ Un filtre « lieux où l'on mange » a été codé puis **mis en pause** (« pou
 l'instant on garde tout ») ; rien n'a été appliqué à la base. Pour le
 reprendre : `git revert dfd6712`. Exigence : des règles valables pour le
 monde entier, jamais de liste d'exclusion à la main.
+
+## Apparence (clair / sombre)
+
+- Le réglage Apparence pilote le thème de toute l'app (`TablTheme.clair()`,
+  `TablTheme.sombre()`, `themeMode`). Le clair de tous les écrans reprend la
+  palette de l'Explorer (fond de lin, braise, ivoire, encre).
+- La Constellation reste TOUJOURS de nuit, quel que soit le réglage.
+- Connexion, inscription et accueil suivent aussi le réglage.
+- Un écran lit ses couleurs par `TablCouleurs.of(context)` (dans
+  `theme/tokens.dart`), jamais par `TablTokens.fond` & co, qui sont les
+  couleurs du sombre seul. Un écran qui lit encore `TablTokens.<couleur>`
+  est illisible en clair tant qu'il n'est pas migré.
+- L'Explorer a sa propre palette (`PaletteExplorer`) et son thème la suit
+  (clair avec elle, sombre dans la Constellation). Ses composants lisent
+  `TablCouleurs.of(context)` ou la palette ; ses feuilles (filtres, tri,
+  « Proposer », « Où cherchez-vous ? ») suivent le réglage — la feuille des
+  filtres n'est plus « toujours papier » (décision réversible). Restent
+  volontairement fixes : la barre flottante et les tuiles de lieux (objets
+  sombres ou ivoire, encre propre à chaque type de tuile) et la pilule
+  « Rechercher » (ivoire, encre). La
+  fiche d'un restaurant (`widgets/carte/fiche.dart`) suit le réglage ; seul
+  le voile noir posé sur sa photo, derrière le bouton retour, reste noir.

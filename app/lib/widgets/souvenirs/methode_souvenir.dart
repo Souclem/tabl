@@ -58,18 +58,15 @@ class _Cadre extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final vide = DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color.lerp(
-              TablTokens.surface,
-              TablTokens.primaire,
-              0.08 + 0.06 * teinte,
-            )!,
-            TablTokens.surfaceBasse,
+            Color.lerp(c.surface, c.primaire, 0.08 + 0.06 * teinte)!,
+            c.surfaceBasse,
           ],
         ),
       ),
@@ -79,7 +76,7 @@ class _Cadre extends StatelessWidget {
       height: hauteur,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(TablTokens.arrondiM - 2),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.16)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.16)),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,
@@ -125,6 +122,7 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -137,12 +135,9 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            Color.lerp(TablTokens.surface, TablTokens.fond, 0.2)!,
-            TablTokens.surfaceBasse,
-          ],
+          colors: [Color.lerp(c.surface, c.fond, 0.2)!, c.surfaceBasse],
         ),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.1)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,18 +146,15 @@ class TablCarteAjoutSouvenir extends StatelessWidget {
           const SizedBox(height: TablTokens.espaceL),
           Text(
             titre,
-            style: TablTokens.titreAffichage.copyWith(
-              fontSize: 28,
-              height: 1.15,
-            ),
+            style: c.titreAffichage.copyWith(fontSize: 28, height: 1.15),
           ),
           const SizedBox(height: TablTokens.espaceS),
           Text(
             texte,
-            style: TablTokens.corps.copyWith(
+            style: c.corps.copyWith(
               fontSize: 14,
               height: 1.45,
-              color: TablTokens.texte.withValues(alpha: 0.72),
+              color: c.texte.withValues(alpha: 0.72),
             ),
           ),
           const SizedBox(height: TablTokens.espaceL - 4),
@@ -195,6 +187,7 @@ class TablMethodeSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final active = onPresse != null;
     return Semantics(
       button: true,
@@ -205,21 +198,21 @@ class TablMethodeSouvenir extends StatelessWidget {
           padding: const EdgeInsets.all(TablTokens.espaceM),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-            border: Border.all(color: TablTokens.bordure),
+            border: Border.all(color: c.bordure),
           ),
           child: Row(
             children: [
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.surfaceBasse,
+                  color: c.surfaceBasse,
                 ),
                 child: Icon(
                   icone,
                   size: 19,
-                  color: active ? TablTokens.texte : TablTokens.texteDoux,
+                  color: active ? c.texte : c.texteDoux,
                 ),
               ),
               const SizedBox(width: TablTokens.espaceM - 4),
@@ -229,17 +222,14 @@ class TablMethodeSouvenir extends StatelessWidget {
                   children: [
                     Text(
                       titre,
-                      style: TablTokens.corps.copyWith(
+                      style: c.corps.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: active ? TablTokens.texte : TablTokens.texteDoux,
+                        color: active ? c.texte : c.texteDoux,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      texte,
-                      style: TablTokens.legende.copyWith(fontSize: 13),
-                    ),
+                    Text(texte, style: c.legende.copyWith(fontSize: 13)),
                   ],
                 ),
               ),
@@ -251,21 +241,18 @@ class TablMethodeSouvenir extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: TablTokens.surfaceBasse,
+                    color: c.surfaceBasse,
                     borderRadius: BorderRadius.circular(
                       TablTokens.arrondiBouton,
                     ),
                   ),
                   child: Text(
                     mention!,
-                    style: TablTokens.legende.copyWith(fontSize: 12),
+                    style: c.legende.copyWith(fontSize: 12),
                   ),
                 )
               else
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: TablTokens.texteDoux,
-                ),
+                Icon(Icons.chevron_right_rounded, color: c.texteDoux),
             ],
           ),
         ),
@@ -287,6 +274,7 @@ class TablPiluleAjoutSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       excludeSemantics: true,
@@ -297,25 +285,18 @@ class TablPiluleAjoutSouvenir extends StatelessWidget {
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
           decoration: BoxDecoration(
-            color: TablTokens.surfaceBasse,
+            color: c.surfaceBasse,
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-            border: Border.all(color: TablTokens.bordure),
+            border: Border.all(color: c.bordure),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.nightlight_round,
-                size: 15,
-                color: TablTokens.texte,
-              ),
+              Icon(Icons.nightlight_round, size: 15, color: c.texte),
               const SizedBox(width: TablTokens.espaceS),
               Text(
                 libelle,
-                style: TablTokens.corps.copyWith(
-                  fontSize: 14,
-                  color: TablTokens.texte,
-                ),
+                style: c.corps.copyWith(fontSize: 14, color: c.texte),
               ),
             ],
           ),
@@ -343,6 +324,7 @@ class TablInvitationSouvenirs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -351,9 +333,9 @@ class TablInvitationSouvenirs extends StatelessWidget {
         TablTokens.espaceL - 4,
       ),
       decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
+        color: c.surfaceBasse,
         borderRadius: BorderRadius.circular(TablTokens.arrondiL + 4),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.1)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -362,18 +344,15 @@ class TablInvitationSouvenirs extends StatelessWidget {
           const SizedBox(height: TablTokens.espaceL),
           Text(
             titre,
-            style: TablTokens.titreAffichage.copyWith(
-              fontSize: 26,
-              height: 1.2,
-            ),
+            style: c.titreAffichage.copyWith(fontSize: 26, height: 1.2),
           ),
           const SizedBox(height: TablTokens.espaceS),
           Text(
             texte,
-            style: TablTokens.corps.copyWith(
+            style: c.corps.copyWith(
               fontSize: 14,
               height: 1.45,
-              color: TablTokens.texte.withValues(alpha: 0.72),
+              color: c.texte.withValues(alpha: 0.72),
             ),
           ),
           const SizedBox(height: TablTokens.espaceL - 4),

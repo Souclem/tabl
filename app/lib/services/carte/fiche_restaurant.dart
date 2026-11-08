@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../souvenirs/journal_profil.dart';
 import '../souvenirs/personne_presente.dart';
 import '../souvenirs/presentation_souvenir.dart';
@@ -203,3 +205,66 @@ List<PersonnePresente> personnesFiche(List<ProcheFiche> proches) => [
   for (final p in proches)
     PersonnePresente(id: p.id, pseudo: p.pseudo, photoUrl: p.photoUrl),
 ];
+
+/// Une carte de l'éventail : un proche, textes prêts à afficher.
+typedef CarteProche = ({
+  String id,
+  String pseudo,
+  String? photoUrl,
+
+  /// Son ressenti de la dernière visite ("😍"), `null` sans ressenti.
+  String? ressenti,
+
+  /// "1 fois", "3 fois".
+  String fois,
+
+  /// "Aujourd'hui", "Hier", "Il y a 2 mois".
+  String derniereVisite,
+});
+
+/// L'éventail d'une fiche : les cartes montrées, et la pastille « +N » qui
+/// remplace les proches suivants (`null` : tous sont là).
+typedef EventailProches = ({
+  List<CarteProche> cartes,
+  ({String texte, bool nombreux})? autres,
+});
+
+/// Au plus [maxCartesSansPlus] proches : une carte chacun ; au-delà, trois
+/// cartes et « +min(n − 3, 10) » ([nombreux] : plus de 10 autres, la
+/// pastille se dore).
+const maxCartesSansPlus = 4;
+const _cartesAvecPlus = 3;
+
+EventailProches eventailProches(
+  List<ProcheFiche> proches,
+  DateTime maintenant,
+) {
+  final montres = proches.length <= maxCartesSansPlus
+      ? proches
+      : proches.take(_cartesAvecPlus).toList();
+  final autres = proches.length - montres.length;
+  return (
+    cartes: [
+      for (final p in montres)
+        (
+          id: p.id,
+          pseudo: p.pseudo,
+          photoUrl: p.photoUrl,
+          ressenti: p.emoji,
+          fois: '${p.fois} fois',
+          derniereVisite: derniereVisiteLisible(p.derniere, maintenant),
+        ),
+    ],
+    autres: autres <= 0
+        ? null
+        : (texte: '+${math.min(autres, 10)}', nombreux: autres > 10),
+  );
+}
+
+/// "Aujourd'hui", "Hier", "Il y a 3 semaines", "Il y a 2 ans".
+String derniereVisiteLisible(DateTime date, DateTime maintenant) {
+  final temps = tempsDepuis(date, maintenant);
+  if (temps == null) return "Aujourd'hui";
+  if (temps.nombre == '1' && temps.unite == 'jour') return 'Hier';
+  return 'Il y a ${temps.nombre} ${temps.unite}';
+}

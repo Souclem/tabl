@@ -18,19 +18,20 @@ class TablSurtitreSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Row(
       children: [
-        Icon(icone, size: 13, color: TablTokens.texte),
+        Icon(icone, size: 13, color: c.texte),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             texte.toUpperCase(),
             overflow: TextOverflow.ellipsis,
-            style: TablTokens.legende.copyWith(
+            style: c.legende.copyWith(
               fontSize: 11,
               letterSpacing: 1.6,
               fontWeight: FontWeight.w600,
-              color: TablTokens.texte.withValues(alpha: 0.85),
+              color: c.texte.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -65,6 +66,7 @@ class TablTitreLieuSouvenir extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       label: nom ?? indication,
@@ -76,10 +78,10 @@ class TablTitreLieuSouvenir extends StatelessWidget {
           children: [
             Text(
               nom ?? indication,
-              style: TablTokens.titreAffichage.copyWith(
+              style: c.titreAffichage.copyWith(
                 fontSize: 32,
                 height: 1.1,
-                color: nom == null ? TablTokens.texteDoux : TablTokens.texte,
+                color: nom == null ? c.texteDoux : c.texte,
               ),
             ),
             const SizedBox(height: 6),
@@ -91,17 +93,17 @@ class TablTitreLieuSouvenir extends StatelessWidget {
                       detail!,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende.copyWith(fontSize: 14),
+                      style: c.legende.copyWith(fontSize: 14),
                     ),
                   ),
                   const SizedBox(width: TablTokens.espaceS),
                 ],
                 Text(
                   action,
-                  style: TablTokens.legende.copyWith(
+                  style: c.legende.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: TablTokens.primaire,
+                    color: c.primaire,
                   ),
                 ),
               ],
@@ -141,6 +143,7 @@ class TablLigneOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       child: InkWell(
@@ -155,10 +158,10 @@ class TablLigneOption extends StatelessWidget {
                 height: 40,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.surfaceBasse,
-                  border: Border.all(color: TablTokens.bordure),
+                  color: c.surfaceBasse,
+                  border: Border.all(color: c.bordure),
                 ),
-                child: Icon(icone, size: 19, color: TablTokens.texte),
+                child: Icon(icone, size: 19, color: c.texte),
               ),
               const SizedBox(width: TablTokens.espaceM - 4),
               Expanded(
@@ -169,16 +172,13 @@ class TablLigneOption extends StatelessWidget {
                       texte,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.corps.copyWith(
-                        color: vide ? TablTokens.texteDoux : TablTokens.texte,
+                      style: c.corps.copyWith(
+                        color: vide ? c.texteDoux : c.texte,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (detail != null)
-                      Text(
-                        detail!,
-                        style: TablTokens.legende.copyWith(fontSize: 12),
-                      ),
+                      Text(detail!, style: c.legende.copyWith(fontSize: 12)),
                   ],
                 ),
               ),
@@ -186,10 +186,7 @@ class TablLigneOption extends StatelessWidget {
                 const SizedBox(width: TablTokens.espaceS),
                 fin!,
               ],
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: TablTokens.texteDoux,
-              ),
+              Icon(Icons.chevron_right_rounded, color: c.texteDoux),
             ],
           ),
         ),
@@ -212,7 +209,8 @@ class TablChampLegende extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TablTokens.titreAffichage.copyWith(
+    final c = TablCouleurs.of(context);
+    final style = c.titreAffichage.copyWith(
       fontSize: 19,
       fontStyle: FontStyle.italic,
       fontWeight: FontWeight.w400,
@@ -224,10 +222,10 @@ class TablChampLegende extends StatelessWidget {
       maxLines: 4,
       textCapitalization: TextCapitalization.sentences,
       style: style,
-      cursorColor: TablTokens.primaire,
+      cursorColor: c.primaire,
       decoration: InputDecoration(
         hintText: indication,
-        hintStyle: style.copyWith(color: TablTokens.texteDoux),
+        hintStyle: style.copyWith(color: c.texteDoux),
         border: InputBorder.none,
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
@@ -259,12 +257,13 @@ class TablCarteChoixLieu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.all(TablTokens.espaceM),
       decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
+        color: c.surfaceBasse,
         borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.12)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.12)),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,
@@ -279,14 +278,11 @@ class TablCarteChoixLieu extends StatelessWidget {
         children: [
           Text(
             nom,
-            style: TablTokens.titreAffichage.copyWith(
-              fontSize: 22,
-              height: 1.15,
-            ),
+            style: c.titreAffichage.copyWith(fontSize: 22, height: 1.15),
           ),
           if (detail.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text(detail, style: TablTokens.legende.copyWith(fontSize: 13)),
+            Text(detail, style: c.legende.copyWith(fontSize: 13)),
           ],
           const SizedBox(height: TablTokens.espaceM),
           TablBouton(libelle: libelleBouton, onPresse: onChoisir),

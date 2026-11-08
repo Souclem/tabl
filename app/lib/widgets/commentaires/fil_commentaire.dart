@@ -79,6 +79,7 @@ class TablFilCommentaire extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final couleurs = TablCouleurs.of(context);
     final libelle = fil.libelleVoirReponses;
     final basculer = fil.onBasculerReponses;
     return Column(
@@ -96,7 +97,7 @@ class TablFilCommentaire extends StatelessWidget {
                   width: 24,
                   height: 1,
                   margin: const EdgeInsets.only(right: TablTokens.espaceS),
-                  color: TablTokens.texteDoux.withValues(alpha: 0.5),
+                  color: couleurs.texteDoux.withValues(alpha: 0.5),
                 ),
                 texte: fil.reponsesVisibles ? 'Masquer les réponses' : libelle,
                 onPresse: basculer,
@@ -125,7 +126,8 @@ class _LigneCommentaire extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = commentaire;
-    final discret = TablTokens.legende.copyWith(fontSize: 12.5);
+    final couleurs = TablCouleurs.of(context);
+    final discret = couleurs.legende.copyWith(fontSize: 12.5);
     final libelleJaime = c.libelleJaime;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -158,7 +160,7 @@ class _LigneCommentaire extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: c.pseudo,
-                        style: TablTokens.corps.copyWith(
+                        style: couleurs.corps.copyWith(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
                         ),
@@ -170,7 +172,7 @@ class _LigneCommentaire extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   c.texte,
-                  style: TablTokens.corps.copyWith(fontSize: 15, height: 1.35),
+                  style: couleurs.corps.copyWith(fontSize: 15, height: 1.35),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -214,6 +216,7 @@ class _LienDiscret extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Semantics(
       button: true,
       child: GestureDetector(
@@ -228,7 +231,7 @@ class _LienDiscret extends StatelessWidget {
               ?avant,
               Text(
                 texte,
-                style: TablTokens.legende.copyWith(
+                style: c.legende.copyWith(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                 ),

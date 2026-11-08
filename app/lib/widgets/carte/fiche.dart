@@ -19,15 +19,14 @@ class TablEtiquetteFiche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Text(
       texte.toUpperCase(),
-      style: TablTokens.legende.copyWith(
+      style: c.legende.copyWith(
         fontSize: 10.5,
         letterSpacing: 1.5,
         fontWeight: FontWeight.w700,
-        color: doree
-            ? TablTokens.primaire
-            : TablTokens.texte.withValues(alpha: 0.45),
+        color: doree ? c.primaire : c.texte.withValues(alpha: 0.45),
       ),
     );
   }
@@ -43,12 +42,13 @@ class _Case extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final contenu = Container(
       padding: remplissage ?? const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF121318),
+        color: c.surfaceBasse,
         borderRadius: BorderRadius.circular(TablTokens.arrondiM + 2),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.07)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.07)),
       ),
       child: child,
     );
@@ -57,8 +57,9 @@ class _Case extends StatelessWidget {
   }
 }
 
-/// Le haut de la fiche : la photo en grand, le retour, le nom et où
-/// c'est ; une mention dorée quand c'est l'une de mes adresses.
+/// Le bandeau nuit, haut de la fiche : la photo en grand sous un voile qui
+/// se fond dans la nuit, le retour, le marque-page, le nom et où c'est ;
+/// une mention dorée quand c'est l'une de mes adresses.
 class TablHerosFiche extends StatelessWidget {
   const TablHerosFiche({
     super.key,
@@ -67,6 +68,8 @@ class TablHerosFiche extends StatelessWidget {
     required this.photoUrl,
     required this.onRetour,
     this.mention,
+    this.onMarquePage,
+    this.gardee = false,
   });
 
   final String nom;
@@ -79,8 +82,15 @@ class TablHerosFiche extends StatelessWidget {
   final String? mention;
   final VoidCallback onRetour;
 
+  /// Garde ou retire l'adresse de mes envies ; `null` : pas de marque-page.
+  final VoidCallback? onMarquePage;
+
+  /// L'adresse est dans mes envies : marque-page plein et doré.
+  final bool gardee;
+
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final haut = MediaQuery.paddingOf(context).top;
     return SizedBox(
       height: 300 + haut,
@@ -94,17 +104,20 @@ class TablHerosFiche extends StatelessWidget {
             rayon: 0,
             tailleLettre: 140,
           ),
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0, 0.3, 0.62, 1],
+                stops: const [0, 0.3, 0.62, 1],
+                // Le voile du haut protège le bouton retour sur la photo
+                // (noir dans les deux apparences) ; le bas se fond dans la
+                // page, où le nom se pose.
                 colors: [
-                  Color(0x8C000000),
-                  Color(0x00000000),
-                  Color(0x33000000),
-                  TablTokens.fond,
+                  const Color(0x8C000000),
+                  const Color(0x00000000),
+                  const Color(0x33000000),
+                  c.fond,
                 ],
               ),
             ),
@@ -118,6 +131,21 @@ class TablHerosFiche extends StatelessWidget {
               onPresse: onRetour,
             ),
           ),
+          if (onMarquePage != null)
+            Positioned(
+              top: haut + TablTokens.espaceS,
+              right: TablTokens.espaceM,
+              child: TablBoutonVerre(
+                icone: gardee
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                libelle: gardee
+                    ? 'Retirer de mes envies'
+                    : 'Garder pour plus tard',
+                doree: gardee,
+                onPresse: onMarquePage!,
+              ),
+            ),
           Positioned(
             left: TablTokens.espaceL - 4,
             right: TablTokens.espaceL - 4,
@@ -135,18 +163,18 @@ class TablHerosFiche extends StatelessWidget {
                       borderRadius: BorderRadius.circular(
                         TablTokens.arrondiBouton,
                       ),
-                      color: const Color(0x66000000),
+                      color: c.fond.withValues(alpha: 0.6),
                       border: Border.all(
-                        color: TablTokens.primaire.withValues(alpha: 0.6),
+                        color: c.primaire.withValues(alpha: 0.6),
                       ),
                     ),
                     child: Text(
                       mention!.toUpperCase(),
-                      style: TablTokens.legende.copyWith(
+                      style: c.legende.copyWith(
                         fontSize: 10,
                         letterSpacing: 1.3,
                         fontWeight: FontWeight.w700,
-                        color: TablTokens.primaire,
+                        color: c.primaire,
                       ),
                     ),
                   ),
@@ -156,12 +184,15 @@ class TablHerosFiche extends StatelessWidget {
                   nom,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TablTokens.titreAffichage.copyWith(
+                  style: c.titreAffichage.copyWith(
                     fontSize: 36,
                     height: 1.05,
                     letterSpacing: -0.6,
-                    shadows: const [
-                      Shadow(color: Colors.black54, blurRadius: 14),
+                    shadows: [
+                      Shadow(
+                        color: c.fond.withValues(alpha: 0.7),
+                        blurRadius: 14,
+                      ),
                     ],
                   ),
                 ),
@@ -171,9 +202,9 @@ class TablHerosFiche extends StatelessWidget {
                     sousTitre,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.legende.copyWith(
+                    style: c.legende.copyWith(
                       fontSize: 13.5,
-                      color: TablTokens.texte.withValues(alpha: 0.78),
+                      color: c.texte.withValues(alpha: 0.78),
                     ),
                   ),
                 ],
@@ -211,6 +242,7 @@ class TablActionsFiche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Row(
       children: [
         for (var i = 0; i < actions.length; i++) ...[
@@ -226,13 +258,13 @@ class TablActionsFiche extends StatelessWidget {
                   height: 58,
                   decoration: BoxDecoration(
                     color: actions[i].active
-                        ? TablTokens.primaire.withValues(alpha: 0.12)
-                        : const Color(0xFF121318),
+                        ? c.primaire.withValues(alpha: 0.12)
+                        : c.surfaceBasse,
                     borderRadius: BorderRadius.circular(TablTokens.arrondiM),
                     border: Border.all(
                       color: actions[i].active
-                          ? TablTokens.primaire.withValues(alpha: 0.45)
-                          : TablTokens.texte.withValues(alpha: 0.07),
+                          ? c.primaire.withValues(alpha: 0.45)
+                          : c.texte.withValues(alpha: 0.07),
                     ),
                   ),
                   child: Column(
@@ -241,19 +273,15 @@ class TablActionsFiche extends StatelessWidget {
                       Icon(
                         actions[i].icone,
                         size: 18,
-                        color: actions[i].active
-                            ? TablTokens.primaire
-                            : TablTokens.texte,
+                        color: actions[i].active ? c.primaire : c.texte,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         actions[i].libelle,
-                        style: TablTokens.legende.copyWith(
+                        style: c.legende.copyWith(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: actions[i].active
-                              ? TablTokens.primaire
-                              : TablTokens.texte,
+                          color: actions[i].active ? c.primaire : c.texte,
                         ),
                       ),
                     ],
@@ -297,6 +325,7 @@ class TablAvisCercle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -318,15 +347,12 @@ class TablAvisCercle extends StatelessWidget {
                       children: [
                         Text(
                           note!,
-                          style: TablTokens.titreAffichage.copyWith(
+                          style: c.titreAffichage.copyWith(
                             fontSize: 42,
                             height: 1,
                           ),
                         ),
-                        Text(
-                          ' / 5',
-                          style: TablTokens.legende.copyWith(fontSize: 14),
-                        ),
+                        Text(' / 5', style: c.legende.copyWith(fontSize: 14)),
                         if (emoji != null) ...[
                           const SizedBox(width: 6),
                           Text(emoji!, style: const TextStyle(fontSize: 20)),
@@ -336,13 +362,10 @@ class TablAvisCercle extends StatelessWidget {
                   else
                     Text(
                       'Pas encore d\'avis',
-                      style: TablTokens.titreAffichage.copyWith(fontSize: 20),
+                      style: c.titreAffichage.copyWith(fontSize: 20),
                     ),
                   const SizedBox(height: 6),
-                  Text(
-                    detailAvis,
-                    style: TablTokens.legende.copyWith(fontSize: 12.5),
-                  ),
+                  Text(detailAvis, style: c.legende.copyWith(fontSize: 12.5)),
                 ],
               ),
             ),
@@ -365,7 +388,7 @@ class TablAvisCercle extends StatelessWidget {
                           children: [
                             Text(
                               '$connaissent',
-                              style: TablTokens.titreAffichage.copyWith(
+                              style: c.titreAffichage.copyWith(
                                 fontSize: 24,
                                 height: 1,
                               ),
@@ -388,10 +411,10 @@ class TablAvisCercle extends StatelessWidget {
                               ),
                               const Spacer(),
                               if (onConnaissent != null)
-                                const Icon(
+                                Icon(
                                   Icons.chevron_right_rounded,
                                   size: 18,
-                                  color: TablTokens.texteDoux,
+                                  color: c.texteDoux,
                                 ),
                             ],
                           ),
@@ -414,7 +437,7 @@ class TablAvisCercle extends StatelessWidget {
                           children: [
                             Text(
                               '$yRetournent',
-                              style: TablTokens.titreAffichage.copyWith(
+                              style: c.titreAffichage.copyWith(
                                 fontSize: 24,
                                 height: 1,
                               ),
@@ -433,15 +456,13 @@ class TablAvisCercle extends StatelessWidget {
                             children: [
                               Text(
                                 'Voir qui',
-                                style: TablTokens.legende.copyWith(
-                                  fontSize: 12.5,
-                                ),
+                                style: c.legende.copyWith(fontSize: 12.5),
                               ),
                               const Spacer(),
-                              const Icon(
+                              Icon(
                                 Icons.chevron_right_rounded,
                                 size: 18,
-                                color: TablTokens.texteDoux,
+                                color: c.texteDoux,
                               ),
                             ],
                           ),
@@ -474,6 +495,7 @@ class TablPremiereDecouverte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return _Case(
       onPresse: onPresse,
       child: Row(
@@ -483,15 +505,9 @@ class TablPremiereDecouverte extends StatelessWidget {
             height: 34,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: TablTokens.primaire.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: c.primaire.withValues(alpha: 0.5)),
             ),
-            child: const Icon(
-              Icons.explore_outlined,
-              size: 17,
-              color: TablTokens.primaire,
-            ),
+            child: Icon(Icons.explore_outlined, size: 17, color: c.primaire),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -511,7 +527,7 @@ class TablPremiereDecouverte extends StatelessWidget {
                       child: Text(
                         visage.pseudo,
                         overflow: TextOverflow.ellipsis,
-                        style: TablTokens.titreAffichage.copyWith(fontSize: 18),
+                        style: c.titreAffichage.copyWith(fontSize: 18),
                       ),
                     ),
                   ],
@@ -521,10 +537,10 @@ class TablPremiereDecouverte extends StatelessWidget {
           ),
           Text(
             annee,
-            style: TablTokens.titreAffichage.copyWith(
+            style: c.titreAffichage.copyWith(
               fontSize: 15,
               letterSpacing: 1,
-              color: TablTokens.primaire.withValues(alpha: 0.8),
+              color: c.primaire.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -553,13 +569,14 @@ class TablMonHistoireFiche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     if (fois == 0) {
       return _Case(
         child: Text(
           'Pas encore dans votre histoire.',
-          style: TablTokens.corps.copyWith(
+          style: c.corps.copyWith(
             fontSize: 14,
-            color: TablTokens.texte.withValues(alpha: 0.7),
+            color: c.texte.withValues(alpha: 0.7),
           ),
         ),
       );
@@ -578,10 +595,7 @@ class TablMonHistoireFiche extends StatelessWidget {
                   children: [
                     Text(
                       '$fois',
-                      style: TablTokens.titreAffichage.copyWith(
-                        fontSize: 30,
-                        height: 1,
-                      ),
+                      style: c.titreAffichage.copyWith(fontSize: 30, height: 1),
                     ),
                     const SizedBox(height: 4),
                     const TablEtiquetteFiche(texte: 'fois ici'),
@@ -590,7 +604,7 @@ class TablMonHistoireFiche extends StatelessWidget {
                 const SizedBox(width: 16),
                 VerticalDivider(
                   width: 1,
-                  color: TablTokens.texte.withValues(alpha: 0.12),
+                  color: c.texte.withValues(alpha: 0.12),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -599,7 +613,7 @@ class TablMonHistoireFiche extends StatelessWidget {
                     children: [
                       Text(
                         d == null ? 'Aujourd\'hui' : '${d.nombre} ${d.unite}',
-                        style: TablTokens.titreAffichage.copyWith(
+                        style: c.titreAffichage.copyWith(
                           fontSize: 30,
                           height: 1,
                         ),
@@ -618,7 +632,7 @@ class TablMonHistoireFiche extends StatelessWidget {
           ),
           if (detail.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(detail, style: TablTokens.legende.copyWith(fontSize: 12.5)),
+            Text(detail, style: c.legende.copyWith(fontSize: 12.5)),
           ],
         ],
       ),
@@ -635,6 +649,7 @@ class TablCeQuiRessort extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final max = impressions.isEmpty
         ? 1
         : impressions.map((i) => i.fois).reduce((a, b) => a > b ? a : b);
@@ -651,15 +666,12 @@ class TablCeQuiRessort extends StatelessWidget {
                     Expanded(
                       child: Text(
                         i.libelle,
-                        style: TablTokens.corps.copyWith(
-                          fontSize: 14,
-                          color: TablTokens.texte,
-                        ),
+                        style: c.corps.copyWith(fontSize: 14, color: c.texte),
                       ),
                     ),
                     Text(
                       i.fois == 1 ? '1 fois' : '${i.fois} fois',
-                      style: TablTokens.legende.copyWith(fontSize: 12.5),
+                      style: c.legende.copyWith(fontSize: 12.5),
                     ),
                   ],
                 ),
@@ -669,8 +681,8 @@ class TablCeQuiRessort extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: i.fois / max,
                     minHeight: 2,
-                    color: TablTokens.primaire,
-                    backgroundColor: TablTokens.texte.withValues(alpha: 0.08),
+                    color: c.primaire,
+                    backgroundColor: c.texte.withValues(alpha: 0.08),
                   ),
                 ),
               ],

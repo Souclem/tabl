@@ -143,6 +143,17 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
           abonnementService: widget.abonnementService,
           souvenirService: widget.souvenirService,
           avisService: _avisService,
+          // Comme `_notificationsSysteme` : sans backend (tests), rien.
+          carteService:
+              widget.carteService ??
+              (TablBackend.estDemarre
+                  ? CarteServiceSupabase(TablBackend.client)
+                  : null),
+          tableService:
+              widget.tableService ??
+              (TablBackend.estDemarre
+                  ? TableServiceSupabase(TablBackend.client)
+                  : null),
         ),
       ),
     );
@@ -221,7 +232,7 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: TablCouleurs.of(context).fond,
       // La barre flotte au-dessus du contenu (Stack), plutôt que
       // `bottomNavigationBar` qui la coincerait pleine largeur contre le
       // bord — voir la note de classe de TablBarreNavigation.

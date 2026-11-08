@@ -118,6 +118,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       estEnvie: souvenir.estEnvie,
       souvenirService: souvenirService,
       abonnementService: abonnementService,
+      tableService: _tables,
     );
     if (!mounted) return;
     recharger();
@@ -195,8 +196,9 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   void optionsPublication(SouvenirFeed souvenir) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       builder: (contexteFeuille) {
+        final erreur = TablCouleurs.of(contexteFeuille).erreur;
         void choisir(Future<void> Function(SouvenirFeed) action) {
           Navigator.of(contexteFeuille).pop();
           action(souvenir);
@@ -220,14 +222,8 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
                 onTap: () => choisir(modifierAudience),
               ),
               ListTile(
-                leading: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: TablTokens.erreur,
-                ),
-                title: const Text(
-                  'Supprimer',
-                  style: TextStyle(color: TablTokens.erreur),
-                ),
+                leading: Icon(Icons.delete_outline_rounded, color: erreur),
+                title: Text('Supprimer', style: TextStyle(color: erreur)),
                 onTap: () => choisir(supprimerPublication),
               ),
             ],
@@ -307,10 +303,11 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   /// Après confirmation : c'est définitif.
   Future<void> supprimerPublication(SouvenirFeed souvenir) async {
     final quoi = souvenir.estSouvenir ? 'ce souvenir' : 'ce moment';
+    final c = TablCouleurs.of(context);
     final confirme = await showDialog<bool>(
       context: context,
       builder: (contexteDialogue) => AlertDialog(
-        backgroundColor: TablTokens.surface,
+        backgroundColor: c.surface,
         title: Text('Supprimer $quoi ?'),
         content: const Text(
           'Il disparaîtra de votre profil, avec ses photos, ses réactions '
@@ -323,10 +320,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
           ),
           TextButton(
             onPressed: () => Navigator.of(contexteDialogue).pop(true),
-            child: const Text(
-              'Supprimer',
-              style: TextStyle(color: TablTokens.erreur),
-            ),
+            child: Text('Supprimer', style: TextStyle(color: c.erreur)),
           ),
         ],
       ),

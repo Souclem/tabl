@@ -142,6 +142,7 @@ class _EcranAccueilState extends State<EcranAccueil>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
       body: TablFondHeros(
         child: SafeArea(
@@ -159,14 +160,11 @@ class _EcranAccueilState extends State<EcranAccueil>
                       debut: 0,
                       fin: 0.55,
                       depart: const Offset(0, -0.15),
-                      child: const Column(
+                      child: Column(
                         children: [
                           TablLogo(grand: true),
                           SizedBox(height: TablTokens.espaceM),
-                          SizedBox(
-                            width: 40,
-                            child: Divider(color: TablTokens.bordure),
-                          ),
+                          SizedBox(width: 40, child: Divider(color: c.bordure)),
                         ],
                       ),
                     ),
@@ -178,17 +176,14 @@ class _EcranAccueilState extends State<EcranAccueil>
                       depart: const Offset(0, 0.15),
                       child: Text.rich(
                         TextSpan(
-                          style: TablTokens.corps.copyWith(
-                            fontSize: 19,
-                            height: 1.4,
-                          ),
-                          children: const [
+                          style: c.corps.copyWith(fontSize: 19, height: 1.4),
+                          children: [
                             TextSpan(
                               text: 'Partagez les bonnes adresses avec ',
                             ),
                             TextSpan(
                               text: 'les personnes qui comptent vraiment.',
-                              style: TextStyle(color: TablTokens.primaire),
+                              style: TextStyle(color: c.primaire),
                             ),
                           ],
                         ),
@@ -244,7 +239,7 @@ class _EcranAccueilState extends State<EcranAccueil>
                             "En continuant, vous acceptez nos Conditions "
                             "d'utilisation et notre Politique de confidentialité.",
                             textAlign: TextAlign.center,
-                            style: TablTokens.legende,
+                            style: c.legende,
                           ),
                         ],
                       ),

@@ -68,9 +68,10 @@ class _EcranRepondreAvisState extends State<EcranRepondreAvis> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final reponse = _reponse;
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -111,9 +112,9 @@ class _EcranRepondreAvisState extends State<EcranRepondreAvis> {
                       Expanded(
                         child: Text(
                           '${widget.demandeur} vous demande',
-                          style: TablTokens.corps.copyWith(
+                          style: c.corps.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: TablTokens.texte,
+                            color: c.texte,
                           ),
                         ),
                       ),
@@ -122,7 +123,7 @@ class _EcranRepondreAvisState extends State<EcranRepondreAvis> {
                   const SizedBox(height: TablTokens.espaceM),
                   Text(
                     '« ${widget.question} »',
-                    style: TablTokens.titreAffichage.copyWith(
+                    style: c.titreAffichage.copyWith(
                       fontSize: 26,
                       height: 1.25,
                       fontStyle: FontStyle.italic,
@@ -131,7 +132,7 @@ class _EcranRepondreAvisState extends State<EcranRepondreAvis> {
                   const SizedBox(height: TablTokens.espaceXl),
                   Text(
                     'Répondez en un toucher. Votre réponse reste privée.',
-                    style: TablTokens.legende.copyWith(fontSize: 13),
+                    style: c.legende.copyWith(fontSize: 13),
                   ),
                   const SizedBox(height: TablTokens.espaceM - 4),
                   for (final r in ReponseAvis.values)

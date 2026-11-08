@@ -27,12 +27,13 @@ class TablEnTeteMois extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           height: hauteur,
-          color: TablTokens.fond.withValues(alpha: 0.9),
+          color: c.fond.withValues(alpha: 0.9),
           padding: const EdgeInsets.fromLTRB(
             TablTokens.espaceL - 4,
             14,
@@ -43,19 +44,13 @@ class TablEnTeteMois extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                titre,
-                style: TablTokens.titreAffichage.copyWith(fontSize: 26),
-              ),
+              Text(titre, style: c.titreAffichage.copyWith(fontSize: 26)),
               const SizedBox(width: 8),
-              Text(annee, style: TablTokens.legende.copyWith(fontSize: 15)),
+              Text(annee, style: c.legende.copyWith(fontSize: 15)),
               const Spacer(),
               Text(
                 compte.toUpperCase(),
-                style: TablTokens.legende.copyWith(
-                  fontSize: 12,
-                  letterSpacing: 1.2,
-                ),
+                style: c.legende.copyWith(fontSize: 12, letterSpacing: 1.2),
               ),
             ],
           ),
@@ -167,6 +162,7 @@ class _Tuile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final retard = (rang.clamp(0, 12)) * 35;
     final duree = 380 + retard;
     return TweenAnimationBuilder<double>(
@@ -195,14 +191,16 @@ class _Tuile extends StatelessWidget {
                   child: _Photo(url: tuile.photoUrl),
                 ),
                 if (tuile.marquant)
-                  const Positioned(
+                  Positioned(
                     top: 7,
                     right: 7,
                     child: Icon(
                       Icons.favorite_rounded,
                       size: 17,
-                      color: TablTokens.primaire,
-                      shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+                      color: c.primaire,
+                      shadows: const [
+                        Shadow(color: Colors.black54, blurRadius: 6),
+                      ],
                     ),
                   ),
               ],
@@ -223,15 +221,11 @@ class _Photo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return ColoredBox(
-      color: TablTokens.surface,
+      color: c.surface,
       child: url == null
-          ? const Center(
-              child: Icon(
-                Icons.restaurant_rounded,
-                color: TablTokens.texteDoux,
-              ),
-            )
+          ? Center(child: Icon(Icons.restaurant_rounded, color: c.texteDoux))
           : Image.network(
               url!,
               fit: BoxFit.cover,

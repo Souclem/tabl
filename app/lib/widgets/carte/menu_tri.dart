@@ -23,14 +23,15 @@ class TablMenuTri extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = PaletteExplorer.of(context);
+    final c = TablCouleurs.of(context);
     return PopupMenuButton<int>(
       tooltip: 'Changer le tri',
       onSelected: onChoisir,
       position: PopupMenuPosition.under,
       offset: const Offset(0, 6),
-      color: TablTokens.papier,
+      color: c.surface,
       elevation: 12,
-      shadowColor: TablTokens.encre.withValues(alpha: 0.4),
+      shadowColor: c.texte.withValues(alpha: 0.4),
       constraints: const BoxConstraints(minWidth: 272, maxWidth: 272),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       menuPadding: const EdgeInsets.all(6),
@@ -43,7 +44,7 @@ class TablMenuTri extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: i == choisi ? TablTokens.lin : null,
+                color: i == choisi ? c.fond : null,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
@@ -59,7 +60,7 @@ class TablMenuTri extends StatelessWidget {
                             fontWeight: i == choisi
                                 ? FontWeight.w700
                                 : FontWeight.w600,
-                            color: TablTokens.encre,
+                            color: c.texte,
                           ),
                         ),
                         const SizedBox(height: 1),
@@ -67,17 +68,17 @@ class TablMenuTri extends StatelessWidget {
                           options[i].description,
                           style: TablTokens.legende.copyWith(
                             fontSize: 12.5,
-                            color: TablTokens.encrePale,
+                            color: c.texteDoux,
                           ),
                         ),
                       ],
                     ),
                   ),
                   if (i == choisi)
-                    const Icon(
+                    Icon(
                       Icons.check_rounded,
                       size: 20,
-                      color: TablTokens.primaireFoncee,
+                      color: c.primaireFoncee,
                     ),
                 ],
               ),

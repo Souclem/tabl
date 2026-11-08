@@ -32,6 +32,7 @@ class TablSaisieCommentaire extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final destinataire = enReponseA;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -49,7 +50,7 @@ class TablSaisieCommentaire extends StatelessWidget {
                   child: Text(
                     'En réponse à $destinataire',
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.legende.copyWith(fontSize: 13),
+                    style: c.legende.copyWith(fontSize: 13),
                   ),
                 ),
                 if (onAnnulerReponse != null)
@@ -57,7 +58,7 @@ class TablSaisieCommentaire extends StatelessWidget {
                     tooltip: 'Ne plus répondre',
                     onPressed: onAnnulerReponse,
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    color: TablTokens.texteDoux,
+                    color: c.texteDoux,
                     visualDensity: VisualDensity.compact,
                   ),
               ],
@@ -73,42 +74,39 @@ class TablSaisieCommentaire extends StatelessWidget {
           textCapitalization: TextCapitalization.sentences,
           textInputAction: TextInputAction.send,
           onSubmitted: (_) => onEnvoyer(),
-          style: TablTokens.corps,
-          cursorColor: TablTokens.primaire,
+          style: c.corps,
+          cursorColor: c.primaire,
           decoration: InputDecoration(
             hintText: destinataire == null
                 ? 'Ajouter un commentaire…'
                 : 'Votre réponse…',
-            hintStyle: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+            hintStyle: c.corps.copyWith(color: c.texteDoux),
             // La limite est là pour la base ; le compteur, lui, ne
             // ferait que du bruit.
             counterText: '',
             filled: true,
-            fillColor: TablTokens.surfaceBasse,
+            fillColor: c.surfaceBasse,
             contentPadding: const EdgeInsets.fromLTRB(20, 14, 4, 14),
-            enabledBorder: _bord(TablTokens.bordure),
-            disabledBorder: _bord(TablTokens.bordure),
-            focusedBorder: _bord(TablTokens.primaire.withValues(alpha: 0.6)),
+            enabledBorder: _bord(c.bordure),
+            disabledBorder: _bord(c.bordure),
+            focusedBorder: _bord(c.primaire.withValues(alpha: 0.6)),
             suffixIcon: Padding(
               padding: const EdgeInsets.only(right: 4),
               child: enCours
-                  ? const Padding(
-                      padding: EdgeInsets.all(14),
+                  ? Padding(
+                      padding: const EdgeInsets.all(14),
                       child: SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: TablTokens.primaire,
+                          color: c.primaire,
                         ),
                       ),
                     )
                   : IconButton(
                       tooltip: 'Publier le commentaire',
                       onPressed: onEnvoyer,
-                      icon: const Icon(
-                        Icons.arrow_upward_rounded,
-                        color: TablTokens.primaire,
-                      ),
+                      icon: Icon(Icons.arrow_upward_rounded, color: c.primaire),
                     ),
             ),
           ),

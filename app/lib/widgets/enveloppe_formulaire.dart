@@ -29,8 +29,9 @@ class EnveloppeFormulaire extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Stack(
           children: [
@@ -49,11 +50,12 @@ class EnveloppeFormulaire extends StatelessWidget {
                     children: [
                       const Center(child: TablLogo()),
                       const SizedBox(height: TablTokens.espaceXl),
-                      Text(titre, style: TablTokens.grandTitre),
+                      Text(titre, style: c.grandTitre),
                       const SizedBox(height: TablTokens.espaceS),
-                      Text(sousTitre, style: TablTokens.corps.copyWith(
-                        color: TablTokens.texteDoux,
-                      )),
+                      Text(
+                        sousTitre,
+                        style: c.corps.copyWith(color: c.texteDoux),
+                      ),
                       const SizedBox(height: TablTokens.espaceXl),
                       ...children,
                     ],
