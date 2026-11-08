@@ -141,6 +141,7 @@ class TablPublication extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final aDesInstants = instantsTotal > 0 && onOuvrirInstants != null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 34),
@@ -175,7 +176,7 @@ class TablPublication extends StatelessWidget {
                 if (legende != null)
                   Text(
                     legende!,
-                    style: TablTokens.titreAffichage.copyWith(fontSize: 16),
+                    style: c.titreAffichage.copyWith(fontSize: 16),
                   ),
                 if (impressions.isNotEmpty) ...[
                   const SizedBox(height: 15),
@@ -187,10 +188,7 @@ class TablPublication extends StatelessWidget {
                       for (final impression in impressions.take(2))
                         TablPuceImpression(texte: impression),
                       if (impressions.length > 2)
-                        Text(
-                          '+${impressions.length - 2}',
-                          style: TablTokens.legende,
-                        ),
+                        Text('+${impressions.length - 2}', style: c.legende),
                     ],
                   ),
                 ],
@@ -255,18 +253,15 @@ class _EnTete extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final date = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (audienceRestreinte) ...[
-          const Icon(
-            Icons.lock_outline_rounded,
-            size: 11,
-            color: TablTokens.texteDoux,
-          ),
+          Icon(Icons.lock_outline_rounded, size: 11, color: c.texteDoux),
           const SizedBox(width: 4),
         ],
-        Text(dateLisible, style: TablTokens.legende.copyWith(fontSize: 11)),
+        Text(dateLisible, style: c.legende.copyWith(fontSize: 11)),
       ],
     );
     return Padding(
@@ -298,7 +293,7 @@ class _EnTete extends StatelessWidget {
                         child: Text(
                           auteurPseudo!,
                           overflow: TextOverflow.ellipsis,
-                          style: TablTokens.corps.copyWith(
+                          style: c.corps.copyWith(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -318,7 +313,7 @@ class _EnTete extends StatelessWidget {
                 onPressed: onOptions,
                 tooltip: 'Options',
                 icon: const Icon(Icons.more_horiz_rounded, size: 20),
-                color: TablTokens.texteDoux,
+                color: c.texteDoux,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
                   width: 36,
@@ -363,6 +358,7 @@ class _PhotoState extends State<_Photo> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final photoUrls = widget.photoUrls;
     final restaurantNom = widget.restaurantNom;
     final ville = widget.ville;
@@ -383,7 +379,7 @@ class _PhotoState extends State<_Photo> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(color: TablTokens.surface),
+                  Container(color: c.surface),
                   if (photoUrls.length > 1)
                     PageView(
                       onPageChanged: (page) => setState(() => _page = page),
@@ -438,10 +434,10 @@ class _PhotoState extends State<_Photo> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.location_on_outlined,
                                 size: 15,
-                                color: TablTokens.primaire,
+                                color: c.primaire,
                               ),
                               const SizedBox(width: 7),
                               Flexible(
@@ -501,10 +497,8 @@ class _PhotoState extends State<_Photo> {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: TablTokens.fond.withValues(alpha: 0.62),
-                  border: Border.all(
-                    color: TablTokens.primaire.withValues(alpha: 0.18),
-                  ),
+                  color: c.fond.withValues(alpha: 0.62),
+                  border: Border.all(color: c.primaire.withValues(alpha: 0.18)),
                 ),
                 child: Text(emojiEmotion, style: const TextStyle(fontSize: 19)),
               ),
@@ -549,19 +543,17 @@ class TablPuceImpression extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.075)),
-        color: TablTokens.texte.withValues(alpha: 0.022),
+        border: Border.all(color: c.texte.withValues(alpha: 0.075)),
+        color: c.texte.withValues(alpha: 0.022),
       ),
       child: Text(
         texte,
-        style: TextStyle(
-          fontSize: 11.5,
-          color: TablTokens.texte.withValues(alpha: 0.6),
-        ),
+        style: TextStyle(fontSize: 11.5, color: c.texte.withValues(alpha: 0.6)),
       ),
     );
   }
@@ -631,6 +623,7 @@ class TablLigneReactions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Row(
       children: [
         if (bulles.isNotEmpty) ...[
@@ -640,8 +633,8 @@ class TablLigneReactions extends StatelessWidget {
         Flexible(
           child: Text(
             libelle,
-            style: TablTokens.legende.copyWith(
-              color: TablTokens.texteDoux.withValues(alpha: 0.9),
+            style: c.legende.copyWith(
+              color: c.texteDoux.withValues(alpha: 0.9),
             ),
           ),
         ),
@@ -665,14 +658,11 @@ class _ActionIcone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return IconButton(
       onPressed: onPresse,
       tooltip: libelle,
-      icon: Icon(
-        icone,
-        size: 23,
-        color: actif ? TablTokens.primaire : TablTokens.texteDoux,
-      ),
+      icon: Icon(icone, size: 23, color: actif ? c.primaire : c.texteDoux),
     );
   }
 }

@@ -16,10 +16,11 @@ Future<bool> demanderUnAvis(
   required List<ProcheFiche> proches,
 }) async {
   if (proches.isEmpty) return false;
+  final c = TablCouleurs.of(context);
   final envoye = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF111216),
+    backgroundColor: c.surface,
     showDragHandle: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -105,6 +106,7 @@ class _FeuilleDemanderAvisState extends State<_FeuilleDemanderAvis> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final maintenant = DateTime.now();
     final n = widget.proches.length;
     return Padding(
@@ -127,7 +129,7 @@ class _FeuilleDemanderAvisState extends State<_FeuilleDemanderAvis> {
               const SizedBox(height: 6),
               Text(
                 n == 1 ? '1 proche y est allé' : '$n proches y sont allés',
-                style: TablTokens.titreAffichage.copyWith(fontSize: 26),
+                style: c.titreAffichage.copyWith(fontSize: 26),
               ),
               const SizedBox(height: 2),
               Text(
@@ -135,7 +137,7 @@ class _FeuilleDemanderAvisState extends State<_FeuilleDemanderAvis> {
                   widget.nom,
                   if (widget.detail.isNotEmpty) widget.detail,
                 ].join(' · '),
-                style: TablTokens.legende.copyWith(fontSize: 13),
+                style: c.legende.copyWith(fontSize: 13),
               ),
               const SizedBox(height: TablTokens.espaceM),
               for (final p in widget.proches)
@@ -177,16 +179,16 @@ class _FeuilleDemanderAvisState extends State<_FeuilleDemanderAvis> {
               const SizedBox(height: TablTokens.espaceS),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.lock_outline_rounded,
                     size: 13,
-                    color: TablTokens.texteDoux,
+                    color: c.texteDoux,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       'Leur réponse restera privée. Rien ne sera publié.',
-                      style: TablTokens.legende.copyWith(fontSize: 12.5),
+                      style: c.legende.copyWith(fontSize: 12.5),
                     ),
                   ),
                 ],

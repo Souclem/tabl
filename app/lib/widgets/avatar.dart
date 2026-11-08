@@ -18,18 +18,19 @@ class TablAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final initiale = pseudo.isEmpty ? '?' : pseudo[0].toUpperCase();
     final repli = Text(
       initiale,
-      style: TablTokens.legende.copyWith(
+      style: c.legende.copyWith(
         fontSize: rayon * 0.9,
-        color: TablTokens.texteSurPrimaire,
+        color: c.texteSurPrimaire,
         fontWeight: FontWeight.w700,
       ),
     );
     return CircleAvatar(
       radius: rayon,
-      backgroundColor: TablTokens.primaire.withValues(alpha: 0.85),
+      backgroundColor: c.primaire.withValues(alpha: 0.85),
       child: photoUrl == null
           ? repli
           : ClipOval(

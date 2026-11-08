@@ -309,19 +309,22 @@ class _EcranFeedState extends State<EcranFeed>
     final candidats = _candidatsATableMaintenant;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
                 TablTokens.espaceM,
                 TablTokens.espaceS,
                 TablTokens.espaceM,
                 TablTokens.espaceS,
               ),
-              child: Text('À table maintenant', style: TablTokens.sousTitre),
+              child: Text(
+                'À table maintenant',
+                style: TablCouleurs.of(context).sousTitre,
+              ),
             ),
             for (final candidat in candidats)
               TablLigneATableMaintenant(
@@ -430,8 +433,9 @@ class _EcranFeedState extends State<EcranFeed>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           children: [
@@ -447,10 +451,8 @@ class _EcranFeedState extends State<EcranFeed>
                 future: _futurFeed,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: TablTokens.primaire,
-                      ),
+                    return Center(
+                      child: CircularProgressIndicator(color: c.primaire),
                     );
                   }
                   if (snapshot.hasError) {
@@ -463,9 +465,7 @@ class _EcranFeedState extends State<EcranFeed>
                     return Center(
                       child: Text(
                         messageErreurGenerique,
-                        style: TablTokens.corps.copyWith(
-                          color: TablTokens.texteDoux,
-                        ),
+                        style: c.corps.copyWith(color: c.texteDoux),
                       ),
                     );
                   }
@@ -525,6 +525,7 @@ class _BarreSuperieure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL,
@@ -541,7 +542,7 @@ class _BarreSuperieure extends StatelessWidget {
               children: [
                 Text(
                   'Tabl.',
-                  style: TablTokens.titreAffichage.copyWith(
+                  style: c.titreAffichage.copyWith(
                     fontSize: 26,
                     letterSpacing: -0.5,
                     height: 1,
@@ -553,12 +554,12 @@ class _BarreSuperieure extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    foregroundColor: TablTokens.texteDoux,
+                    foregroundColor: c.texteDoux,
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Ces 30 derniers jours', style: TablTokens.legende),
+                      Text('Ces 30 derniers jours', style: c.legende),
                       const SizedBox(width: TablTokens.espaceXs),
                       const Icon(Icons.expand_more_rounded, size: 14),
                     ],
@@ -605,13 +606,14 @@ class _IconeCirculaire extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Material(
-          color: TablTokens.texte.withValues(alpha: 0.03),
+          color: c.texte.withValues(alpha: 0.03),
           shape: CircleBorder(
-            side: BorderSide(color: TablTokens.texte.withValues(alpha: 0.1)),
+            side: BorderSide(color: c.texte.withValues(alpha: 0.1)),
           ),
           clipBehavior: Clip.antiAlias,
           child: SizedBox(
@@ -619,7 +621,7 @@ class _IconeCirculaire extends StatelessWidget {
             height: 38,
             child: IconButton(
               onPressed: onPresse,
-              icon: Icon(icone, size: 19, color: TablTokens.texte),
+              icon: Icon(icone, size: 19, color: c.texte),
               padding: EdgeInsets.zero,
             ),
           ),
@@ -633,8 +635,8 @@ class _IconeCirculaire extends StatelessWidget {
               height: 6,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: TablTokens.primaire,
-                border: Border.all(color: TablTokens.fond, width: 2),
+                color: c.primaire,
+                border: Border.all(color: c.fond, width: 2),
               ),
             ),
           ),
@@ -653,6 +655,7 @@ class _EtatVide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final invitation = Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Column(
@@ -661,14 +664,14 @@ class _EtatVide extends StatelessWidget {
           Text(
             'Votre feed est encore vide.',
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+            style: c.titreAffichage.copyWith(fontSize: 24),
           ),
           const SizedBox(height: TablTokens.espaceM),
           Text(
             "Les bonnes adresses prennent vie lorsqu'elles sont partagées "
             'avec les personnes qui comptent vraiment.',
             textAlign: TextAlign.center,
-            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+            style: c.corps.copyWith(color: c.texteDoux),
           ),
           const SizedBox(height: TablTokens.espaceXl),
           TablBouton(libelle: 'Trouver des personnes', onPresse: onAjouterAmis),
@@ -710,7 +713,9 @@ class _PiedDeFeed extends StatelessWidget {
         children: [
           Text(
             'Vous êtes à jour.',
-            style: TablTokens.titreAffichage.copyWith(fontSize: 20),
+            style: TablCouleurs.of(
+              context,
+            ).titreAffichage.copyWith(fontSize: 20),
           ),
         ],
       ),

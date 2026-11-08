@@ -51,7 +51,9 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
       _erreur = false;
     });
     try {
-      final detail = await widget.tableService.detailProposition(widget.propositionId);
+      final detail = await widget.tableService.detailProposition(
+        widget.propositionId,
+      );
       if (!mounted) return;
       setState(() {
         _detail = detail;
@@ -100,13 +102,16 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   void _toggleJour(DateTime jour) {
     setState(() {
       final existant = _joursEnCoursDeSelection.firstWhere(
-        (d) => d.year == jour.year && d.month == jour.month && d.day == jour.day,
+        (d) =>
+            d.year == jour.year && d.month == jour.month && d.day == jour.day,
         orElse: () => DateTime(0),
       );
       if (existant.year == 0) {
         _joursEnCoursDeSelection = {..._joursEnCoursDeSelection, jour};
       } else {
-        _joursEnCoursDeSelection = _joursEnCoursDeSelection.where((d) => d != existant).toSet();
+        _joursEnCoursDeSelection = _joursEnCoursDeSelection
+            .where((d) => d != existant)
+            .toSet();
       }
     });
   }
@@ -130,25 +135,35 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
     final idsSelectionnes = [
       for (final c in detail.candidats)
         if (_joursEnCoursDeSelection.any(
-          (d) => d.year == c.date.year && d.month == c.date.month && d.day == c.date.day,
+          (d) =>
+              d.year == c.date.year &&
+              d.month == c.date.month &&
+              d.day == c.date.day,
         ))
           c.id,
     ];
-    await widget.tableService.soumettreDisponibilites(widget.propositionId, idsSelectionnes);
+    await widget.tableService.soumettreDisponibilites(
+      widget.propositionId,
+      idsSelectionnes,
+    );
     setState(() => _selectionParticipantOuverte = false);
     await _charger();
   }
 
-  Future<void> _confirmer(String dateCandidateId, {required bool avecAbsents}) async {
+  Future<void> _confirmer(
+    String dateCandidateId, {
+    required bool avecAbsents,
+  }) async {
+    final c = TablCouleurs.of(context);
     if (avecAbsents) {
       final confirme = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          backgroundColor: TablTokens.surface,
-          title: const Text('Confirmer quand même ?', style: TablTokens.sousTitre),
-          content: const Text(
+          backgroundColor: c.surface,
+          title: Text('Confirmer quand même ?', style: c.sousTitre),
+          content: Text(
             'Certains participants ne pourront pas être présents ce jour-là.',
-            style: TablTokens.corps,
+            style: c.corps,
           ),
           actions: [
             TextButton(
@@ -158,8 +173,8 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: TablTokens.primaire,
-                foregroundColor: TablTokens.texteSurPrimaire,
+                backgroundColor: c.primaire,
+                foregroundColor: c.texteSurPrimaire,
               ),
               child: const Text('Confirmer quand même'),
             ),
@@ -194,7 +209,8 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   Future<void> _replanifier() async {
     final confirme = await _confirmerAction(
       titre: 'Replanifier ?',
-      message: 'La date confirmée sera retirée et un nouveau sondage de dates commencera.',
+      message:
+          'La date confirmée sera retirée et un nouveau sondage de dates commencera.',
       libelleAction: 'Replanifier',
     );
     if (!confirme) return;
@@ -218,12 +234,13 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
     required String message,
     required String libelleAction,
   }) async {
+    final c = TablCouleurs.of(context);
     final confirme = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: TablTokens.surface,
-        title: Text(titre, style: TablTokens.sousTitre),
-        content: Text(message, style: TablTokens.corps),
+        backgroundColor: c.surface,
+        title: Text(titre, style: c.sousTitre),
+        content: Text(message, style: c.corps),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -232,8 +249,8 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: TablTokens.primaire,
-              foregroundColor: TablTokens.texteSurPrimaire,
+              backgroundColor: c.primaire,
+              foregroundColor: c.texteSurPrimaire,
             ),
             child: Text(libelleAction),
           ),
@@ -256,16 +273,17 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     if (_chargement) {
-      return const Scaffold(
-        backgroundColor: TablTokens.fond,
-        body: Center(child: CircularProgressIndicator(color: TablTokens.primaire)),
+      return Scaffold(
+        backgroundColor: c.fond,
+        body: Center(child: CircularProgressIndicator(color: c.primaire)),
       );
     }
     final detail = _detail;
     if (_erreur || detail == null) {
       return Scaffold(
-        backgroundColor: TablTokens.fond,
+        backgroundColor: c.fond,
         body: SafeArea(
           child: Column(
             children: [
@@ -275,9 +293,15 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Cette proposition n\'est plus disponible.', style: TablTokens.corps),
+                      Text(
+                        'Cette proposition n\'est plus disponible.',
+                        style: c.corps,
+                      ),
                       const SizedBox(height: TablTokens.espaceM),
-                      OutlinedButton(onPressed: _charger, child: const Text('Réessayer')),
+                      OutlinedButton(
+                        onPressed: _charger,
+                        child: const Text('Réessayer'),
+                      ),
                     ],
                   ),
                 ),
@@ -289,7 +313,7 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
     }
 
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -304,10 +328,10 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
                   TablTokens.espaceL,
                 ),
                 children: [
-                  Text(detail.restaurantNom, style: TablTokens.titre),
+                  Text(detail.restaurantNom, style: c.titre),
                   Text(
                     '${detail.ville} · Proposé par ${detail.proposePar}',
-                    style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                    style: c.legende.copyWith(color: c.texteDoux),
                   ),
                   const SizedBox(height: TablTokens.espaceM),
                   ..._corpsSelonEtat(detail),
@@ -328,13 +352,18 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
         TablTokens.espaceM,
         0,
       ),
-      child: Row(children: [TablBoutonRetour(onPresse: () => Navigator.of(context).pop())]),
+      child: Row(
+        children: [
+          TablBoutonRetour(onPresse: () => Navigator.of(context).pop()),
+        ],
+      ),
     );
   }
 
   List<Widget> _corpsSelonEtat(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     if (!detail.active) {
-      return [Text(detail.etatTexte, style: TablTokens.corps)];
+      return [Text(detail.etatTexte, style: c.corps)];
     }
 
     final blocs = <Widget>[];
@@ -345,7 +374,7 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
     }
 
     if (detail.nombreGo == 0) {
-      blocs.add(const Text('En attente de premières réponses.', style: TablTokens.corps));
+      blocs.add(Text('En attente de premières réponses.', style: c.corps));
       return blocs;
     }
 
@@ -357,7 +386,9 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
       blocs.addAll(_blocSondageEnCours(detail));
     }
 
-    if (detail.nombreGo >= 2 && detail.peutAccederChat && !detail.chatArchive()) {
+    if (detail.nombreGo >= 2 &&
+        detail.peutAccederChat &&
+        !detail.chatArchive()) {
       blocs.add(const SizedBox(height: TablTokens.espaceM));
       blocs.addAll(_blocOrganisationApercu(detail));
     }
@@ -366,6 +397,7 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   List<Widget> _blocGoPasse(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     return [
       Row(
         children: [
@@ -373,12 +405,12 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
             child: OutlinedButton(
               onPressed: () => _repondre(true),
               style: OutlinedButton.styleFrom(
-                backgroundColor: detail.monInteret == true ? TablTokens.primaire : null,
+                backgroundColor: detail.monInteret == true ? c.primaire : null,
                 foregroundColor: detail.monInteret == true
-                    ? TablTokens.texteSurPrimaire
-                    : TablTokens.texte,
+                    ? c.texteSurPrimaire
+                    : c.texte,
                 side: BorderSide(
-                  color: detail.monInteret == true ? TablTokens.primaire : TablTokens.bordure,
+                  color: detail.monInteret == true ? c.primaire : c.bordure,
                 ),
               ),
               child: const Text('GO'),
@@ -389,12 +421,12 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
             child: OutlinedButton(
               onPressed: () => _repondre(false),
               style: OutlinedButton.styleFrom(
-                backgroundColor: detail.monInteret == false ? TablTokens.primaire : null,
+                backgroundColor: detail.monInteret == false ? c.primaire : null,
                 foregroundColor: detail.monInteret == false
-                    ? TablTokens.texteSurPrimaire
-                    : TablTokens.texte,
+                    ? c.texteSurPrimaire
+                    : c.texte,
                 side: BorderSide(
-                  color: detail.monInteret == false ? TablTokens.primaire : TablTokens.bordure,
+                  color: detail.monInteret == false ? c.primaire : c.bordure,
                 ),
               ),
               child: const Text('Je passe'),
@@ -407,16 +439,23 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   List<Widget> _blocAvantDates(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     if (detail.parMoi) {
       return [
         if (_selectionCreatorOuverte)
           ..._selecteurCreator()
         else
-          TablBouton(libelle: 'Proposer des dates', onPresse: _ouvrirSelecteurCreator),
+          TablBouton(
+            libelle: 'Proposer des dates',
+            onPresse: _ouvrirSelecteurCreator,
+          ),
       ];
     }
     return [
-      Text('En attente de dates de la part de ${detail.proposePar}.', style: TablTokens.corps),
+      Text(
+        'En attente de dates de la part de ${detail.proposePar}.',
+        style: c.corps,
+      ),
     ];
   }
 
@@ -428,10 +467,16 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
         joursDesactives: const {},
         onToggleJour: _toggleJour,
         onMoisPrecedent: () => setState(
-          () => _moisAffiche = DateTime(_moisAffiche.year, _moisAffiche.month - 1),
+          () => _moisAffiche = DateTime(
+            _moisAffiche.year,
+            _moisAffiche.month - 1,
+          ),
         ),
         onMoisSuivant: () => setState(
-          () => _moisAffiche = DateTime(_moisAffiche.year, _moisAffiche.month + 1),
+          () => _moisAffiche = DateTime(
+            _moisAffiche.year,
+            _moisAffiche.month + 1,
+          ),
         ),
       ),
       const SizedBox(height: TablTokens.espaceM),
@@ -440,10 +485,11 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   List<Widget> _blocSondageEnCours(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     final blocs = <Widget>[
       Text(
         '${detail.progressionSoumis}/${detail.progressionEligibles} ont répondu',
-        style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+        style: c.legende.copyWith(color: c.texteDoux),
       ),
       const SizedBox(height: TablTokens.espaceS),
     ];
@@ -465,11 +511,14 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
     }
 
     if (detail.toutesLesDatesSontPassees) {
-      blocs.add(const Text('Ces dates sont passées.', style: TablTokens.corps));
+      blocs.add(Text('Ces dates sont passées.', style: c.corps));
       if (detail.parMoi) {
         blocs.add(const SizedBox(height: TablTokens.espaceS));
         blocs.add(
-          TablBouton(libelle: 'Proposer de nouvelles dates', onPresse: _ouvrirSelecteurCreator),
+          TablBouton(
+            libelle: 'Proposer de nouvelles dates',
+            onPresse: _ouvrirSelecteurCreator,
+          ),
         );
       }
       return blocs;
@@ -482,7 +531,7 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
           communes.length == 1
               ? 'Une date convient à tout le monde.'
               : '${communes.length} dates conviennent à tout le monde.',
-          style: TablTokens.corps,
+          style: c.corps,
         ),
       );
       blocs.add(const SizedBox(height: TablTokens.espaceS));
@@ -493,27 +542,32 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
         blocs.add(
           Text(
             'En attente de confirmation de ${detail.proposePar}.',
-            style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+            style: c.legende.copyWith(color: c.texteDoux),
           ),
         );
       }
     } else {
-      blocs.add(const Text('Aucune date ne convient à tout le monde.', style: TablTokens.corps));
+      blocs.add(
+        Text('Aucune date ne convient à tout le monde.', style: c.corps),
+      );
       if (detail.parMoi) {
         blocs.add(const SizedBox(height: TablTokens.espaceS));
-        blocs.add(const Text('Meilleurs compromis', style: TablTokens.sousTitre));
-        for (final c in detail.meilleursCompromis) {
-          blocs.add(_ligneResultat(c, detail, compromis: true));
+        blocs.add(Text('Meilleurs compromis', style: c.sousTitre));
+        for (final candidat in detail.meilleursCompromis) {
+          blocs.add(_ligneResultat(candidat, detail, compromis: true));
         }
         blocs.add(const SizedBox(height: TablTokens.espaceS));
         blocs.add(
-          TablBoutonTexte(libelle: 'Proposer d\'autres dates', onPresse: _ouvrirSelecteurCreator),
+          TablBoutonTexte(
+            libelle: 'Proposer d\'autres dates',
+            onPresse: _ouvrirSelecteurCreator,
+          ),
         );
       } else {
         blocs.add(
           Text(
             '${detail.proposePar} peut proposer de nouvelles dates.',
-            style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+            style: c.legende.copyWith(color: c.texteDoux),
           ),
         );
       }
@@ -522,24 +576,25 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   Widget _ligneResultat(
-    CandidatDateProposition c,
+    CandidatDateProposition candidat,
     DetailProposition detail, {
     required bool compromis,
   }) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXs),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              '${_dateLisible(c.date)} · ${c.disponibles}/${c.eligibles}',
-              style: TablTokens.corps,
+              '${_dateLisible(candidat.date)} · ${candidat.disponibles}/${candidat.eligibles}',
+              style: c.corps,
             ),
           ),
           if (detail.parMoi)
             TablBoutonTexte(
               libelle: compromis ? 'Confirmer quand même' : 'Confirmer',
-              onPresse: () => _confirmer(c.id, avecAbsents: compromis),
+              onPresse: () => _confirmer(candidat.id, avecAbsents: compromis),
             ),
         ],
       ),
@@ -547,11 +602,12 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   List<Widget> _selecteurParticipant() {
+    final c = TablCouleurs.of(context);
     return [
-      const Text('Vos disponibilités', style: TablTokens.sousTitre),
-      const Text(
+      Text('Vos disponibilités', style: c.sousTitre),
+      Text(
         'Sélectionnez tous les jours où vous êtes disponible.',
-        style: TablTokens.legende,
+        style: c.legende,
       ),
       const SizedBox(height: TablTokens.espaceS),
       TablCalendrierJours(
@@ -563,35 +619,49 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
         },
         onToggleJour: _toggleJour,
         onMoisPrecedent: () => setState(
-          () => _moisAffiche = DateTime(_moisAffiche.year, _moisAffiche.month - 1),
+          () => _moisAffiche = DateTime(
+            _moisAffiche.year,
+            _moisAffiche.month - 1,
+          ),
         ),
         onMoisSuivant: () => setState(
-          () => _moisAffiche = DateTime(_moisAffiche.year, _moisAffiche.month + 1),
+          () => _moisAffiche = DateTime(
+            _moisAffiche.year,
+            _moisAffiche.month + 1,
+          ),
         ),
       ),
       const SizedBox(height: TablTokens.espaceM),
-      TablBouton(libelle: 'Envoyer mes disponibilités', onPresse: _validerDisponibilites),
+      TablBouton(
+        libelle: 'Envoyer mes disponibilités',
+        onPresse: _validerDisponibilites,
+      ),
     ];
   }
 
   List<Widget> _blocConfirme(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     final confirmation = detail.confirmation!;
     final texte = confirmation.heure == null
         ? 'Prévu ${_dateLisible(confirmation.date)}'
         : 'Prévu ${_dateLisible(confirmation.date)} à ${confirmation.heure}';
     return [
-      Text(texte, style: TablTokens.corps),
+      Text(texte, style: c.corps),
       if (confirmation.heure == null) ...[
-        const Text('Heure à confirmer', style: TablTokens.legende),
+        Text('Heure à confirmer', style: c.legende),
         if (detail.parMoi) ...[
           const SizedBox(height: TablTokens.espaceXs),
-          TablBoutonTexte(libelle: 'Ajouter une heure', onPresse: _ajouterHeure),
+          TablBoutonTexte(
+            libelle: 'Ajouter une heure',
+            onPresse: _ajouterHeure,
+          ),
         ],
       ],
       const SizedBox(height: TablTokens.espaceS),
       TablBoutonTexte(
         libelle: 'Ajouter au calendrier',
-        onPresse: () => afficherMessage(context, 'Ajout au calendrier bientôt disponible.'),
+        onPresse: () =>
+            afficherMessage(context, 'Ajout au calendrier bientôt disponible.'),
       ),
       if (detail.parMoi) ...[
         const SizedBox(height: TablTokens.espaceS),
@@ -607,8 +677,9 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   }
 
   List<Widget> _blocOrganisationApercu(DetailProposition detail) {
+    final c = TablCouleurs.of(context);
     return [
-      const Divider(color: TablTokens.bordure),
+      Divider(color: c.bordure),
       const SizedBox(height: TablTokens.espaceS),
       Row(
         children: [
@@ -617,7 +688,7 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
               detail.nombreMessages == 0
                   ? 'Organisation'
                   : 'Organisation · ${detail.nombreMessages} message${detail.nombreMessages > 1 ? "s" : ""}',
-              style: TablTokens.sousTitre,
+              style: c.sousTitre,
             ),
           ),
           TablBoutonTexte(libelle: 'Discuter', onPresse: _ouvrirOrganisation),
@@ -629,8 +700,18 @@ class _EcranPropositionTableState extends State<EcranPropositionTable> {
   String _dateLisible(DateTime date) {
     const jours = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
     const mois = [
-      'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
-      'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
     ];
     return '${jours[date.weekday - 1]} ${date.day} ${mois[date.month - 1]}';
   }

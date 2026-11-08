@@ -19,11 +19,12 @@ class TablLienBasDePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Wrap(
       alignment: WrapAlignment.center,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(question, style: TablTokens.legende),
+        Text(question, style: c.legende),
         TablBoutonTexte(libelle: libelleAction, onPresse: onAction),
       ],
     );

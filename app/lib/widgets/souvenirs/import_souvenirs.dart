@@ -18,17 +18,18 @@ class TablEtapesImport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: TablTokens.espaceM),
       decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
+        color: c.surfaceBasse,
         borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.1)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
           for (var i = 0; i < etapes.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: TablTokens.surface),
+            if (i > 0) Divider(height: 1, color: c.surface),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
               child: Row(
@@ -39,14 +40,10 @@ class TablEtapesImport extends StatelessWidget {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: TablTokens.surface,
-                      border: Border.all(color: TablTokens.bordure),
+                      color: c.surface,
+                      border: Border.all(color: c.bordure),
                     ),
-                    child: Icon(
-                      etapes[i].icone,
-                      size: 20,
-                      color: TablTokens.texte,
-                    ),
+                    child: Icon(etapes[i].icone, size: 20, color: c.texte),
                   ),
                   const SizedBox(width: TablTokens.espaceM - 2),
                   Expanded(
@@ -55,16 +52,16 @@ class TablEtapesImport extends StatelessWidget {
                       children: [
                         Text(
                           etapes[i].titre,
-                          style: TablTokens.corps.copyWith(
+                          style: c.corps.copyWith(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: TablTokens.texte,
+                            color: c.texte,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           etapes[i].texte,
-                          style: TablTokens.legende.copyWith(fontSize: 13),
+                          style: c.legende.copyWith(fontSize: 13),
                         ),
                       ],
                     ),
@@ -125,15 +122,16 @@ class TablCarteRepas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 250),
       opacity: ajoute ? 0.6 : 1,
       child: Container(
         padding: const EdgeInsets.all(TablTokens.espaceM),
         decoration: BoxDecoration(
-          color: TablTokens.surfaceBasse,
+          color: c.surfaceBasse,
           borderRadius: BorderRadius.circular(TablTokens.arrondiL),
-          border: Border.all(color: TablTokens.texte.withValues(alpha: 0.1)),
+          border: Border.all(color: c.texte.withValues(alpha: 0.1)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -143,28 +141,24 @@ class TablCarteRepas extends StatelessWidget {
                 Expanded(
                   child: Text(
                     quand.toUpperCase(),
-                    style: TablTokens.legende.copyWith(
+                    style: c.legende.copyWith(
                       fontSize: 11,
                       letterSpacing: 1.4,
                       fontWeight: FontWeight.w600,
-                      color: TablTokens.texte.withValues(alpha: 0.85),
+                      color: c.texte.withValues(alpha: 0.85),
                     ),
                   ),
                 ),
                 if (ajoute)
                   Row(
                     children: [
-                      const Icon(
-                        Icons.check_rounded,
-                        size: 16,
-                        color: TablTokens.primaire,
-                      ),
+                      Icon(Icons.check_rounded, size: 16, color: c.primaire),
                       const SizedBox(width: 4),
                       Text(
                         'Ajouté',
-                        style: TablTokens.legende.copyWith(
+                        style: c.legende.copyWith(
                           fontSize: 12,
-                          color: TablTokens.primaire,
+                          color: c.primaire,
                         ),
                       ),
                     ],
@@ -201,7 +195,7 @@ class TablCarteRepas extends StatelessWidget {
             ),
             if (mention != null) ...[
               const SizedBox(height: 6),
-              Text(mention!, style: TablTokens.legende.copyWith(fontSize: 12)),
+              Text(mention!, style: c.legende.copyWith(fontSize: 12)),
             ],
             const SizedBox(height: TablTokens.espaceM - 4),
             Semantics(
@@ -214,12 +208,10 @@ class TablCarteRepas extends StatelessWidget {
                   children: [
                     Text(
                       nomLieu ?? 'Quel restaurant ?',
-                      style: TablTokens.titreAffichage.copyWith(
+                      style: c.titreAffichage.copyWith(
                         fontSize: 22,
                         height: 1.15,
-                        color: nomLieu == null
-                            ? TablTokens.texteDoux
-                            : TablTokens.texte,
+                        color: nomLieu == null ? c.texteDoux : c.texte,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -231,7 +223,7 @@ class TablCarteRepas extends StatelessWidget {
                               detailLieu!,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TablTokens.legende.copyWith(fontSize: 13),
+                              style: c.legende.copyWith(fontSize: 13),
                             ),
                           ),
                           const SizedBox(width: TablTokens.espaceS),
@@ -239,10 +231,10 @@ class TablCarteRepas extends StatelessWidget {
                         if (!ajoute)
                           Text(
                             nomLieu == null ? 'Choisir' : 'Changer',
-                            style: TablTokens.legende.copyWith(
+                            style: c.legende.copyWith(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: TablTokens.primaire,
+                              color: c.primaire,
                             ),
                           ),
                       ],
@@ -287,22 +279,23 @@ class TablBilanImport extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final c in chiffres)
+            for (final chiffre in chiffres)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      c.nombre,
-                      style: TablTokens.titreAffichage.copyWith(fontSize: 44),
+                      chiffre.nombre,
+                      style: c.titreAffichage.copyWith(fontSize: 44),
                     ),
-                    Text(c.libelle, style: TablTokens.legende),
+                    Text(chiffre.libelle, style: c.legende),
                   ],
                 ),
               ),
@@ -310,18 +303,15 @@ class TablBilanImport extends StatelessWidget {
         ),
         if (periode != null) ...[
           const SizedBox(height: TablTokens.espaceL),
-          const Divider(height: 1, color: TablTokens.surface),
+          Divider(height: 1, color: c.surface),
           const SizedBox(height: TablTokens.espaceM),
           Row(
             children: [
-              Text('Période couverte', style: TablTokens.legende),
+              Text('Période couverte', style: c.legende),
               const Spacer(),
               Text(
                 periode!,
-                style: TablTokens.corps.copyWith(
-                  fontSize: 14,
-                  color: TablTokens.texte,
-                ),
+                style: c.corps.copyWith(fontSize: 14, color: c.texte),
               ),
             ],
           ),

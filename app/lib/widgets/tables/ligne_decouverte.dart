@@ -26,6 +26,7 @@ class TablLigneDecouverte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceM),
       child: Column(
@@ -37,10 +38,10 @@ class TablLigneDecouverte extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(restaurantNom, style: TablTokens.corps),
+                    Text(restaurantNom, style: c.corps),
                     Text(
                       sousTitreLieu,
-                      style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+                      style: c.legende.copyWith(color: c.texteDoux),
                     ),
                   ],
                 ),
@@ -49,16 +50,15 @@ class TablLigneDecouverte extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          Text(connaisseursTexte, style: TablTokens.legende),
+          Text(connaisseursTexte, style: c.legende),
           const SizedBox(height: TablTokens.espaceS),
           Row(
             children: [
               OutlinedButton(
                 onPressed: () => onBasculerGarder(!dejaGarde),
                 style: OutlinedButton.styleFrom(
-                  backgroundColor: dejaGarde ? TablTokens.primaire : null,
-                  foregroundColor:
-                      dejaGarde ? TablTokens.texteSurPrimaire : TablTokens.texte,
+                  backgroundColor: dejaGarde ? c.primaire : null,
+                  foregroundColor: dejaGarde ? c.texteSurPrimaire : c.texte,
                 ),
                 child: Text(dejaGarde ? 'Gardé ✓' : 'Garder'),
               ),

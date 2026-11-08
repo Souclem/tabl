@@ -26,23 +26,24 @@ class TablSegmentModeCarte extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: TablTokens.surface,
+        color: c.surface,
         borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-        border: Border.all(color: TablTokens.bordure),
+        border: Border.all(color: c.bordure),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          for (var i = 0; i < options.length; i++) _segment(options[i], i),
+          for (var i = 0; i < options.length; i++) _segment(c, options[i], i),
         ],
       ),
     );
   }
 
-  Widget _segment(String libelle, int index) {
+  Widget _segment(TablCouleurs c, String libelle, int index) {
     final actif = index == selectionne;
     return Semantics(
       label: libelle,
@@ -58,14 +59,14 @@ class TablSegmentModeCarte extends StatelessWidget {
             vertical: TablTokens.espaceS,
           ),
           decoration: BoxDecoration(
-            color: actif ? TablTokens.primaire : Colors.transparent,
+            color: actif ? c.primaire : Colors.transparent,
             borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
           ),
           child: Text(
             libelle,
-            style: TablTokens.legende.copyWith(
+            style: c.legende.copyWith(
               fontWeight: FontWeight.w600,
-              color: actif ? TablTokens.texteSurPrimaire : TablTokens.texteDoux,
+              color: actif ? c.texteSurPrimaire : c.texteDoux,
             ),
           ),
         ),

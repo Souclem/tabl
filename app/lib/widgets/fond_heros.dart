@@ -18,16 +18,13 @@ class TablFondHeros extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            TablTokens.primaireFoncee.withValues(alpha: 0.35),
-            TablTokens.fond,
-            TablTokens.fond,
-          ],
+          colors: [c.primaireFoncee.withValues(alpha: 0.35), c.fond, c.fond],
           stops: const [0, 0.55, 1],
         ),
       ),

@@ -195,10 +195,11 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
     final visibles = profil != null && profil.publicationsVisibles;
     final duo = _duo;
     final pseudo = profil?.pseudo ?? widget.pseudo;
+    final c = TablCouleurs.of(context);
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: RefreshIndicator(
-        color: TablTokens.primaire,
+        color: c.primaire,
         edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
         onRefresh: _charger,
         child: CustomScrollView(
@@ -257,13 +258,11 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
               ),
             ),
             if (_chargement && profil == null)
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.all(TablTokens.espaceXl),
+                  padding: const EdgeInsets.all(TablTokens.espaceXl),
                   child: Center(
-                    child: CircularProgressIndicator(
-                      color: TablTokens.primaire,
-                    ),
+                    child: CircularProgressIndicator(color: c.primaire),
                   ),
                 ),
               )
@@ -310,14 +309,15 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
 
   Widget _boutonSuivi(ProfilVisite profil) {
     final enCours = _actionEnCours;
+    final c = TablCouleurs.of(context);
     switch (profil.statut) {
       case StatutAbonnement.aucun:
       case StatutAbonnement.demandeRecue:
         return FilledButton(
           onPressed: enCours ? null : () => _suivre(profil),
           style: FilledButton.styleFrom(
-            backgroundColor: TablTokens.primaire,
-            foregroundColor: TablTokens.texteSurPrimaire,
+            backgroundColor: c.primaire,
+            foregroundColor: c.texteSurPrimaire,
           ),
           child: Text(profil.meSuit ? 'Suivre en retour' : 'Suivre'),
         );
@@ -329,11 +329,7 @@ class _EcranProfilAutreState extends State<EcranProfilAutre>
       case StatutAbonnement.abonne:
         return OutlinedButton.icon(
           onPressed: enCours ? null : () => _nePlusSuivre(profil),
-          icon: const Icon(
-            Icons.check_rounded,
-            size: 18,
-            color: TablTokens.primaire,
-          ),
+          icon: Icon(Icons.check_rounded, size: 18, color: c.primaire),
           label: const Text('Abonné'),
         );
     }
@@ -348,22 +344,19 @@ class _ProfilPrive extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Column(
         children: [
-          const Icon(
-            Icons.lock_outline_rounded,
-            size: 32,
-            color: TablTokens.texteDoux,
-          ),
+          Icon(Icons.lock_outline_rounded, size: 32, color: c.texteDoux),
           const SizedBox(height: TablTokens.espaceM),
-          const Text('Ce profil est privé', style: TablTokens.sousTitre),
+          Text('Ce profil est privé', style: c.sousTitre),
           const SizedBox(height: TablTokens.espaceXs),
           Text(
             'Suivez $pseudo pour voir ses moments.',
             textAlign: TextAlign.center,
-            style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+            style: c.corps.copyWith(color: c.texteDoux),
           ),
         ],
       ),
@@ -378,12 +371,13 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Text(
         texte,
         textAlign: TextAlign.center,
-        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+        style: c.corps.copyWith(color: c.texteDoux),
       ),
     );
   }

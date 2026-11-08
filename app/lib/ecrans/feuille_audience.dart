@@ -20,10 +20,11 @@ Future<AudienceSouvenir?> ouvrirFeuilleAudience(
   Future<DonneesAudience>? donnees,
   Set<String> amisTaguesIds = const {},
 }) {
+  final c = TablCouleurs.of(context);
   return showModalBottomSheet<AudienceSouvenir>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: TablTokens.surface,
+    backgroundColor: c.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(
         top: Radius.circular(TablTokens.arrondiL),
@@ -150,11 +151,11 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
               }
               final donnees = snapshot.data;
               if (donnees == null) {
-                return const Padding(
-                  padding: EdgeInsets.all(TablTokens.espaceXl),
+                return Padding(
+                  padding: const EdgeInsets.all(TablTokens.espaceXl),
                   child: Center(
                     child: CircularProgressIndicator(
-                      color: TablTokens.primaire,
+                      color: TablCouleurs.of(context).primaire,
                     ),
                   ),
                 );
@@ -168,6 +169,7 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
   }
 
   Widget _contenu(DonneesAudience donnees) {
+    final c = TablCouleurs.of(context);
     final contexte = donnees.contexte;
     final pseudos = {for (final r in donnees.relations) r.id: r.pseudo};
     final horsAudience = contexte.taguesHorsAudience(
@@ -192,13 +194,13 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: TablTokens.bordure,
+                color: c.bordure,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: TablTokens.espaceM),
-          Text('Qui peut voir ce moment ?', style: TablTokens.titre),
+          Text('Qui peut voir ce moment ?', style: c.titre),
           const SizedBox(height: TablTokens.espaceM),
           TablOptionAudience(
             titre: 'Tout le monde',
@@ -260,7 +262,7 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
           Text(
             contexte.libellePortee(_audience),
             textAlign: TextAlign.center,
-            style: TablTokens.legende.copyWith(color: TablTokens.texteDoux),
+            style: c.legende,
           ),
           const SizedBox(height: TablTokens.espaceM),
           TablBouton(
@@ -277,10 +279,11 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
   /// Recherche + pastilles : les personnes déjà choisies restent
   /// toujours visibles, les autres sont filtrées par la recherche.
   Widget _choixPersonnes(List<ProfilPublic> relations) {
+    final c = TablCouleurs.of(context);
     if (relations.isEmpty) {
       return Text(
         'Personne pour l\'instant — suivez des gens pour les choisir ici.',
-        style: TablTokens.legende,
+        style: c.legende,
       );
     }
     final filtre = _recherche.text.trim().toLowerCase();
@@ -297,13 +300,13 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
           TextField(
             controller: _recherche,
             onChanged: (_) => setState(() {}),
-            style: TablTokens.corps,
+            style: c.corps,
             decoration: InputDecoration(
               isDense: true,
               hintText: 'Rechercher…',
               prefixIcon: const Icon(Icons.search_rounded, size: 18),
               filled: true,
-              fillColor: TablTokens.fond,
+              fillColor: c.fond,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(TablTokens.arrondiM),
                 borderSide: BorderSide.none,
@@ -336,11 +339,12 @@ class _Rubrique extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: TablTokens.espaceS),
       child: Text(
         texte.toUpperCase(),
-        style: TablTokens.legende.copyWith(
+        style: c.legende.copyWith(
           fontSize: 11,
           letterSpacing: 0.8,
           fontWeight: FontWeight.w600,
@@ -358,20 +362,17 @@ class _AvertissementTague extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: TablTokens.espaceS),
       child: Row(
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            size: 16,
-            color: TablTokens.primaire,
-          ),
+          Icon(Icons.info_outline_rounded, size: 16, color: c.primaire),
           const SizedBox(width: TablTokens.espaceS),
           Expanded(
             child: Text(
               '$pseudo était avec vous mais ne verra pas ce moment.',
-              style: TablTokens.legende.copyWith(color: TablTokens.texte),
+              style: c.legende.copyWith(color: c.texte),
             ),
           ),
           if (onAjouter != null)
@@ -389,12 +390,13 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceXl),
       child: Text(
         texte,
         textAlign: TextAlign.center,
-        style: TablTokens.corps.copyWith(color: TablTokens.texteDoux),
+        style: c.corps.copyWith(color: c.texteDoux),
       ),
     );
   }

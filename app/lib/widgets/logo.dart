@@ -19,13 +19,10 @@ class TablLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final style = grand
-        ? TablTokens.logo.copyWith(
-            fontSize: 48,
-            letterSpacing: 0.5,
-            color: TablTokens.texte,
-          )
-        : TablTokens.logo.copyWith(color: TablTokens.texte);
+        ? c.logo.copyWith(fontSize: 48, letterSpacing: 0.5, color: c.texte)
+        : c.logo.copyWith(color: c.texte);
 
     return Text.rich(
       TextSpan(
@@ -34,7 +31,7 @@ class TablLogo extends StatelessWidget {
           const TextSpan(text: 'tabl'),
           TextSpan(
             text: '.',
-            style: TextStyle(color: TablTokens.primaire),
+            style: TextStyle(color: c.primaire),
           ),
         ],
       ),

@@ -27,25 +27,26 @@ class TablCommentairesMoment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final fils = this.fils;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(titre, style: TablTokens.sousTitre),
+        Text(titre, style: c.sousTitre),
         const SizedBox(height: TablTokens.espaceM),
         AnimatedSize(
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
           child: fils == null
-              ? const SizedBox(
+              ? SizedBox(
                   height: 48,
                   child: Center(
                     child: SizedBox.square(
                       dimension: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: TablTokens.primaire,
+                        color: c.primaire,
                       ),
                     ),
                   ),

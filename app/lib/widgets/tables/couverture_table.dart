@@ -26,7 +26,7 @@ class TablCouvertureTable extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(arrondi),
       child: switch (urls.length) {
-        0 => _fallback(),
+        0 => _fallback(context),
         1 => _photo(urls[0]),
         2 => _split(urls, const [0.5, 0.5]),
         3 => _troisPhotos(urls),
@@ -35,14 +35,12 @@ class TablCouvertureTable extends StatelessWidget {
     );
   }
 
-  Widget _fallback() {
+  Widget _fallback(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
-      color: TablTokens.surface,
+      color: c.surface,
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.table_restaurant_outlined,
-        color: TablTokens.texteDoux,
-      ),
+      child: Icon(Icons.table_restaurant_outlined, color: c.texteDoux),
     );
   }
 
@@ -50,7 +48,7 @@ class TablCouvertureTable extends StatelessWidget {
     return Image.network(
       url,
       fit: BoxFit.cover,
-      errorBuilder: (context, error, stack) => _fallback(),
+      errorBuilder: (context, error, stack) => _fallback(context),
     );
   }
 

@@ -33,6 +33,7 @@ class TablLignePersonne extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return InkWell(
       onTap: onPresse,
       child: Padding(
@@ -53,7 +54,7 @@ class TablLignePersonne extends StatelessWidget {
                     pseudo,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TablTokens.corps.copyWith(
+                    style: c.corps.copyWith(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -64,7 +65,7 @@ class TablLignePersonne extends StatelessWidget {
                       precision!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TablTokens.legende.copyWith(fontSize: 12.5),
+                      style: c.legende.copyWith(fontSize: 12.5),
                     ),
                   ],
                 ],

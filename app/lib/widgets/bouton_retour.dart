@@ -13,17 +13,18 @@ class TablBoutonRetour extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Material(
       // Fond opaque, pas transparent : ce bouton flotte au-dessus d'un
       // contenu qui peut défiler dessous (formulaire) — un fond transparent
       // laisserait voir ce contenu à travers, façon collision visuelle.
-      color: TablTokens.fond,
-      shape: const CircleBorder(side: BorderSide(color: TablTokens.bordure)),
+      color: c.fond,
+      shape: CircleBorder(side: BorderSide(color: c.bordure)),
       clipBehavior: Clip.antiAlias,
       child: IconButton(
         onPressed: onPresse,
         icon: const Icon(Icons.arrow_back_rounded, size: 20),
-        color: TablTokens.texte,
+        color: c.texte,
         splashRadius: 22,
       ),
     );

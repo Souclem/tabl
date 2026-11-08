@@ -104,9 +104,11 @@ sont dans `docs/regles.md`.
   valable partout dans le monde) ; de près, chaque resto.
 - **Explorer = la maquette « Carnet »** : grille de tuiles + barre flottante
   + recherche + thème clair et sombre (réglage Apparence
-  Automatique/Clair/Sombre ; seul l'Explorer le suit pour l'instant). Les
-  modes Envies et Le cercle ont été supprimés. Filtres : feuille papier
-  claire, une ligne par filtre, une seule ouverte, compte en direct
+  Automatique/Clair/Sombre ; le thème de l'app le suit, écran par écran :
+  fait pour le Feed et l'Explorer, le reste est en cours de migration, voir
+  « Apparence » ci-dessous). Les
+  modes Envies et Le cercle ont été supprimés. Filtres : feuille (papier
+  en clair), une ligne par filtre, une seule ouverte, compte en direct
   (« Voir N adresses »). Tri : menu « Trié par » avec descriptions.
 - **Recherche** : la pilule glisse vers le haut (jamais de téléportation) ;
   on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox),
@@ -162,3 +164,25 @@ Un filtre « lieux où l'on mange » a été codé puis **mis en pause** (« pou
 l'instant on garde tout ») ; rien n'a été appliqué à la base. Pour le
 reprendre : `git revert dfd6712`. Exigence : des règles valables pour le
 monde entier, jamais de liste d'exclusion à la main.
+
+## Apparence (clair / sombre)
+
+- Le réglage Apparence pilote le thème de toute l'app (`TablTheme.clair()`,
+  `TablTheme.sombre()`, `themeMode`). Le clair de tous les écrans reprend la
+  palette de l'Explorer (fond de lin, braise, ivoire, encre).
+- La Constellation reste TOUJOURS de nuit, quel que soit le réglage.
+- Connexion, inscription et accueil suivent aussi le réglage.
+- Un écran lit ses couleurs par `TablCouleurs.of(context)` (dans
+  `theme/tokens.dart`), jamais par `TablTokens.fond` & co, qui sont les
+  couleurs du sombre seul. Un écran qui lit encore `TablTokens.<couleur>`
+  est illisible en clair tant qu'il n'est pas migré.
+- L'Explorer a sa propre palette (`PaletteExplorer`) et son thème la suit
+  (clair avec elle, sombre dans la Constellation). Ses composants lisent
+  `TablCouleurs.of(context)` ou la palette ; ses feuilles (filtres, tri,
+  « Proposer », « Où cherchez-vous ? ») suivent le réglage — la feuille des
+  filtres n'est plus « toujours papier » (décision réversible). Restent
+  volontairement fixes : la barre flottante et les tuiles de lieux (objets
+  sombres ou ivoire, encre propre à chaque type de tuile) et la pilule
+  « Rechercher » (ivoire, encre). La
+  fiche d'un restaurant (`widgets/carte/fiche.dart`) suit le réglage ; seul
+  le voile noir posé sur sa photo, derrière le bouton retour, reste noir.

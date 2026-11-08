@@ -20,21 +20,18 @@ class TablBarreRecherche extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        color: TablTokens.surfaceBasse,
+        color: c.surfaceBasse,
         borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-        border: Border.all(color: TablTokens.texte.withValues(alpha: 0.08)),
+        border: Border.all(color: c.texte.withValues(alpha: 0.08)),
       ),
       child: Row(
         children: [
           const SizedBox(width: 14),
-          const Icon(
-            Icons.search_rounded,
-            size: 20,
-            color: TablTokens.texteDoux,
-          ),
+          Icon(Icons.search_rounded, size: 20, color: c.texteDoux),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
@@ -42,16 +39,13 @@ class TablBarreRecherche extends StatelessWidget {
               onChanged: onChanged,
               textInputAction: TextInputAction.search,
               autocorrect: false,
-              cursorColor: TablTokens.primaire,
-              style: TablTokens.corps.copyWith(fontSize: 15),
+              cursorColor: c.primaire,
+              style: c.corps.copyWith(fontSize: 15),
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
                 hintText: indication,
-                hintStyle: TablTokens.corps.copyWith(
-                  fontSize: 15,
-                  color: TablTokens.texteDoux,
-                ),
+                hintStyle: c.corps.copyWith(fontSize: 15, color: c.texteDoux),
               ),
             ),
           ),
@@ -65,10 +59,10 @@ class TablBarreRecherche extends StatelessWidget {
                       controleur.clear();
                       onChanged('');
                     },
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.cancel_rounded,
                       size: 18,
-                      color: TablTokens.texteDoux,
+                      color: c.texteDoux,
                     ),
                   ),
           ),

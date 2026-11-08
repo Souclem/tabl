@@ -25,14 +25,15 @@ class TablOngletsTexte extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const duree = Duration(milliseconds: 380);
+    final c = TablCouleurs.of(context);
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
           height: hauteur,
           decoration: BoxDecoration(
-            color: TablTokens.fond.withValues(alpha: 0.92),
-            border: const Border(bottom: BorderSide(color: TablTokens.surface)),
+            color: c.fond.withValues(alpha: 0.92),
+            border: Border(bottom: BorderSide(color: c.surface)),
           ),
           child: Stack(
             children: [
@@ -48,11 +49,9 @@ class TablOngletsTexte extends StatelessWidget {
                           child: Center(
                             child: AnimatedDefaultTextStyle(
                               duration: duree,
-                              style: TablTokens.corps.copyWith(
+                              style: c.corps.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: i == index
-                                    ? TablTokens.texte
-                                    : TablTokens.texteDoux,
+                                color: i == index ? c.texte : c.texteDoux,
                               ),
                               child: Text(libelles[i]),
                             ),
@@ -77,7 +76,7 @@ class TablOngletsTexte extends StatelessWidget {
                     height: 2.5,
                     margin: const EdgeInsets.symmetric(horizontal: 28),
                     decoration: BoxDecoration(
-                      color: TablTokens.primaire,
+                      color: c.primaire,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -107,6 +106,7 @@ class TablChoixPeriode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -125,20 +125,16 @@ class TablChoixPeriode extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: choisie ? TablTokens.primaire : Colors.transparent,
+                  color: choisie ? c.primaire : Colors.transparent,
                   borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-                  border: Border.all(
-                    color: choisie ? TablTokens.primaire : TablTokens.bordure,
-                  ),
+                  border: Border.all(color: choisie ? c.primaire : c.bordure),
                 ),
                 child: Text(
                   periodes[i],
-                  style: TablTokens.corps.copyWith(
+                  style: c.corps.copyWith(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: choisie
-                        ? TablTokens.texteSurPrimaire
-                        : TablTokens.texte,
+                    color: choisie ? c.texteSurPrimaire : c.texte,
                   ),
                 ),
               ),

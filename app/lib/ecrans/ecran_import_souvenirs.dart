@@ -185,7 +185,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
     final suivant = rang < _repas.length - 1 ? _repas[rang + 1] : null;
     final choix = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: TablTokens.surface,
+      backgroundColor: TablCouleurs.of(context).surface,
       showDragHandle: true,
       builder: (contexte) => SafeArea(
         child: Column(
@@ -260,11 +260,14 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
     String valeur,
     IconData icone,
     String libelle,
-  ) => ListTile(
-    leading: Icon(icone, color: TablTokens.texte),
-    title: Text(libelle, style: TablTokens.corps),
-    onTap: () => Navigator.of(contexte).pop(valeur),
-  );
+  ) {
+    final c = TablCouleurs.of(contexte);
+    return ListTile(
+      leading: Icon(icone, color: c.texte),
+      title: Text(libelle, style: c.corps),
+      onTap: () => Navigator.of(contexte).pop(valeur),
+    );
+  }
 
   static List<PhotoChoisie> _parHeure(List<PhotoChoisie> photos) {
     final sansDate = DateTime(9999);
@@ -312,7 +315,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
       final quitter = await showDialog<bool>(
         context: context,
         builder: (contexte) => AlertDialog(
-          backgroundColor: TablTokens.surface,
+          backgroundColor: TablCouleurs.of(contexte).surface,
           title: const Text('Quitter l\'importation ?'),
           content: const Text(
             'Vos souvenirs ajoutés sont conservés ; les autres repas seront '
@@ -353,13 +356,14 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (aQuitte, _) {
         if (!aQuitte) _quitter();
       },
       child: Scaffold(
-        backgroundColor: TablTokens.fond,
+        backgroundColor: c.fond,
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -383,7 +387,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
                     const Spacer(),
                     if (_etape == _Etape.revue)
                       // « repas » ne prend pas de s.
-                      Text('${_repas.length} repas', style: TablTokens.legende),
+                      Text('${_repas.length} repas', style: c.legende),
                   ],
                 ),
               ),
@@ -403,23 +407,27 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
     );
   }
 
-  Widget _titre(String surtitre, String titre, {String? texte}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      TablSurtitreSouvenir(texte: surtitre),
-      const SizedBox(height: TablTokens.espaceS),
-      Text(
-        titre,
-        style: TablTokens.titreAffichage.copyWith(fontSize: 30, height: 1.15),
-      ),
-      if (texte != null) ...[
+  Widget _titre(String surtitre, String titre, {String? texte}) {
+    final c = TablCouleurs.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TablSurtitreSouvenir(texte: surtitre),
         const SizedBox(height: TablTokens.espaceS),
-        Text(texte, style: TablTokens.legende.copyWith(fontSize: 14)),
+        Text(
+          titre,
+          style: c.titreAffichage.copyWith(fontSize: 30, height: 1.15),
+        ),
+        if (texte != null) ...[
+          const SizedBox(height: TablTokens.espaceS),
+          Text(texte, style: c.legende.copyWith(fontSize: 14)),
+        ],
       ],
-    ],
-  );
+    );
+  }
 
   Widget _accueil() {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TablTokens.espaceL - 4,
@@ -466,15 +474,11 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.lock_outline_rounded,
-                size: 13,
-                color: TablTokens.texteDoux,
-              ),
+              Icon(Icons.lock_outline_rounded, size: 13, color: c.texteDoux),
               const SizedBox(width: 6),
               Text(
                 'Les photos déjà importées seront ignorées.',
-                style: TablTokens.legende.copyWith(fontSize: 12),
+                style: c.legende.copyWith(fontSize: 12),
               ),
             ],
           ),
@@ -484,6 +488,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
   }
 
   Widget _lecture() {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceL - 4),
       child: Column(
@@ -493,7 +498,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
           Text(
             'Lecture de vos photos',
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 28),
+            style: c.titreAffichage.copyWith(fontSize: 28),
           ),
           const SizedBox(height: TablTokens.espaceL),
           ClipRRect(
@@ -501,8 +506,8 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
             child: LinearProgressIndicator(
               minHeight: 3,
               value: _total == 0 ? null : _lues / _total,
-              color: TablTokens.texte,
-              backgroundColor: TablTokens.surface,
+              color: c.texte,
+              backgroundColor: c.surface,
             ),
           ),
           const SizedBox(height: TablTokens.espaceM),
@@ -511,7 +516,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
                 ? 'Préparation de vos photos…'
                 : '$_lues photos lues sur $_total',
             textAlign: TextAlign.center,
-            style: TablTokens.legende,
+            style: c.legende,
           ),
         ],
       ),
@@ -519,6 +524,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
   }
 
   Widget _revue() {
+    final c = TablCouleurs.of(context);
     final mentions = [
       if (_dejaImportees > 0)
         _dejaImportees == 1
@@ -583,7 +589,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
                   child: Text(
                     m,
                     textAlign: TextAlign.center,
-                    style: TablTokens.legende.copyWith(fontSize: 12),
+                    style: c.legende.copyWith(fontSize: 12),
                   ),
                 ),
             ],
@@ -618,6 +624,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
   }
 
   Widget _rien() {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.all(TablTokens.espaceL - 4),
       child: Column(
@@ -629,7 +636,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
           Text(
             'Aucun repas retrouvé',
             textAlign: TextAlign.center,
-            style: TablTokens.titreAffichage.copyWith(fontSize: 28),
+            style: c.titreAffichage.copyWith(fontSize: 28),
           ),
           const SizedBox(height: TablTokens.espaceS),
           Text(
@@ -638,7 +645,7 @@ class _EcranImportSouvenirsState extends State<EcranImportSouvenirs> {
                 : 'Ces photos n\'ont ni date ni position utilisables. Elles '
                       'restent sur votre téléphone, rien n\'a été ajouté.',
             textAlign: TextAlign.center,
-            style: TablTokens.legende.copyWith(fontSize: 14),
+            style: c.legende.copyWith(fontSize: 14),
           ),
           const Spacer(),
           TablBouton(

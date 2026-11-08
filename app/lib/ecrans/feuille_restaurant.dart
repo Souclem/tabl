@@ -236,11 +236,12 @@ class _FicheRestaurantState extends State<FicheRestaurant>
   }
 
   Future<void> _proposer() async {
+    final c = TablCouleurs.of(context);
     final service = widget.tableService;
     if (service == null || _tables.isEmpty) return;
     final table = await showModalBottomSheet<ResumeTable>(
       context: context,
-      backgroundColor: const Color(0xFF111216),
+      backgroundColor: TablCouleurs.of(context).surfaceBasse,
       showDragHandle: true,
       builder: (contexte) => SafeArea(
         child: ListView(
@@ -254,12 +255,12 @@ class _FicheRestaurantState extends State<FicheRestaurant>
           children: [
             Text(
               'Proposer ${widget.nom}',
-              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
+              style: c.titreAffichage.copyWith(fontSize: 24),
             ),
             const SizedBox(height: 4),
             Text(
               'À quelle Table ? Elle répondra GO ou non, puis on trouvera la date.',
-              style: TablTokens.legende,
+              style: c.legende,
             ),
             const SizedBox(height: TablTokens.espaceM),
             for (final t in _tables)
@@ -269,11 +270,8 @@ class _FicheRestaurantState extends State<FicheRestaurant>
                   t.emoji ?? '🍽',
                   style: const TextStyle(fontSize: 22),
                 ),
-                title: Text(t.nom, style: TablTokens.corps),
-                trailing: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: TablTokens.texteDoux,
-                ),
+                title: Text(t.nom, style: c.corps),
+                trailing: Icon(Icons.chevron_right_rounded, color: c.texteDoux),
                 onTap: () => Navigator.of(contexte).pop(t),
               ),
           ],
@@ -303,9 +301,10 @@ class _FicheRestaurantState extends State<FicheRestaurant>
   /// La liste de ceux qui le connaissent (ou y retournent), et « Qui y est
   /// allé » depuis la carte « +N » de l'éventail.
   void _voirProches(String titre, List<ProcheFiche> proches) {
+    final c = TablCouleurs.of(context);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF111216),
+      backgroundColor: TablCouleurs.of(context).surfaceBasse,
       showDragHandle: true,
       builder: (contexte) => SafeArea(
         child: ListView(
@@ -317,10 +316,7 @@ class _FicheRestaurantState extends State<FicheRestaurant>
             TablTokens.espaceM,
           ),
           children: [
-            Text(
-              titre,
-              style: TablTokens.titreAffichage.copyWith(fontSize: 24),
-            ),
+            Text(titre, style: c.titreAffichage.copyWith(fontSize: 24)),
             const SizedBox(height: TablTokens.espaceS),
             for (final p in proches)
               ListTile(
@@ -330,10 +326,10 @@ class _FicheRestaurantState extends State<FicheRestaurant>
                   photoUrl: p.photoUrl,
                   rayon: 20,
                 ),
-                title: Text(p.pseudo, style: TablTokens.corps),
+                title: Text(p.pseudo, style: c.corps),
                 subtitle: Text(
                   p.fois == 1 ? 'Une fois' : '${p.fois} fois',
-                  style: TablTokens.legende,
+                  style: c.legende,
                 ),
                 onTap: abonnementService == null
                     ? null
@@ -377,6 +373,7 @@ class _FicheRestaurantState extends State<FicheRestaurant>
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     final moments = souvenirs ?? const <SouvenirFeed>[];
     final r = resumerFiche(moments);
     final note = r.note;
@@ -418,7 +415,7 @@ class _FicheRestaurantState extends State<FicheRestaurant>
         ),
     ];
     return Scaffold(
-      backgroundColor: TablTokens.fond,
+      backgroundColor: c.fond,
       body: ListView(
         padding: EdgeInsets.only(
           bottom: MediaQuery.paddingOf(context).bottom + TablTokens.espaceXl,
@@ -461,12 +458,10 @@ class _FicheRestaurantState extends State<FicheRestaurant>
                 if (_erreur)
                   const _Message(texte: messageErreurGenerique)
                 else if (_chargement)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.all(TablTokens.espaceXl),
                     child: Center(
-                      child: CircularProgressIndicator(
-                        color: TablTokens.primaire,
-                      ),
+                      child: CircularProgressIndicator(color: c.primaire),
                     ),
                   )
                 else if (r.estVide)
@@ -564,12 +559,13 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: TablTokens.espaceXl),
       child: Text(
         texte,
         textAlign: TextAlign.center,
-        style: TablTokens.titreAffichage.copyWith(fontSize: 19, height: 1.35),
+        style: c.titreAffichage.copyWith(fontSize: 19, height: 1.35),
       ),
     );
   }

@@ -15,11 +15,12 @@ Future<void> ouvrirFeuilleCommentaires(
   void Function(String profilId, String pseudo)? onOuvrirProfil,
   ValueChanged<int>? onNombre,
 }) {
+  final c = TablCouleurs.of(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: TablTokens.surface,
+    backgroundColor: c.surface,
     clipBehavior: Clip.antiAlias,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

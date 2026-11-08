@@ -160,6 +160,7 @@ class _VueCamera extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
     return Stack(
       children: [
         const Center(
@@ -203,10 +204,7 @@ class _VueCamera extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(
-                        color: TablTokens.primaire,
-                        width: 4,
-                      ),
+                      border: Border.all(color: c.primaire, width: 4),
                     ),
                   ),
                 ),

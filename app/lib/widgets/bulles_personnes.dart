@@ -63,8 +63,8 @@ class _Bulle extends StatelessWidget {
       width: taille,
       height: taille,
       padding: const EdgeInsets.all(2),
-      decoration: const BoxDecoration(
-        color: TablTokens.fond,
+      decoration: BoxDecoration(
+        color: TablCouleurs.of(context).fond,
         shape: BoxShape.circle,
       ),
       child: TablAvatar(
