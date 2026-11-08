@@ -33,6 +33,9 @@ void main() {
   test('la note sur 5 vient des ressentis, calculée par l\'app', () {
     expect(noteSurCinq(['😍', '🙂']), 4.25);
     expect(noteSurCinq(['🤩']), 5);
+    expect(noteSurCinq(['😞']), 1);
+    expect(noteSurCinq(['😕']), 2);
+    expect(noteSurCinq(['😞', '😕', '😍']), closeTo(8 / 3, 1e-9));
     expect(noteSurCinq([]), isNull);
     expect(noteSurCinq(['?']), isNull);
     expect(noteLisible(4.25), '4,3');
