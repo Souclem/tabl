@@ -25,8 +25,8 @@ pourquoi) sont dans `docs/decisions.md`.
 
 ## Gestes réservés au propriétaire du projet
 
-Jamais de sa propre initiative ; on prépare, puis on signale ce qu'il faut
-lancer :
+Jamais de sa propre initiative, sauf geste délégué (voir plus bas) ; on
+prépare, puis on signale ce qu'il faut lancer :
 
 - `supabase db push`, `supabase functions deploy`, `supabase secrets set` —
   écrire la migration ou la fonction, puis écrire « à pousser : … ».
@@ -46,6 +46,17 @@ garde-fou dans l'app « Garde-fous Tabl » (source : `scripts/garde_fous_app/`,
 réglages dans `~/.config/tabl/garde_fous.json`). Un agent ne touche jamais à
 ces réglages et ne cherche pas à contourner un refus : il écrit dans sa tâche
 ce qui reste à lancer.
+
+**Geste délégué.** Un garde-fou décoché veut dire que le propriétaire délègue
+ce geste aux agents : l'agent le fait lui-même au lieu d'écrire « à pousser ».
+Inutile de lire les réglages : on essaie, et si le garde-fou refuse, on écrit
+ce qui reste à lancer. `supabase db push` est délégué tant que l'app n'est pas
+ouverte au public : seulement des migrations approuvées en relecture et
+testées sur PGlite, d'abord `--dry-run`, et on vérifie que la liste ne
+contient que les migrations attendues. Le lien vers le projet Supabase est
+copié dans chaque copie d'agent. Restent interdits même délégués :
+`supabase config push`, `supabase db reset --linked`, toute suppression de
+projet ou de données de la vraie base.
 
 ## Base de données (Supabase)
 
