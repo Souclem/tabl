@@ -96,7 +96,7 @@ void main() {
     await attendre(tester);
 
     expect(camera.photosPrises, hasLength(1));
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 1);
     expect(liste, hasLength(1));
     expect(liste.single.photos, hasLength(1));
     expect(find.text('Continuer · 1'), findsOneWidget);
@@ -109,9 +109,9 @@ void main() {
 
     await tester.tap(find.byType(DeclencheurCamera));
     await tester.tap(find.byType(DeclencheurCamera));
+    final liste = await gardes(tester, photos: 2);
     await attendre(tester);
 
-    final liste = await gardes(tester);
     expect(liste, hasLength(1));
     expect(liste.single.photos, hasLength(2));
     expect(find.text('Continuer · 2'), findsOneWidget);
@@ -147,7 +147,7 @@ void main() {
     await tester.tap(find.byType(DeclencheurCamera));
     await attendre(tester);
 
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 2);
     expect(liste, hasLength(2));
     await terminer(tester);
   });
@@ -180,7 +180,7 @@ void main() {
     await tester.tap(find.byType(DeclencheurCamera));
     await attendre(tester);
 
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 2);
     expect(liste, hasLength(2));
     await terminer(tester);
   });
@@ -200,7 +200,7 @@ void main() {
     await tester.tap(find.byType(DeclencheurCamera));
     await attendre(tester);
 
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 2);
     expect(liste, hasLength(1));
     expect(liste.single.photos, hasLength(2));
     await terminer(tester);
@@ -222,7 +222,7 @@ void main() {
     await attendre(tester);
 
     expect(demande, nombreMaxPhotosSouvenir);
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 2);
     expect(liste, hasLength(1));
     expect(liste.single.photos, hasLength(2));
     expect(find.text('Continuer · 2'), findsOneWidget);
@@ -258,27 +258,40 @@ void main() {
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pump(const Duration(milliseconds: 300));
 
-    final liste = await gardes(tester);
+    final liste = await gardes(tester, photos: 1);
     expect(liste, hasLength(1));
     await terminer(tester);
   });
 }
 
-/// Le contenu du téléphone, une fois les écritures en cours rangées.
-Future<List<Brouillon>> gardes(WidgetTester tester) async {
-  List<Brouillon>? lus;
-  unawaited(brouillons.lister().then((v) => lus = v));
-  for (var i = 0; i < 100 && lus == null; i++) {
+/// Le contenu du téléphone, relu jusqu'à ce qu'il contienne au moins
+/// [photos] photos (limite 10 s). Les écritures se font hors horloge
+/// simulée : on alterne attente réelle et rendu, sans jamais bloquer dessus.
+Future<List<Brouillon>> gardes(WidgetTester tester, {int photos = 0}) async {
+  final fin = DateTime.now().add(const Duration(seconds: 10));
+  var lus = <Brouillon>[];
+  while (true) {
+    List<Brouillon>? relus;
+    unawaited(brouillons.lister().then((v) => relus = v));
+    while (relus == null && DateTime.now().isBefore(fin)) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump();
+    }
+    lus = relus ?? lus;
+    final total = lus.fold<int>(0, (somme, b) => somme + b.photos.length);
+    if (relus == null || total >= photos || DateTime.now().isAfter(fin)) break;
     await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
     );
     await tester.pump();
   }
-  return lus!;
+  await tester.pump(const Duration(milliseconds: 400));
+  return lus;
 }
 
-/// Les écritures sur disque se font hors horloge simulée : on alterne
-/// attente réelle et rendu jusqu'à ce que tout soit rangé.
+/// Laisse l'écran rendre ce qui est en cours.
 Future<void> attendre(WidgetTester tester) async {
   for (var i = 0; i < 20; i++) {
     await tester.runAsync(
