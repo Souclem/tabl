@@ -54,9 +54,11 @@ ce qui reste à lancer. `supabase db push` est délégué tant que l'app n'est p
 ouverte au public : seulement des migrations approuvées en relecture et
 testées sur PGlite, d'abord `--dry-run`, et on vérifie que la liste ne
 contient que les migrations attendues. Le lien vers le projet Supabase est
-copié dans chaque copie d'agent. Restent interdits même délégués :
-`supabase config push`, `supabase db reset --linked`, toute suppression de
-projet ou de données de la vraie base.
+copié dans chaque copie d'agent. Restent interdits même délégués, et le
+garde-fou les refuse toujours : `supabase config push`, `supabase db reset`
+sur la vraie base (`--linked`, `--db-url`), la suppression d'un projet ou d'une
+branche Supabase. Toute autre suppression de données de la vraie base reste
+interdite aussi.
 
 ## Base de données (Supabase)
 

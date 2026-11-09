@@ -857,6 +857,10 @@ MSG_PROCESSUS = ("Ce code lance un autre programme (subprocess, system, exec, ch
 MSG_TESTFLIGHT = "Les builds pour TestFlight / les stores ne partent que sur demande explicite du propriétaire."
 # Motifs cherchés dans du code (texte sans espaces ni guillemets) : (garde-fou, motif, message)
 CODE_INTERDIT: List[Tuple[Optional[str], "re.Pattern[str]", str]] = [
+    # Toujours refusé, même CLI Supabase déléguée (voir supabase_toujours_interdit).
+    (None, re.compile(r"supabase.{0,60}?(configpush|dbreset.{0,80}?(linked|dburl)|(projects|branches)delete)"),
+     "Geste irréversible sur la vraie base (config push, db reset distant, suppression de projet ou de "
+     "branche) : interdit même quand la CLI Supabase est déléguée aux agents. " + A_POUSSER),
     ("supabase", re.compile(r"supabase(db|functions|secrets|link|login|logout|projects|branches|migration(up|repair|"
                             r"squash|fetch)|storage|config|gen|inspect|sso|domains|vanity|network|orgs|postgres|"
                             r"seed|init|bootstrap|unlink|start|stop)"),
@@ -980,6 +984,27 @@ def de_confiance(chemin_reel: str) -> bool:
 
 class Refus(Exception):
     pass
+
+
+def supabase_toujours_interdit(positionnels: List[str], options: List[str]) -> None:
+    """Gestes irréversibles sur la vraie base, refusés même quand le propriétaire a
+    délégué la CLI Supabase aux agents (garde-fou « supabase » décoché) : décision du
+    propriétaire, 9 novembre 2026. On cherche la paire de mots n'importe où, pour ne
+    pas être trompé par une option globale placée avant (--workdir x)."""
+    def paire(a: str, b: str) -> bool:
+        return any(positionnels[i:i + 2] == [a, b] for i in range(len(positionnels)))
+
+    distant = any(o.split("=")[0] in ("--linked", "--db-url") for o in options)
+    if paire("config", "push"):
+        raison = "« supabase config push » écraserait la configuration de la vraie base (site_url local)."
+    elif paire("db", "reset") and distant:
+        raison = "« supabase db reset » sur la vraie base l'effacerait entièrement."
+    elif paire("projects", "delete") or paire("branches", "delete"):
+        raison = "Supprimer un projet ou une branche Supabase est irréversible."
+    else:
+        return
+    raise Refus(raison + " Interdit même quand la CLI Supabase est déléguée aux agents : seul le "
+                         "propriétaire peut le faire, à la main. " + A_POUSSER)
 
 
 def mot_dynamique() -> Mot:
@@ -1634,12 +1659,18 @@ class Verificateur:
 
     # -- commandes précises ------------------------------------------------------------
     def supabase(self, args: List[Mot]) -> None:
+        positionnels = [a.texte for a in args if not a.texte.startswith("-")]
+        options = [a.texte for a in args if a.texte.startswith("-")]
         if "supabase" not in self.actifs:
+            # CLI déléguée aux agents (garde-fou décoché) : restent refusés les gestes
+            # irréversibles sur la vraie base, et ce qu'on ne peut pas lire.
+            if any(a.dynamique for a in args):
+                raise Refus("Argument dynamique dans une commande Supabase : écrivez-la en clair. "
+                            "Même déléguée, la CLI Supabase n'accepte que des commandes lisibles.")
+            supabase_toujours_interdit(positionnels, options)
             return
         if any(a.dynamique for a in args):
             self.opaque("argument dynamique de la CLI Supabase")
-        positionnels = [a.texte for a in args if not a.texte.startswith("-")]
-        options = [a.texte for a in args if a.texte.startswith("-")]
         permis = (not positionnels and all(o in ("--version", "-v", "--help", "-h") for o in options)) \
             or positionnels in (["help"], ["migration", "new"], ["migration", "list"]) \
             or (positionnels[:2] == ["migration", "new"] and len(positionnels) == 3)
