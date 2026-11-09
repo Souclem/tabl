@@ -34,6 +34,26 @@ enum StatutEnvoi {
   annule,
 }
 
+/// Où en est réellement une publication, relue au retour de l'app au premier
+/// plan (voir [EnvoiPublications.etatReel]).
+enum EtatReel {
+  /// Le moment est publié sur le serveur.
+  publie,
+
+  /// Un envoi tourne encore dans l'app.
+  enCours,
+
+  /// L'envoi a échoué ; la file attend le choix de l'auteur.
+  echec,
+
+  /// Plus aucun envoi ne tourne alors que rien n'est publié : l'envoi a été
+  /// coupé (l'OS a suspendu l'app). Le brouillon est intact.
+  coupe,
+
+  /// Le brouillon n'existe plus et le serveur n'a rien publié.
+  introuvable,
+}
+
 class ResultatEnvoi {
   const ResultatEnvoi(
     this.statut, {
@@ -126,6 +146,10 @@ class EnvoiPublications {
   /// Les publications en cours de traitement dans cette session de l'app.
   final _actifs = <String, Future<Object?>>{};
   final _annulations = <String>{};
+
+  /// L'essai de la cloche qui a la main sur chaque publication : un essai
+  /// détaché ([detacher]) perd son jeton et s'arrête avant son commit.
+  final _jetons = <String, Completer<void>>{};
   Future<List<ResultatReprise>>? _reprise;
 
   /// Ce que la reprise a constaté et que l'écran n'a pas encore montré.
@@ -162,15 +186,55 @@ class EnvoiPublications {
     String brouillonId, {
     void Function(int envoyees, int total)? surProgression,
   }) async {
-    final resultat = await _verrouiller(
-      brouillonId,
-      () => _tenter(
+    final resultat = await _verrouiller(brouillonId, () {
+      final jeton = _jetons[brouillonId] = Completer<void>();
+      return _tenter(
         brouillonId,
         auPremierPlan: true,
         surProgression: surProgression,
+        abandonne: () => !identical(_jetons[brouillonId], jeton),
+      );
+    });
+    return resultat ?? const ResultatEnvoi(StatutEnvoi.dejaEnCours);
+  }
+
+  /// L'envoi de la cloche est suspendu sans erreur (voir `SuiviPublication`) :
+  /// on le lâche, pour que « Garder en brouillon » et « Réessayer » ne
+  /// l'attendent pas. Il s'arrête avant son commit s'il n'y est pas encore ;
+  /// la file passe en échec, le brouillon est intact.
+  Future<void> detacher(String brouillonId) async {
+    final etait = _actifs.remove(brouillonId);
+    _jetons.remove(brouillonId)?.complete();
+    _annulations.remove(brouillonId);
+    if (etait == null) return;
+    await _file.modifier(
+      brouillonId,
+      (e) => e.copieAvec(
+        etat: EtatEnvoi.echec,
+        derniereErreur: () => 'envoi suspendu',
       ),
     );
-    return resultat ?? const ResultatEnvoi(StatutEnvoi.dejaEnCours);
+  }
+
+  /// Relit l'état réel de la publication, au retour de l'app au premier
+  /// plan : l'OS a pu suspendre l'envoi pendant l'absence. Lève si le serveur
+  /// est injoignable (l'état n'est alors pas connu).
+  Future<EtatReel> etatReel(String brouillonId) async {
+    if (_actifs.containsKey(brouillonId)) return EtatReel.enCours;
+    final statut = await _depot.statutDe(brouillonId);
+    if (statut == statutPublie) {
+      try {
+        await _terminer(brouillonId);
+      } catch (_) {
+        // La prochaine reprise le constate.
+      }
+      return EtatReel.publie;
+    }
+    if (await _brouillons.charger(brouillonId) == null) {
+      return EtatReel.introuvable;
+    }
+    final envoi = await _file.lire(brouillonId);
+    return envoi?.etat == EtatEnvoi.echec ? EtatReel.echec : EtatReel.coupe;
   }
 
   /// « Envoyer dès que possible » : la publication est gardée dans la file
@@ -205,7 +269,7 @@ class EnvoiPublications {
     if (enCours != null) {
       _annulations.add(brouillonId);
       try {
-        await enCours;
+        await Future.any([enCours, ?_jetons[brouillonId]?.future]);
       } catch (_) {}
     }
     try {
@@ -388,6 +452,7 @@ class EnvoiPublications {
     String id, {
     required bool auPremierPlan,
     void Function(int envoyees, int total)? surProgression,
+    bool Function()? abandonne,
   }) async {
     final brouillon = await _brouillons.charger(id);
     if (brouillon == null) return const ResultatEnvoi(StatutEnvoi.introuvable);
@@ -441,7 +506,7 @@ class EnvoiPublications {
         surProgression: surProgression,
       );
       if (!prepare.dejaPublie) {
-        if (_annulations.contains(id)) {
+        if (_annulations.contains(id) || (abandonne?.call() ?? false)) {
           return const ResultatEnvoi(StatutEnvoi.annule);
         }
         await _file.modifier(id, (e) => e.copieAvec(commitLance: true));
@@ -498,8 +563,12 @@ class EnvoiPublications {
     try {
       return await execution;
     } finally {
-      _actifs.remove(id);
-      _annulations.remove(id);
+      // Un essai détaché qui se termine tard ne doit pas défaire le suivant.
+      if (identical(_actifs[id], execution)) {
+        _actifs.remove(id);
+        _annulations.remove(id);
+        _jetons.remove(id);
+      }
     }
   }
 }
