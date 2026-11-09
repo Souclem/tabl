@@ -10,7 +10,9 @@ const Map<String, double> valeurRessentis = {
   '😍': 5,
   '🤩': 5,
   '🙂': 3.5,
+  '😕': 2,
   '😐': 2,
+  '😞': 1,
 };
 
 /// La moyenne des ressentis sur 5, `null` sans aucun ressenti reconnu.

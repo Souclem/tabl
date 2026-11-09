@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -258,6 +259,14 @@ class BrouillonsLocaux {
   /// Le fichier d'une photo, à afficher (`Image.file`) ou à envoyer.
   File fichierPhoto(String brouillonId, String photoId) =>
       File('${_dossier(brouillonId).path}/$photoId.jpg');
+
+  /// La photo à afficher, lue depuis son fichier.
+  ImageProvider imagePhoto(String brouillonId, String photoId) =>
+      FileImage(fichierPhoto(brouillonId, photoId));
+
+  /// Le contenu d'une photo, à envoyer.
+  Future<Uint8List> octetsPhoto(String brouillonId, String photoId) =>
+      fichierPhoto(brouillonId, photoId).readAsBytes();
 
   File _photoCorbeille(String photoId) =>
       File('${_dossierCorbeille.path}/$photoId.jpg');

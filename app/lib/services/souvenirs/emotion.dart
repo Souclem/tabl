@@ -1,14 +1,29 @@
-/// Les 4 émotions parmi lesquelles choisir en finalisant un moment — de
-/// vrais emoji (clavier natif), jamais des icônes dessinées sur mesure.
-/// Ensemble et ordre exacts repris du prototype fonctionnel
-/// (`instruction/Clément (2)/Tabl.dc.html`, `emotionOptions`).
+/// Les émotions d'un moment — de vrais emoji (clavier natif), jamais des
+/// icônes dessinées sur mesure. On en propose 5, du pire au meilleur
+/// (voir [proposees]) ; `neutre` ne sert plus qu'à relire les anciens
+/// moments.
 enum Emotion {
-  coupDeCoeur('😍'),
-  inoubliable('🤩'),
-  satisfait('🙂'),
-  neutre('😐');
+  decu('😞', 'Déçu'),
+  bof('😕', 'Bof'),
+  satisfait('🙂', 'Bien'),
+  coupDeCoeur('😍', 'J\'adore'),
+  inoubliable('🤩', 'Exceptionnel'),
+  neutre('😐', 'Neutre');
 
-  const Emotion(this.emoji);
+  const Emotion(this.emoji, this.libelle);
+
+  /// Les 5 émotions proposées à la finalisation, dans l'ordre d'affichage.
+  /// `neutre` (ancien jeu) n'y figure plus.
+  static const List<Emotion> proposees = [
+    decu,
+    bof,
+    satisfait,
+    coupDeCoeur,
+    inoubliable,
+  ];
+
+  /// Le nom affiché sous l'emoji choisi.
+  final String libelle;
 
   /// L'emoji affiché — c'est aussi la valeur stockée telle quelle en
   /// base (colonne `souvenirs.emotion`), pas de code interne séparé à
