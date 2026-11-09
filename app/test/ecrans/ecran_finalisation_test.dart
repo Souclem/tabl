@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/ecrans/ecran_cloche.dart';
 import 'package:app/ecrans/ecran_finalisation.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
@@ -106,6 +108,45 @@ class _FauxBrouillons implements BrouillonsLocaux {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
+/// La file d'envoi, simulée : la publication réussit aussitôt et garde le
+/// brouillon tel que la cloche l'aurait lu.
+class _FauxEnvois implements EnvoiPublications {
+  _FauxEnvois(this._brouillons);
+
+  final _FauxBrouillons _brouillons;
+  final List<Brouillon> envoyes = [];
+  ResultatEnvoi resultat = const ResultatEnvoi(StatutEnvoi.publie);
+
+  /// Quand il est posé, l'envoi attend : le test le termine à la main.
+  Completer<ResultatEnvoi>? attente;
+
+  @override
+  BrouillonsLocaux get brouillons => _brouillons;
+
+  @override
+  Future<ResultatEnvoi> envoyer(
+    String brouillonId, {
+    void Function(int envoyees, int total)? surProgression,
+  }) async {
+    envoyes.add(_brouillons.brouillon);
+    return attente?.future ?? resultat;
+  }
+
+  @override
+  Future<bool> garderEnBrouillon(String brouillonId) async {
+    if (attente case final a? when !a.isCompleted) {
+      a.complete(const ResultatEnvoi(StatutEnvoi.annule));
+    }
+    return true;
+  }
+
+  @override
+  Future<bool> mettreEnAttente(String brouillonId) async => true;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 const _comptoir = LieuRestaurant(
   fsqPlaceId: 'fsq-comptoir',
   nom: 'Le Comptoir',
@@ -147,36 +188,54 @@ final _publie = SouvenirFeed(
   estAMoi: true,
 );
 
+/// Ce que l'écran a rendu en se fermant, et la file d'envoi qu'il a vue.
+class _Ouverture {
+  _Ouverture(this.service, this.envois);
+
+  final _FauxSouvenirService service;
+  final _FauxEnvois? envois;
+  Object? rendu;
+  bool ferme = false;
+}
+
 /// Pousse l'écran sur une vraie pile : `Navigator.pop` a un écran dessous.
-Future<_FauxSouvenirService> _ouvrir(
+Future<_Ouverture> _ouvrir(
   WidgetTester tester, {
   _FauxBrouillons? brouillons,
   SouvenirFeed? aModifier,
   MomentModifiable? moment,
-  Future<void> Function()? ouvrirPhotos,
+  Future<void> Function(BuildContext context)? ouvrirPhotos,
 }) async {
   tester.view.physicalSize = const Size(1170, 2532);
   tester.view.devicePixelRatio = 3.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   final service = _FauxSouvenirService()..momentAModifier = moment;
+  final envois = aModifier == null && brouillons != null
+      ? _FauxEnvois(brouillons)
+      : null;
+  final ouverture = _Ouverture(service, envois);
   await tester.pumpWidget(
     MaterialApp(
       home: Builder(
         builder: (context) => ElevatedButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<bool>(
-              builder: (_) => EcranFinalisation(
-                souvenirService: service,
-                abonnementService: _FauxAbonnementService(),
-                brouillons: aModifier == null ? brouillons : null,
-                brouillon: aModifier == null ? brouillons?.brouillon : null,
-                aModifier: aModifier,
-                ouvrirPhotos: ouvrirPhotos,
-                maintenant: () => DateTime(2026, 8, 20, 14),
+          onPressed: () async {
+            ouverture.rendu = await Navigator.of(context).push<Object>(
+              MaterialPageRoute<Object>(
+                builder: (_) => EcranFinalisation(
+                  souvenirService: service,
+                  abonnementService: _FauxAbonnementService(),
+                  brouillons: aModifier == null ? brouillons : null,
+                  brouillon: aModifier == null ? brouillons?.brouillon : null,
+                  envois: envois,
+                  aModifier: aModifier,
+                  ouvrirPhotos: ouvrirPhotos,
+                  maintenant: () => DateTime(2026, 8, 20, 14),
+                ),
               ),
-            ),
-          ),
+            );
+            ouverture.ferme = true;
+          },
           child: const Text('ouvrir'),
         ),
       ),
@@ -184,7 +243,15 @@ Future<_FauxSouvenirService> _ouvrir(
   );
   await tester.tap(find.text('ouvrir'));
   await tester.pumpAndSettle();
-  return service;
+  return ouverture;
+}
+
+/// La cloche tourne sur un ticker : on avance image par image plutôt que
+/// d'attendre un calme qui ne vient pas.
+Future<void> _laisserPublier(WidgetTester tester) async {
+  for (var t = 0; t < 2500; t += 50) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 TablBoutonPrincipalFinalisation _principal(WidgetTester tester) =>
@@ -224,7 +291,7 @@ void main() {
       await _ouvrir(
         tester,
         brouillons: _FauxBrouillons(_brouillon(photo: false)),
-        ouvrirPhotos: () async => ouvertes++,
+        ouvrirPhotos: (_) async => ouvertes++,
       );
 
       expect(find.text('Choisir les photos'), findsOneWidget);
@@ -251,7 +318,7 @@ void main() {
     testWidgets('avec photos et lieu : « Publier », grisé sans émotion', (
       tester,
     ) async {
-      final service = await _ouvrir(
+      final ouverture = await _ouvrir(
         tester,
         brouillons: _FauxBrouillons(_brouillon(lieu: _comptoir)),
       );
@@ -262,7 +329,7 @@ void main() {
       await tester.tap(find.text('Publier'));
       await tester.pump();
 
-      expect(service.appelsPublier, isEmpty);
+      expect(ouverture.envois!.envoyes, isEmpty);
       // La rangée d'émotions rappelle ce qui manque : tous les noms.
       expect(find.text('Déçu'), findsOneWidget);
       expect(find.text('Exceptionnel'), findsOneWidget);
@@ -283,27 +350,127 @@ void main() {
     });
   });
 
-  testWidgets('publie le moment, vide le brouillon et se ferme', (
+  testWidgets('publie : écrit le brouillon, ouvre la cloche, se ferme dessus', (
     tester,
   ) async {
     final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
-    final service = await _ouvrir(tester, brouillons: brouillons);
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
+
+    await tester.tap(find.text('🤩'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajouter un mot').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Onze assiettes');
+    await tester.tap(find.text('Valider'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publier'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(EcranCloche), findsOneWidget);
+    await _laisserPublier(tester);
+
+    final envoye = ouverture.envois!.envoyes.single;
+    expect(envoye.lieu, _comptoir);
+    expect(envoye.emotion, Emotion.inoubliable);
+    expect(envoye.legende, 'Onze assiettes');
+    expect(envoye.audience.mode, ModeAudience.toutLeMonde);
+    expect(ouverture.ferme, isTrue);
+    expect((ouverture.rendu! as ResultatCloche).issue, IssueCloche.publie);
+    expect(find.byType(EcranFinalisation), findsNothing);
+    expect(find.byType(EcranCloche), findsNothing);
+  });
+
+  testWidgets('un lieu seulement proposé est écrit avant la cloche', (
+    tester,
+  ) async {
+    final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
+    // Un brouillon relu sans lieu : seul l'écran le connaît.
+    brouillons.brouillon = brouillons.brouillon.copieAvec(lieu: () => null);
+
+    await tester.tap(find.text('🙂'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publier'));
+    await _laisserPublier(tester);
+
+    expect(ouverture.envois!.envoyes.single.lieu, _comptoir);
+  });
+
+  testWidgets('« Modifier » dans la cloche ramène à la finalisation', (
+    tester,
+  ) async {
+    final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
+    ouverture.envois!.attente = Completer<ResultatEnvoi>();
 
     await tester.tap(find.text('🤩'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Publier'));
     await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Modifier'));
+    await _laisserPublier(tester);
+
+    expect(find.byType(EcranCloche), findsNothing);
+    expect(find.byType(EcranFinalisation), findsOneWidget);
+    expect(ouverture.ferme, isFalse);
+  });
+
+  testWidgets('« Annuler » dans la cloche rend le résultat à l\'appelant', (
+    tester,
+  ) async {
+    final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
+    ouverture.envois!.attente = Completer<ResultatEnvoi>();
+
+    await tester.tap(find.text('🤩'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publier'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Annuler'));
+    await _laisserPublier(tester);
+
+    expect(ouverture.ferme, isTrue);
+    expect((ouverture.rendu! as ResultatCloche).issue, IssueCloche.annule);
+    expect(brouillons.supprimes, isEmpty);
+  });
+
+  testWidgets('les photos retirées de la publication ne comptent pas', (
+    tester,
+  ) async {
+    var ouvertes = 0;
+    await _ouvrir(
+      tester,
+      brouillons: _FauxBrouillons(
+        _brouillon(lieu: _comptoir).copieAvec(horsPublicationIds: {'p1'}),
+      ),
+      ouvrirPhotos: (_) async => ouvertes++,
+    );
+
+    expect(find.text('Choisir les photos'), findsOneWidget);
+    await tester.tap(find.text('Choisir les photos'));
+    await tester.pumpAndSettle();
+    expect(ouvertes, 1);
+  });
+
+  testWidgets('« Où et quand » : le repas choisi est écrit au brouillon', (
+    tester,
+  ) async {
+    final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
+    await _ouvrir(tester, brouillons: brouillons);
+
+    await tester.tap(find.text('Le Comptoir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Où et quand'), findsOneWidget);
+    await tester.tap(find.text('Soir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Valider'));
     await tester.pumpAndSettle();
 
-    expect(service.appelsPublier, hasLength(1));
-    final appel = service.appelsPublier.single;
-    expect(appel['lieu'], _comptoir);
-    expect(appel['emotion'], Emotion.inoubliable);
-    expect(appel['photos'], [_octets]);
-    expect(appel['legende'], isNull);
-    expect(brouillons.supprimes, ['b1']);
-    expect(find.byType(EcranFinalisation), findsNothing);
+    expect(brouillons.brouillon.priseLe, DateTime(2026, 8, 20, 20));
+    expect(brouillons.brouillon.lieu, _comptoir);
+    expect(find.textContaining('dîner'), findsOneWidget);
   });
 
   group('Ajouter un mot', () {
@@ -329,7 +496,7 @@ void main() {
       final brouillons = _FauxBrouillons(
         _brouillon(lieu: _comptoir, emotion: Emotion.satisfait),
       );
-      final service = await _ouvrir(tester, brouillons: brouillons);
+      final ouverture = await _ouvrir(tester, brouillons: brouillons);
 
       await tester.tap(find.text('Ajouter un mot').first);
       await tester.pumpAndSettle();
@@ -350,7 +517,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Publier'));
       await tester.pumpAndSettle();
-      expect(service.appelsPublier, isEmpty);
+      expect(ouverture.envois!.envoyes, isEmpty);
     });
   });
 
@@ -386,28 +553,27 @@ void main() {
         etoiles: {'cuisine': 4, 'service': 2},
       ),
     );
-    final service = await _ouvrir(tester, brouillons: brouillons);
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
 
     await tester.tap(find.text('Publier'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+    await _laisserPublier(tester);
 
-    expect(service.appelsPublier.single['notes'], {'cuisine': 4, 'service': 2});
+    expect(ouverture.envois!.envoyes.single.etoiles, {
+      'cuisine': 4,
+      'service': 2,
+    });
   });
 
   testWidgets('publie sans étoiles : notes vides', (tester) async {
     final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
-    final service = await _ouvrir(tester, brouillons: brouillons);
+    final ouverture = await _ouvrir(tester, brouillons: brouillons);
 
     await tester.tap(find.text('🤩'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Publier'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 2));
-    await tester.pumpAndSettle();
+    await _laisserPublier(tester);
 
-    expect(service.appelsPublier.single['notes'], isEmpty);
+    expect(ouverture.envois!.envoyes.single.etoiles, isEmpty);
   });
 
   group('modification d\'un moment publié', () {
@@ -432,17 +598,24 @@ void main() {
     testWidgets('enregistre les changements sans toucher aux photos', (
       tester,
     ) async {
-      final service = await _ouvrir(tester, aModifier: _publie, moment: moment);
+      final ouverture = await _ouvrir(
+        tester,
+        aModifier: _publie,
+        moment: moment,
+      );
 
       await tester.tap(find.text('🤩'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Enregistrer'));
       await tester.pumpAndSettle();
 
-      expect(service.appelsModifier, hasLength(1));
-      expect(service.appelsModifier.single.id, 'm1');
-      expect(service.appelsModifier.single.moment.emotion, Emotion.inoubliable);
-      expect(service.appelsPublier, isEmpty);
+      expect(ouverture.service.appelsModifier, hasLength(1));
+      expect(ouverture.service.appelsModifier.single.id, 'm1');
+      expect(
+        ouverture.service.appelsModifier.single.moment.emotion,
+        Emotion.inoubliable,
+      );
+      expect(ouverture.service.appelsPublier, isEmpty);
       expect(find.byType(EcranFinalisation), findsNothing);
     });
 
@@ -452,14 +625,20 @@ void main() {
         emotion: Emotion.satisfait,
         notes: {'cuisine': 5},
       );
-      final service = await _ouvrir(tester, aModifier: _publie, moment: notees);
+      final ouverture = await _ouvrir(
+        tester,
+        aModifier: _publie,
+        moment: notees,
+      );
 
       await tester.tap(find.text('🤩'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Enregistrer'));
       await tester.pumpAndSettle();
 
-      expect(service.appelsModifier.single.moment.notes, {'cuisine': 5});
+      expect(ouverture.service.appelsModifier.single.moment.notes, {
+        'cuisine': 5,
+      });
     });
 
     testWidgets('fermer après un changement demande confirmation', (

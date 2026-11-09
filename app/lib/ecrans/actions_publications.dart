@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+import 'ecran_finalisation.dart';
 import 'ecran_profil_autre.dart';
-import 'ecran_publier.dart';
 import 'feuille_audience.dart';
 import 'feuille_commentaires.dart';
 import 'feuille_restaurant.dart';
@@ -236,13 +236,14 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   TableService get _tables =>
       tableService ?? TableServiceSupabase(TablBackend.client);
 
-  /// Le moment s'ouvre dans l'écran qui l'a publié, prérempli.
+  /// Le moment s'ouvre dans la finalisation, en mode édition : prérempli,
+  /// sans cloche.
   Future<void> modifierPublication(SouvenirFeed souvenir) async {
     final abonnements = abonnementService;
     if (abonnements == null) return;
     final modifie = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => EcranPublier(
+        builder: (_) => EcranFinalisation(
           souvenirService: souvenirService,
           abonnementService: abonnements,
           tableService: _tables,
@@ -257,7 +258,7 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     if (modifie != true || !mounted) return;
     _revenirIci();
     recharger();
-    afficherMessage(context, 'Moment modifié.');
+    afficherMessage(context, 'Modifications enregistrées.');
   }
 
   Future<void> modifierAudience(SouvenirFeed souvenir) async {

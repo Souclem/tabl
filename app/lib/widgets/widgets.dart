@@ -80,7 +80,6 @@ export 'souvenirs/etoiles_notes.dart';
 export 'souvenirs/import_souvenirs.dart';
 export 'souvenirs/liste_photos_moment.dart';
 export 'souvenirs/methode_souvenir.dart';
-export 'souvenirs/moment_garde.dart';
 export 'souvenirs/panneau_souvenir.dart';
 export 'souvenirs/pile_photos_camera.dart';
 export 'souvenirs/rail_finalisation.dart';

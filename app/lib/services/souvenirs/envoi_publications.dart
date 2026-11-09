@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'brouillon_local.dart';
 import 'file_envoi.dart';
+import 'metadonnees_photo.dart';
 import 'publication_en_deux_temps.dart';
 import 'publication_service.dart';
 
@@ -116,6 +117,11 @@ class EnvoiPublications {
   final FileEnvoi _file;
   final PublicationService _service;
   final DateTime Function() _maintenant;
+
+  /// Les brouillons du téléphone, ceux que cette file publie : l'écran qui
+  /// les modifie doit partager cette instance, pour que leurs écritures
+  /// passent dans le même ordre.
+  BrouillonsLocaux get brouillons => _brouillons;
 
   /// Les publications en cours de traitement dans cette session de l'app.
   final _actifs = <String, Future<Object?>>{};
@@ -412,12 +418,16 @@ class EnvoiPublications {
 
     MomentPrepare prepare;
     try {
+      final octets = [
+        for (final p in brouillon.photosAPublier)
+          await _brouillons.fichierPhoto(id, p.id).readAsBytes(),
+      ];
       final demande = DemandePublication(
         id: id,
         lieu: lieu,
-        photos: [
-          for (final p in brouillon.photos)
-            await _brouillons.fichierPhoto(id, p.id).readAsBytes(),
+        photos: octets,
+        empreintes: [
+          for (final p in await lirePhotos(octets)) ?p.metadonnees.empreinte,
         ],
         emotion: emotion,
         priseLe: brouillon.priseLe,

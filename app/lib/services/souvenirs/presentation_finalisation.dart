@@ -1,5 +1,6 @@
 import 'presentation_souvenir.dart';
 import 'precompletion_souvenir.dart';
+import 'suivi_publication.dart';
 
 /// « Ajouter un mot » : 300 caractères au plus.
 const longueurMaxMot = 300;
@@ -101,3 +102,13 @@ EtapeFinalisation etapeFinalisation({
   if (!aUnLieu) return EtapeFinalisation.choisirLieu;
   return EtapeFinalisation.publier;
 }
+
+/// Ce que la cloche laisse à dire au retour, ou `null` quand la suite parle
+/// d'elle-même (le moment arrive dans le Fil, ou la cloche l'a déjà dit).
+String? messageApresCloche(IssueCloche issue) => switch (issue) {
+  IssueCloche.publie || IssueCloche.dejaPublie || IssueCloche.modifier => null,
+  IssueCloche.annule =>
+    'Publication annulée. Votre moment est gardé sur ce téléphone.',
+  IssueCloche.brouillonGarde => 'Votre moment est gardé sur ce téléphone.',
+  IssueCloche.enAttente => 'Votre moment sera envoyé dès que possible.',
+};

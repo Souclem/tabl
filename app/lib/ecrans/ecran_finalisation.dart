@@ -7,7 +7,10 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 import 'creation_moment.dart';
+import 'ecran_cloche.dart';
 import 'feuille_audience.dart';
+import 'feuille_avec_qui.dart';
+import 'feuille_ou_et_quand.dart';
 
 /// La finalisation d'un moment, dernière étape de la création : les photos
 /// en grand, le lieu, la date et la légende en haut, à droite le rail
@@ -15,12 +18,14 @@ import 'feuille_audience.dart';
 /// c'était — obligatoire —, qui peut voir, et le bouton principal.
 ///
 /// Un moment en création vient d'un [brouillon] : chaque choix y est écrit
-/// aussitôt, « Plus tard » n'a donc rien à sauvegarder. Se ferme sur `true`
-/// une fois le moment publié.
+/// aussitôt, « Plus tard » n'a donc rien à sauvegarder. « Publier » écrit le
+/// brouillon puis ouvre la cloche ([EcranCloche]) ; l'écran se ferme alors
+/// sur le [ResultatCloche] (`null` : fermé par « Plus tard »). « Modifier »
+/// dans la cloche ramène ici.
 ///
 /// Avec [aModifier], le même écran modifie un moment déjà publié : ses
-/// photos et sa date sont figées, le bouton devient « Enregistrer ». Se
-/// ferme sur `true` une fois enregistré.
+/// photos et sa date sont figées, pas de cloche, le bouton devient
+/// « Enregistrer ». Se ferme sur `true` une fois enregistré.
 ///
 /// Toujours sombre, quelle que soit l'apparence de l'app.
 class EcranFinalisation extends StatelessWidget {
@@ -30,6 +35,7 @@ class EcranFinalisation extends StatelessWidget {
     required this.abonnementService,
     this.brouillons,
     this.brouillon,
+    this.envois,
     this.aModifier,
     this.tableService,
     this.rechercheLieuService,
@@ -37,8 +43,10 @@ class EcranFinalisation extends StatelessWidget {
     this.ouvrirPhotos,
     this.maintenant = DateTime.now,
   }) : assert(
-         (brouillon != null && brouillons != null) != (aModifier != null),
-         'Un brouillon (avec ses BrouillonsLocaux) ou un moment à modifier.',
+         (brouillon != null && brouillons != null && envois != null) !=
+             (aModifier != null),
+         'Un brouillon (avec ses BrouillonsLocaux et les envois) ou un '
+         'moment à modifier.',
        );
 
   final SouvenirService souvenirService;
@@ -46,6 +54,9 @@ class EcranFinalisation extends StatelessWidget {
 
   /// Les brouillons du téléphone ; avec [brouillon].
   final BrouillonsLocaux? brouillons;
+
+  /// Ce qui publie un brouillon (la cloche) ; avec [brouillon].
+  final EnvoiPublications? envois;
 
   /// Le moment à finaliser, tel qu'il est sur le téléphone.
   final Brouillon? brouillon;
@@ -62,9 +73,10 @@ class EcranFinalisation extends StatelessWidget {
   /// `null` : pas de restaurant proposé d'après l'endroit où l'on est.
   final PositionService? positionService;
 
-  /// « Choisir les photos » : la feuille des photos du moment. Au retour,
-  /// le brouillon est relu. `null` : le bouton ne fait rien.
-  final Future<void> Function()? ouvrirPhotos;
+  /// « Choisir les photos » : la feuille des photos du moment, ouverte avec
+  /// le contexte (sombre) de l'écran. Au retour, le brouillon est relu.
+  /// `null` : le bouton ne fait rien.
+  final Future<void> Function(BuildContext context)? ouvrirPhotos;
 
   /// L'heure d'aujourd'hui, pour dire « Hier » ou « Aujourd'hui ».
   final DateTime Function() maintenant;
@@ -111,7 +123,6 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
   final Set<String> _amisTaguesIds = {};
   AudienceSouvenir _audience = AudienceSouvenir.toutLeMonde;
   bool _enCours = false;
-  bool _publie = false;
 
   /// La rangée d'émotions « respire » : on rappelle qu'un choix manque.
   bool _rappelEmotion = false;
@@ -227,18 +238,19 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
   }
 
   /// Écrit un changement dans le brouillon, sans attendre.
-  void _persister(Brouillon Function(Brouillon actuel) transformation) {
+  Future<void> _persister(
+    Brouillon Function(Brouillon actuel) transformation,
+  ) async {
     final b = _brouillon;
     final brouillons = _ecran.brouillons;
     if (b == null || brouillons == null) return;
-    brouillons
-        .mettreAJour(b.id, transformation)
-        .then((maj) {
-          if (maj != null) _brouillon = maj;
-        })
-        .catchError((Object e) {
-          debugPrint('EcranFinalisation: brouillon : $e');
-        });
+    try {
+      final maj = await brouillons.mettreAJour(b.id, transformation);
+      if (maj == null || !mounted) return;
+      setState(() => _brouillon = maj);
+    } catch (e) {
+      debugPrint('EcranFinalisation: brouillon : $e');
+    }
   }
 
   /// Quelque chose a changé depuis l'ouverture du moment à modifier.
@@ -264,7 +276,9 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     final b = _brouillon;
     final brouillons = _ecran.brouillons;
     if (b != null && brouillons != null) {
-      return [for (final p in b.photos) brouillons.imagePhoto(b.id, p.id)];
+      return [
+        for (final p in b.photosAPublier) brouillons.imagePhoto(b.id, p.id),
+      ];
     }
     final m = _ecran.aModifier;
     if (m == null) return const [];
@@ -275,7 +289,7 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
 
   EtapeFinalisation get _etape => etapeFinalisation(
     modification: _modification,
-    aDesPhotos: _images.isNotEmpty,
+    aDesPhotos: nombrePhotosPublicable(_images.length),
     aUnLieu: lieu != null,
   );
 
@@ -378,36 +392,19 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     _persister((b) => b.copieAvec(etoiles: notes));
   }
 
-  Future<void> _avecQui() async {
-    final c = TablCouleurs.of(context);
-    await _feuille('Avec qui ?', (redessiner) {
-      final relations = _donnees?.relations ?? const <ProfilPublic>[];
-      if (relations.isEmpty) {
-        return Text(
-          'Personne à taguer pour l\'instant : suivez des gens pour les '
-          'retrouver ici.',
-          style: c.legende,
-        );
-      }
-      return TablSelecteurPersonnes(
-        personnes: [
-          for (final r in relations)
-            PersonneSelectionnable(
-              id: r.id,
-              pseudo: r.pseudo,
-              photoUrl: r.photoUrl,
-            ),
-        ],
-        selection: _amisTaguesIds,
-        onBascule: (id) {
-          if (!_amisTaguesIds.remove(id)) _amisTaguesIds.add(id);
-          redessiner();
-        },
-      );
-    });
-    final ids = Set.of(_amisTaguesIds);
-    _persister((b) => b.copieAvec(avecQuiIds: ids));
-  }
+  Future<void> _avecQui() => ouvrirFeuilleAvecQui(
+    context,
+    personnes: _donnees?.relations ?? const <ProfilPublic>[],
+    selection: _amisTaguesIds,
+    onChange: (ids) {
+      setState(() {
+        _amisTaguesIds
+          ..clear()
+          ..addAll(ids);
+      });
+      _persister((b) => b.copieAvec(avecQuiIds: ids));
+    },
+  );
 
   Future<void> _choisirAudience() async {
     final choisie = await ouvrirFeuilleAudience(
@@ -423,11 +420,39 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     _persister((b) => b.copieAvec(audience: choisie));
   }
 
+  /// « Où et quand » : le lieu, et pour un moment en création le repas
+  /// (midi ou soir).
   Future<void> _choisirLieu() async {
-    await changerLieu();
-    final choisi = lieu;
-    if (!lieuChoisi || choisi == null) return;
-    _persister((b) => b.copieAvec(lieu: () => choisi));
+    final b = _brouillon;
+    final resultat = await ouvrirFeuilleOuEtQuand(
+      context,
+      lieu: lieu,
+      lieuConfirme: lieuChoisi,
+      moment: b == null ? null : momentDuBrouillon(b.priseLe),
+      endroits: endroits,
+      prochesParEndroit: prochesParEndroit,
+      repere: repere,
+      rechercheLieuService: rechercheLieuService,
+      positionService: positionService,
+      completerLieuManuel: completerLieuManuel,
+    );
+    if (resultat == null || !mounted) return;
+    final choisi = resultat.lieu;
+    final moment = resultat.moment;
+    setState(() {
+      lieu = choisi ?? lieu;
+      lieuChoisi = resultat.lieuConfirme || lieuChoisi;
+    });
+    if (b == null) return;
+    final priseLe = moment == null
+        ? null
+        : priseLePourMoment(b.priseLe, moment);
+    _persister(
+      (actuel) => actuel.copieAvec(
+        lieu: choisi == null ? null : () => choisi,
+        priseLe: priseLe,
+      ),
+    );
   }
 
   void _choisirEmotion(String emoji) {
@@ -457,8 +482,8 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     }
     switch (etape) {
       case EtapeFinalisation.choisirPhotos:
-        await _ecran.ouvrirPhotos?.call();
-        await _relireBrouillon();
+        await _ecran.ouvrirPhotos?.call(context);
+        if (mounted) await _relireBrouillon();
       case EtapeFinalisation.choisirLieu:
         await _choisirLieu();
       case EtapeFinalisation.publier:
@@ -473,9 +498,10 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     final b = _brouillon;
     final relu = b == null ? null : await _ecran.brouillons?.charger(b.id);
     if (relu == null || !mounted) return;
+    final nombre = relu.photosAPublier.length;
     setState(() {
       _brouillon = relu;
-      _page = _page.clamp(0, relu.photos.isEmpty ? 0 : relu.photos.length - 1);
+      _page = _page.clamp(0, nombre == 0 ? 0 : nombre - 1);
     });
     if (lieu == null && endroits.isEmpty) _chercherLieu();
   }
@@ -483,9 +509,14 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
   Future<void> _publier() async {
     final b = _brouillon;
     final brouillons = _ecran.brouillons;
-    final lieu = this.lieu;
+    final envois = _ecran.envois;
+    final choisi = lieu;
     final emotion = _emotion;
-    if (b == null || brouillons == null || lieu == null || emotion == null) {
+    if (b == null ||
+        brouillons == null ||
+        envois == null ||
+        choisi == null ||
+        emotion == null) {
       return;
     }
     final legende = _mot.text.trim();
@@ -497,35 +528,30 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
 
     setState(() => _enCours = true);
     try {
-      final octets = [
-        for (final p in b.photos) await brouillons.octetsPhoto(b.id, p.id),
-      ];
-      final lues = await lirePhotos(octets);
-      final tablesEnEchec = await _ecran.souvenirService.publier(
-        lieu: lieu,
-        photos: octets,
-        emotion: emotion,
-        legende: legende.isEmpty ? null : legende,
-        amisTaguesIds: _amisTaguesIds.toList(),
-        notes: Map.of(_etoiles),
-        audience: _audience,
-        empreintes: [for (final p in lues) ?p.metadonnees.empreinte],
+      // La cloche publie le brouillon tel qu'il est écrit : tout ce qui est
+      // à l'écran (même un lieu seulement proposé) y passe d'abord.
+      final ecrit = await brouillons.mettreAJour(
+        b.id,
+        (actuel) => actuel.copieAvec(
+          lieu: () => choisi,
+          emotion: () => emotion,
+          legende: () => legende.isEmpty ? null : legende,
+          etoiles: Map.of(_etoiles),
+          avecQuiIds: Set.of(_amisTaguesIds),
+          audience: _audience,
+        ),
       );
-      await brouillons.supprimerBrouillon(b.id);
+      if (ecrit == null) throw StateError('Brouillon ${b.id} introuvable.');
       if (!mounted) return;
-      // Le moment est publié malgré tout (règle 51) : un message discret
-      // plutôt qu'une erreur bloquante.
-      if (tablesEnEchec.isNotEmpty) {
-        afficherMessage(
-          context,
-          'Publié, mais impossible de le partager avec '
-          '${pluriel(tablesEnEchec.length, 'Table')}.',
-        );
+      final resultat = await Navigator.of(context).push<ResultatCloche>(
+        MaterialPageRoute(
+          builder: (_) => EcranCloche(brouillonId: b.id, envois: envois),
+        ),
+      );
+      if (!mounted) return;
+      if (resultat != null && resultat.issue != IssueCloche.modifier) {
+        Navigator.of(context).pop(resultat);
       }
-      HapticFeedback.lightImpact();
-      setState(() => _publie = true);
-      await Future<void>.delayed(const Duration(milliseconds: 1300));
-      if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       debugPrint('EcranFinalisation: $e');
       if (!mounted) return;
@@ -641,7 +667,7 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
     return PopScope(
       canPop: !_enCours && !_modification,
       onPopInvokedWithResult: (aQuitte, _) {
-        if (!aQuitte && !_enCours && !_publie) _fermer();
+        if (!aQuitte && !_enCours) _fermer();
       },
       child: Scaffold(
         backgroundColor: c.fond,
@@ -794,7 +820,6 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
                 ),
               ),
             ),
-            if (_publie) const Positioned.fill(child: TablMomentGarde()),
           ],
         ),
       ),
