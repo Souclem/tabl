@@ -308,6 +308,10 @@ void main() {
       () async {
         final app = ouvrirApp();
         final brouillon = await brouillonPret(app.brouillons);
+        await preparerSurServeur(brouillon, app.brouillons);
+        // Publier sur le serveur (statut = 'publie')
+        await PublicationEnDeuxTemps(depot).valider(brouillon.id);
+        depot.appels.clear();
         await laisserEnvoi(
           app.file,
           brouillon.id,
@@ -317,11 +321,43 @@ void main() {
 
         final resultats = await app.envois.reprendre(auLancement: true);
 
-        expect(resultats, isEmpty);
-        expect(depot.lignes, isEmpty);
+        expect(resultats.map((r) => r.issue), [IssueReprise.publiee]);
+        expect(depot.lignes[brouillon.id]!['statut'], statutPublie);
         expect(depot.appels, isEmpty);
         expect(await app.brouillons.charger(brouillon.id), isNull);
         expect(await app.file.lister(), isEmpty);
+      },
+    );
+
+    test(
+      'commitLance mais statut=null (orpheline nettoyée) : brouillon local gardé, ligne retirée',
+      () async {
+        var app = ouvrirApp();
+        final brouillon = await brouillonPret(app.brouillons);
+        await preparerSurServeur(brouillon, app.brouillons);
+        // Simule l'envoi interrompu après le commit
+        await laisserEnvoi(
+          app.file,
+          brouillon.id,
+          EtatEnvoi.enCours,
+          commitLance: true,
+        );
+        // Le serveur a nettoyé l'orpheline après 24h : statut=null
+        depot.lignes.remove(brouillon.id);
+        depot.fichiers.removeWhere((k, _) => k.startsWith(brouillon.id));
+        depot.appels.clear();
+
+        app = ouvrirApp();
+        final resultats = await app.envois.reprendre(auLancement: true);
+
+        // Pas de message à l'auteur
+        expect(resultats, isEmpty);
+        // Le brouillon local est gardé
+        expect(await app.brouillons.charger(brouillon.id), isNotNull);
+        // La ligne de la file est retirée
+        expect(await app.file.lister(), isEmpty);
+        // Rien n'a été envoyé au serveur
+        expect(depot.appels, isEmpty);
       },
     );
   });

@@ -333,7 +333,10 @@ class EnvoiPublications {
     if (envoi.etat == EtatEnvoi.enCours && envoi.commitLance) {
       // L'ordre de publier est parti : on le mène à terme, une seule fois.
       if (statut == null) {
-        await _terminer(id);
+        // Le brouillon serveur a été nettoyé (orpehline après 24h) mais le
+        // brouillon local existe encore : on le garde et on retire la ligne
+        // de la file pour que l'auteur puisse réessayer.
+        await _file.retirer(id);
         return null;
       }
       try {
