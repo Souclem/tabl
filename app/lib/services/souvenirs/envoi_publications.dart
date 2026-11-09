@@ -38,10 +38,16 @@ class ResultatEnvoi {
     this.statut, {
     this.erreur,
     this.tablesEnEchec = const [],
+    this.dejaPublie = false,
   });
 
   final StatutEnvoi statut;
   final Object? erreur;
+
+  /// Vrai avec [StatutEnvoi.publie] quand le serveur avait déjà publié ce
+  /// moment (le commit d'un essai précédent avait abouti) : les
+  /// modifications du brouillon n'ont pas été appliquées.
+  final bool dejaPublie;
 
   /// Les Tables dont l'association a échoué (voir [MomentPrepare]).
   final List<String> tablesEnEchec;
@@ -451,6 +457,7 @@ class EnvoiPublications {
     return ResultatEnvoi(
       StatutEnvoi.publie,
       tablesEnEchec: prepare.tablesEnEchec,
+      dejaPublie: prepare.dejaPublie,
     );
   }
 

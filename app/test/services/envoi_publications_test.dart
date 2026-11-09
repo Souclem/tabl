@@ -191,6 +191,28 @@ void main() {
       expect((await app.file.lister()), isEmpty);
     });
 
+    test('un moment que le serveur a déjà publié le dit au résultat', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await preparerSurServeur(brouillon, app.brouillons);
+      depot.lignes[brouillon.id]!['statut'] = statutPublie;
+
+      final resultat = await app.envois.envoyer(brouillon.id);
+
+      expect(resultat.statut, StatutEnvoi.publie);
+      expect(resultat.dejaPublie, isTrue);
+      expect(await app.brouillons.charger(brouillon.id), isNull);
+    });
+
+    test('un envoi normal n\'est pas « déjà publié »', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final resultat = await app.envois.envoyer(brouillon.id);
+
+      expect(resultat.dejaPublie, isFalse);
+    });
+
     test('deux envois simultanés du même brouillon : un seul part', () async {
       final serveur = _DepotLent();
       final app = ouvrirApp(serveur);

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:app/services/services.dart';
@@ -29,7 +30,7 @@ class DepotPublicationSimule implements DepotPublication {
   Set<String> tablesRefusees = {};
 
   void _reseau() {
-    if (horsLigne) throw StateError('hors ligne');
+    if (horsLigne) throw const SocketException('hors ligne');
   }
 
   @override
