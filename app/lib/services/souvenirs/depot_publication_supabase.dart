@@ -80,6 +80,23 @@ class DepotPublicationSupabase implements DepotPublication {
   }
 
   @override
+  Future<void> viderLiens(String momentId) async {
+    // Les empreintes restent : l'app ne peut que les ajouter, et elles ne
+    // donnent accès à rien.
+    await (
+      _client.from('souvenirs_photos').delete().eq('souvenir_id', momentId),
+      _client
+          .from('souvenirs_amis_tagues')
+          .delete()
+          .eq('souvenir_id', momentId),
+      _client
+          .from('associations_experience_table')
+          .delete()
+          .eq('souvenir_id', momentId),
+    ).wait;
+  }
+
+  @override
   Future<void> ecrireLiens(
     String momentId, {
     required List<String> cheminsAutresPhotos,

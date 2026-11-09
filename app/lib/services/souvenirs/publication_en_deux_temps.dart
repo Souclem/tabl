@@ -20,7 +20,8 @@ abstract interface class DepotPublication {
   Future<String> idRestaurant(LieuRestaurant lieu);
 
   /// Dépose un fichier dans le dossier de l'auteur. Un fichier déjà là
-  /// n'est pas une erreur : c'est une relance.
+  /// n'est pas une erreur (deux dépôts du même essai) ; [preparer] retire
+  /// d'abord ceux d'un essai précédent, dont le contenu peut différer.
   Future<void> deposerPhoto(String chemin, Uint8List octets);
 
   /// Crée le moment au statut brouillon.
@@ -31,6 +32,12 @@ abstract interface class DepotPublication {
     String momentId,
     Map<String, Object?> colonnes,
   );
+
+  /// Retire d'un brouillon existant les photos supplémentaires, les amis
+  /// tagués et les associations de Tables : une relance les réécrit depuis
+  /// la demande, pour que le serveur ne garde rien de ce que l'auteur a
+  /// retiré entre-temps.
+  Future<void> viderLiens(String momentId);
 
   /// Écrit les lignes liées ; rejouable : ce qui existe déjà est gardé,
   /// la liste des personnes de l'audience remplace l'ancienne.
@@ -87,6 +94,14 @@ class PublicationEnDeuxTemps implements PublicationService {
     if (statut == statutPublie) {
       return MomentPrepare(id: demande.id, dejaPublie: true);
     }
+
+    // Une relance repart de zéro côté serveur : le brouillon garde l'id mais
+    // pas son ancien contenu (Table, ami ou photo retirés, couverture
+    // changée), qui sinon serait publié ou resterait visible des membres
+    // d'une Table retirée.
+    if (statut == statutBrouillon) await _depot.viderLiens(demande.id);
+    final anciens = await _depot.fichiersDuMoment(demande.id);
+    if (anciens.isNotEmpty) await _depot.supprimerFichiers(anciens);
 
     final total = demande.photos.length;
     final monId = _depot.monId;

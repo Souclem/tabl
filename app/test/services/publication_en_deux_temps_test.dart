@@ -33,7 +33,8 @@ class _DepotSimule implements DepotPublication {
     if (echecAuRang != null && chemin.endsWith('-$echecAuRang.jpg')) {
       throw StateError('réseau coupé');
     }
-    fichiers[chemin] = octets;
+    // Comme le stockage : un fichier déjà là n'est pas remplacé (409).
+    fichiers.putIfAbsent(chemin, () => octets);
   }
 
   @override
@@ -53,6 +54,14 @@ class _DepotSimule implements DepotPublication {
   ) async {
     appels.add('maj');
     lignes[momentId]!.addAll(colonnes);
+  }
+
+  @override
+  Future<void> viderLiens(String momentId) async {
+    appels.add('vider liens');
+    liens.remove('photos');
+    liens.remove('amis');
+    tables.remove(momentId);
   }
 
   @override
@@ -126,6 +135,7 @@ DemandePublication _demande({
   Map<String, int> etoiles = const {},
   AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
   List<Uint8List>? octets,
+  Set<String> amis = const {'ami-1'},
 }) => DemandePublication(
   id: id,
   lieu: const LieuRestaurant(nom: 'Chez Marcel', ville: 'Liège'),
@@ -134,10 +144,13 @@ DemandePublication _demande({
   priseLe: DateTime(2026, 11, 8, 12, 30),
   legende: 'Une belle table',
   etoiles: etoiles,
-  amisTaguesIds: const {'ami-1'},
+  amisTaguesIds: amis,
   audience: audience,
   empreintes: const ['abc', 'abc', 'def'],
 );
+
+AudienceSouvenir _audienceTables(Set<String> ids) =>
+    AudienceSouvenir(mode: ModeAudience.seulement, tableIds: ids);
 
 void main() {
   late _DepotSimule depot;
@@ -445,6 +458,75 @@ void main() {
         expect(depot.lignes['moment-1']!['notes'], {'cuisine': 5});
         expect(depot.fichiers, hasLength(3));
         expect(depot.liens['empreintes'], {'abc', 'def'});
+      },
+    );
+
+    test(
+      'une relance qui retire Table, ami et photos ne laisse que la demande',
+      () async {
+        await service.preparer(
+          _demande(audience: _audienceTables({'table-x', 'table-y'})),
+        );
+        expect(depot.tables['moment-1'], {'table-x', 'table-y'});
+
+        await service.preparer(
+          _demande(
+            photos: 1,
+            octets: [_octets(99)],
+            audience: _audienceTables({'table-y'}),
+            amis: const {},
+          ),
+        );
+
+        expect(depot.tables['moment-1'], {'table-y'});
+        expect(depot.liens['amis'], isEmpty);
+        expect(depot.liens['photos'], isEmpty);
+        expect(depot.fichiers.keys, {'auteur-1/moment-1-0.jpg'});
+        expect(
+          depot.lignes['moment-1']!['photo_url'],
+          'auteur-1/moment-1-0.jpg',
+        );
+      },
+    );
+
+    test(
+      'une relance qui remplace une photo envoie le nouveau contenu',
+      () async {
+        await service.preparer(_demande(photos: 2));
+        final nouvelles = [_octets(200), _octets(210)];
+
+        await service.preparer(_demande(octets: nouvelles));
+
+        expect(depot.fichiers['auteur-1/moment-1-0.jpg'], nouvelles[0]);
+        expect(depot.fichiers['auteur-1/moment-1-1.jpg'], nouvelles[1]);
+      },
+    );
+
+    test('une relance après une coupure en plein envoi, photos changées, '
+        'ne garde pas les anciens fichiers', () async {
+      depot.echecAuRang = 1;
+      await expectLater(
+        service.preparer(_demande(photos: 2)),
+        throwsStateError,
+      );
+      depot.echecAuRang = null;
+      final nouvelles = [_octets(200), _octets(210)];
+
+      await service.preparer(_demande(octets: nouvelles));
+
+      expect(depot.fichiers['auteur-1/moment-1-0.jpg'], nouvelles[0]);
+      expect(depot.fichiers['auteur-1/moment-1-1.jpg'], nouvelles[1]);
+    });
+
+    test(
+      'ne touche pas aux fichiers ni aux liens d\'un autre moment',
+      () async {
+        await service.preparer(_demande(id: 'moment-2'));
+
+        await service.preparer(_demande());
+
+        expect(depot.fichiers, hasLength(6));
+        expect(depot.tables.containsKey('moment-2'), isTrue);
       },
     );
 
