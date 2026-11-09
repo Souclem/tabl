@@ -67,7 +67,9 @@ abstract interface class DepotPublication {
   /// création : de quoi retrouver ceux qu'aucune file n'attend plus.
   Future<List<({String id, DateTime creeLe})>> brouillonsDuServeur();
 
-  Future<void> supprimerLigne(String momentId);
+  /// Supprime la ligne si elle est encore au statut brouillon ; `false`
+  /// quand rien n'a été supprimé (moment publié entre-temps, ou disparu).
+  Future<bool> supprimerLigne(String momentId);
   Future<void> supprimerFichiers(List<String> chemins);
 }
 
@@ -177,7 +179,13 @@ class PublicationEnDeuxTemps implements PublicationService {
     // Les fichiers sont repérés avant : une fois la ligne partie, plus
     // rien ne dirait lesquels étaient les siens.
     final fichiers = await _depot.fichiersDuMoment(momentId);
-    if (statut != null) await _depot.supprimerLigne(momentId);
+    if (statut != null && !await _depot.supprimerLigne(momentId)) {
+      // Rien supprimé : publié entre-temps (alors on garde ses fichiers),
+      // ou déjà abandonné ailleurs.
+      if (await _depot.statutDe(momentId) == statutPublie) {
+        throw MomentDejaPublie(momentId);
+      }
+    }
     if (fichiers.isNotEmpty) await _depot.supprimerFichiers(fichiers);
   }
 }

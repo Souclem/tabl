@@ -303,6 +303,22 @@ void main() {
       expect(depot.fichiers, hasLength(3));
     });
 
+    test('publié entre la lecture du statut et la suppression : '
+        'la ligne et les fichiers restent', () async {
+      await service.preparer(_demande());
+      depot.avantSuppressionLigne = () =>
+          depot.lignes['moment-1']!['statut'] = statutPublie;
+
+      await expectLater(
+        service.abandonner('moment-1'),
+        throwsA(isA<MomentDejaPublie>()),
+      );
+
+      expect(depot.lignes['moment-1']!['statut'], statutPublie);
+      expect(depot.fichiers, hasLength(3));
+      expect(depot.appels, isNot(contains('suppression fichiers')));
+    });
+
     test('valider après abandon lève MomentIntrouvable', () async {
       await service.preparer(_demande());
       await service.abandonner('moment-1');
