@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:app/ecrans/ecran_camera.dart';
@@ -10,56 +9,7 @@ import 'package:app/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-final _png = base64Decode(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA'
-  '60e6kgAAAABJRU5ErkJggg==',
-);
-
-const _comptoir = LieuRestaurant(
-  fsqPlaceId: 'fsq-comptoir',
-  nom: 'Le Comptoir',
-  ville: 'Liège',
-  latitude: 50.6327,
-  longitude: 5.5799,
-);
-
-class _FauxSouvenirService implements SouvenirService {
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
-}
-
-class _FauxAbonnementService implements AbonnementService {
-  @override
-  Future<bool> monProfilEstPrive() async => false;
-
-  @override
-  Future<Set<String>> mesAbonnesIds() async => {};
-
-  @override
-  Future<List<ProfilPublic>> mesRelations() async => const [];
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
-}
-
-class _FausseRechercheLieu implements RechercheLieuService {
-  @override
-  Future<List<LieuRestaurant>> lieuxProches({
-    required double latitude,
-    required double longitude,
-    double rayonM = 250,
-    int limite = 8,
-  }) async => [_comptoir];
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
-}
-
-class _PositionFixe implements PositionService {
-  @override
-  Future<Coordonnees?> positionActuelle() async =>
-      (latitude: 50.63, longitude: 5.57);
-}
+import 'parcours_simule.dart';
 
 /// La file d'envoi, simulée : la publication réussit aussitôt.
 class _FauxEnvois implements EnvoiPublications {
@@ -82,16 +32,6 @@ class _FauxEnvois implements EnvoiPublications {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
-/// Laisse la vraie entrée-sortie (fichiers du brouillon) se terminer.
-Future<void> _attendre(WidgetTester tester, {int tours = 20}) async {
-  for (var i = 0; i < tours; i++) {
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 25)),
-    );
-    await tester.pump(const Duration(milliseconds: 50));
-  }
-}
-
 void main() {
   late Directory racine;
   late BrouillonsLocaux brouillons;
@@ -112,7 +52,7 @@ void main() {
       genererId: () => 'id${++compteur}',
     );
     envois = _FauxEnvois(brouillons);
-    camera = FausseCamera(octetsPhoto: _png, maintenant: () => maintenant);
+    camera = FausseCamera(octetsPhoto: pngTest, maintenant: () => maintenant);
     resultat = null;
     termine = false;
   });
@@ -135,12 +75,12 @@ void main() {
                 onPressed: () async {
                   resultat = await ParcoursCreation.ouvrir(
                     context,
-                    souvenirService: _FauxSouvenirService(),
-                    abonnementService: _FauxAbonnementService(),
+                    souvenirService: FauxSouvenirService(),
+                    abonnementService: FauxAbonnementService(),
                     camera: camera,
                     envois: envois,
-                    rechercheLieuService: _FausseRechercheLieu(),
-                    positionService: _PositionFixe(),
+                    rechercheLieuService: FausseRechercheLieu(),
+                    positionService: PositionFixe(),
                     maintenant: () => maintenant,
                   );
                   termine = true;
@@ -153,16 +93,16 @@ void main() {
       ),
     );
     await tester.tap(find.text('Fil'));
-    await _attendre(tester);
+    await attendre(tester);
   }
 
   /// Une photo prise, puis « Continuer » (le restaurant est proposé d'après
   /// la position).
   Future<void> prendreUnePhotoEtContinuer(WidgetTester tester) async {
     await tester.tap(find.byType(DeclencheurCamera));
-    await _attendre(tester);
+    await attendre(tester);
     await tester.tap(find.text('Continuer · 1'));
-    await _attendre(tester);
+    await attendre(tester);
   }
 
   testWidgets('« + » ouvre la caméra', (tester) async {
@@ -189,11 +129,11 @@ void main() {
     await prendreUnePhotoEtContinuer(tester);
 
     await tester.tap(find.text('🤩'));
-    await _attendre(tester, tours: 4);
+    await attendre(tester, tours: 4);
     await tester.tap(find.text('Publier'));
-    await _attendre(tester, tours: 10);
-    await _attendre(tester, tours: 40);
-    await _attendre(tester, tours: 10);
+    await attendre(tester, tours: 10);
+    await attendre(tester, tours: 40);
+    await attendre(tester, tours: 10);
 
     expect(envois.envoyes, ['id1']);
     expect(termine, isTrue);
@@ -209,7 +149,7 @@ void main() {
     await prendreUnePhotoEtContinuer(tester);
 
     await tester.tap(find.text('Plus tard'));
-    await _attendre(tester, tours: 8);
+    await attendre(tester, tours: 8);
 
     expect(termine, isTrue);
     expect(resultat, isNull);
@@ -223,7 +163,7 @@ void main() {
     await demarrer(tester);
 
     await tester.tap(find.byTooltip('Fermer : le brouillon est gardé'));
-    await _attendre(tester, tours: 8);
+    await attendre(tester, tours: 8);
 
     expect(termine, isTrue);
     expect(resultat, isNull);
@@ -241,21 +181,21 @@ void main() {
       ),
     );
     await tester.tap(find.text('Plus tard'));
-    await _attendre(tester, tours: 8);
+    await attendre(tester, tours: 8);
     expect(termine, isTrue);
 
     await tester.tap(find.text('Fil'));
-    await _attendre(tester);
+    await attendre(tester);
     await tester.tap(find.textContaining('Continuer'));
-    await _attendre(tester);
+    await attendre(tester);
     expect(find.text('Choisir les photos'), findsOneWidget);
 
     await tester.tap(find.text('Choisir les photos'));
-    await _attendre(tester, tours: 8);
+    await attendre(tester, tours: 8);
     expect(find.text('Photos du moment'), findsOneWidget);
 
     await tester.tap(find.text('Reprendre des photos'));
-    await _attendre(tester);
+    await attendre(tester);
 
     expect(find.byType(EcranCamera), findsOneWidget);
     expect(find.byType(EcranFinalisation), findsNothing);
