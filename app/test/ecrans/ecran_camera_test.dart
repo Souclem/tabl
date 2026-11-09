@@ -250,6 +250,43 @@ void main() {
     expect(camera.ouverte, isFalse);
   });
 
+  testWidgets('éventail : × retire la photo, « Annuler » la remet', (
+    tester,
+  ) async {
+    await deposer(tester);
+    await deposer(tester);
+    await ouvrir(tester);
+
+    await tester.tap(find.byType(PilePhotosCamera));
+    await attendre(tester);
+    expect(find.byType(EventailPhotosCamera), findsOneWidget);
+    expect(find.text('Importer'), findsOneWidget);
+
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(EventailPhotosCamera),
+            matching: find.byIcon(Icons.close_rounded),
+          )
+          .first,
+    );
+    await attendreQue(
+      tester,
+      find.text('Photo supprimée · récupérable 30 jours'),
+    );
+
+    expect(find.text('Photo supprimée · récupérable 30 jours'), findsOneWidget);
+    var liste = await gardes(tester, photos: 1);
+    expect(liste.single.photos, hasLength(1));
+
+    await tester.tap(find.text('Annuler'));
+    await attendre(tester);
+
+    liste = await gardes(tester, photos: 2);
+    expect(liste.single.photos, hasLength(2));
+    await terminer(tester);
+  });
+
   testWidgets('fermer garde le brouillon', (tester) async {
     await ouvrir(tester);
     await tester.tap(find.byType(DeclencheurCamera));
@@ -292,6 +329,16 @@ Future<List<Brouillon>> gardes(WidgetTester tester, {int photos = 0}) async {
 }
 
 /// Laisse l'écran rendre ce qui est en cours.
+Future<void> attendreQue(WidgetTester tester, Finder finder) async {
+  final fin = DateTime.now().add(const Duration(seconds: 10));
+  while (finder.evaluate().isEmpty && DateTime.now().isBefore(fin)) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
+    await tester.pump();
+  }
+}
+
 Future<void> attendre(WidgetTester tester) async {
   for (var i = 0; i < 20; i++) {
     await tester.runAsync(
