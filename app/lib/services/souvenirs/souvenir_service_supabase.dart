@@ -7,6 +7,7 @@ import '../restaurants/envies_restaurants.dart';
 import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
+import 'depot_publication_supabase.dart';
 import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
 import '../stockage/sans_metadonnees.dart';
@@ -351,53 +352,15 @@ class SouvenirServiceSupabase implements SouvenirService {
     );
   }
 
-  /// Remplace la liste des personnes choisies (autorisées ou exclues
-  /// selon le mode) par [personneIds].
   Future<void> _ecrirePersonnesAudience(
     String souvenirId,
     Set<String> personneIds,
-  ) async {
-    await _client
-        .from('souvenirs_audience')
-        .delete()
-        .eq('souvenir_id', souvenirId);
-    if (personneIds.isEmpty) return;
-    await _client.from('souvenirs_audience').insert([
-      for (final profilId in personneIds)
-        {'souvenir_id': souvenirId, 'profil_id': profilId},
-    ]);
-  }
+  ) => ecrirePersonnesAudience(_client, souvenirId, personneIds);
 
-  /// Associe [souvenirId] à chaque Table de [tableIds] (règle 26-28,
-  /// 39) — un insert par Table plutôt qu'une transaction unique
-  /// (l'architecture cliente Supabase ne permet pas de transaction
-  /// multi-lignes explicite ici, voir plan Bloc 5). Best-effort
-  /// délibéré : le souvenir existe déjà à ce stade, un échec partiel ne
-  /// doit jamais faire disparaître les Tables qui ont réussi
-  /// (règle 51). Retourne les identifiants de Table qui ont échoué —
-  /// jamais d'exception silencieuse.
   Future<List<String>> _associerTables(
     String souvenirId,
     List<String> tableIds,
-  ) async {
-    final echecs = <String>[];
-    for (final tableId in tableIds) {
-      try {
-        await _client.from('associations_experience_table').insert({
-          'souvenir_id': souvenirId,
-          'table_id': tableId,
-          'ajoute_par': _monId,
-        });
-      } on PostgrestException catch (e) {
-        // Déjà associée (double tap, règle 55) : l'état voulu est déjà
-        // atteint, pas une vraie erreur. Sinon (membership perdue entre
-        // la sélection et l'envoi, Table supprimée...) : on continue les
-        // autres Tables plutôt que de tout annuler (règle 51).
-        if (e.code != '23505') echecs.add(tableId);
-      }
-    }
-    return echecs;
-  }
+  ) => associerTablesAuMoment(_client, souvenirId, tableIds);
 
   @override
   Future<List<SouvenirFeed>> feed() => _souvenirsPublies(sansSouvenirs: true);
@@ -587,9 +550,10 @@ class SouvenirServiceSupabase implements SouvenirService {
       for (final p in (ligne['souvenirs_photos'] as List?) ?? const [])
         p['chemin'] as String?,
     ].where(aMoi).cast<String>().toList();
-    final medias = [
-      for (final i in instants) i['media_url'] as String?,
-    ].where(aMoi).cast<String>().toList();
+    final medias = [for (final i in instants) i['media_url'] as String?]
+        .where(aMoi)
+        .cast<String>()
+        .toList();
     try {
       await (
         photos.isEmpty

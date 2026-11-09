@@ -26,6 +26,8 @@ Future<void> main() async {
     clePubliable: ConfigSupabase.clePubliable,
   );
 
+  await TablBackend.demarrerEnvois();
+
   // Lue avant le premier écran : l'Explorer s'ouvre directement dans la
   // bonne apparence ; chaque changement est retenu sur l'appareil.
   final preferenceApparence = PreferenceApparencePreferences();
