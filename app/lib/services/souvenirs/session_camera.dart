@@ -171,6 +171,25 @@ class SessionCamera {
     });
   }
 
+  /// Retire une photo du brouillon actif : elle va à la corbeille, récupérable
+  /// 30 jours. `null` si rien n'a été retiré.
+  Future<PhotoCorbeille?> retirer(String photoId) => _enchainer(() async {
+    final cible = actif;
+    if (cible == null) return null;
+    final entree = await _brouillons.supprimerPhoto(cible.id, photoId);
+    if (entree == null) return null;
+    actif = await _brouillons.charger(cible.id) ?? cible;
+    return entree;
+  });
+
+  /// Remet une photo retirée à sa place. `null` si elle n'est plus dans la
+  /// corbeille.
+  Future<Brouillon?> restaurer(String photoId) => _enchainer(() async {
+    final brouillon = await _brouillons.restaurerPhoto(photoId);
+    if (brouillon != null && actif?.id == brouillon.id) actif = brouillon;
+    return brouillon;
+  });
+
   /// Le brouillon actif, une fois toutes les photos en cours rangées.
   Future<Brouillon?> terminer() async {
     await _file;
