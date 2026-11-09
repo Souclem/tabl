@@ -161,6 +161,21 @@ void main() {
   Future<List<Brouillon>> brouillonsSurDisque(WidgetTester tester) =>
       hors(tester, () => ouvrirApp().brouillons.lister());
 
+  /// Attend que le disque contienne ce que [pret] attend des brouillons.
+  Future<void> attendreSurDisque(
+    WidgetTester tester,
+    bool Function(List<Brouillon>) pret, {
+    required String attendu,
+  }) async {
+    List<Brouillon> liste = const [];
+    for (var i = 0; i < 200; i++) {
+      liste = await brouillonsSurDisque(tester);
+      if (pret(liste)) return;
+      await attendre(tester, tours: 2);
+    }
+    fail('Jamais écrit sur le disque : $attendu. Brouillons : $liste');
+  }
+
   Future<List<EnvoiPublication>> enAttenteSurDisque(WidgetTester tester) =>
       hors(tester, () => ouvrirApp().envois.enAttenteDEnvoi());
 
@@ -387,8 +402,13 @@ void main() {
       await ouvrirParcours(tester, app.envois);
       await prendrePhotoEtContinuer(tester);
       await tester.tap(find.text('🤩'));
-      await attendre(tester, tours: 4);
-      await attendre(tester, tours: 10);
+      // L'émotion est écrite en tâche de fond : « Plus tard » n'attend pas
+      // cette écriture, le test non plus ne doit pas supposer sa durée.
+      await attendreSurDisque(
+        tester,
+        (liste) => liste.any((b) => b.emotion == Emotion.inoubliable),
+        attendu: 'l\'émotion écrite dans le brouillon',
+      );
       await tester.tap(find.text('Plus tard'));
       await attendreFinCloche(tester);
 

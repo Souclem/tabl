@@ -93,16 +93,24 @@ void main() {
       ),
     );
     await tester.tap(find.text('Fil'));
-    await attendre(tester);
+    await attendreAffichage(tester, find.byType(EcranCamera));
+  }
+
+  /// Le parcours a rendu la main au Fil ; les transitions (en temps simulé)
+  /// se terminent ensuite.
+  Future<void> attendreRetourAuFil(WidgetTester tester) async {
+    await attendreJusque(tester, () => termine, attendu: 'le retour au Fil');
+    await attendre(tester, tours: 10);
   }
 
   /// Une photo prise, puis « Continuer » (le restaurant est proposé d'après
   /// la position).
   Future<void> prendreUnePhotoEtContinuer(WidgetTester tester) async {
     await tester.tap(find.byType(DeclencheurCamera));
-    await attendre(tester);
+    await attendreAffichage(tester, find.text('Continuer · 1'));
     await tester.tap(find.text('Continuer · 1'));
-    await attendre(tester);
+    await attendreAffichage(tester, find.byType(EcranFinalisation));
+    await attendreAffichage(tester, find.text('Le Comptoir'));
   }
 
   testWidgets('« + » ouvre la caméra', (tester) async {
@@ -131,9 +139,7 @@ void main() {
     await tester.tap(find.text('🤩'));
     await attendre(tester, tours: 4);
     await tester.tap(find.text('Publier'));
-    await attendre(tester, tours: 10);
-    await attendre(tester, tours: 40);
-    await attendre(tester, tours: 10);
+    await attendreRetourAuFil(tester);
 
     expect(envois.envoyes, ['id1']);
     expect(termine, isTrue);
@@ -149,7 +155,7 @@ void main() {
     await prendreUnePhotoEtContinuer(tester);
 
     await tester.tap(find.text('Plus tard'));
-    await attendre(tester, tours: 8);
+    await attendreRetourAuFil(tester);
 
     expect(termine, isTrue);
     expect(resultat, isNull);
@@ -163,7 +169,7 @@ void main() {
     await demarrer(tester);
 
     await tester.tap(find.byTooltip('Fermer : le brouillon est gardé'));
-    await attendre(tester, tours: 8);
+    await attendreRetourAuFil(tester);
 
     expect(termine, isTrue);
     expect(resultat, isNull);
@@ -181,21 +187,23 @@ void main() {
       ),
     );
     await tester.tap(find.text('Plus tard'));
-    await attendre(tester, tours: 8);
-    expect(termine, isTrue);
+    await attendreRetourAuFil(tester);
 
     await tester.tap(find.text('Fil'));
-    await attendre(tester);
+    await attendreAffichage(tester, find.textContaining('Continuer'));
     await tester.tap(find.textContaining('Continuer'));
-    await attendre(tester);
-    expect(find.text('Choisir les photos'), findsOneWidget);
+    await attendreAffichage(tester, find.text('Choisir les photos'));
 
     await tester.tap(find.text('Choisir les photos'));
-    await attendre(tester, tours: 8);
-    expect(find.text('Photos du moment'), findsOneWidget);
+    await attendreAffichage(tester, find.text('Photos du moment'));
 
     await tester.tap(find.text('Reprendre des photos'));
-    await attendre(tester);
+    await attendreJusque(
+      tester,
+      () => find.byType(EcranFinalisation).evaluate().isEmpty,
+      attendu: 'la caméra à la place de la finalisation',
+    );
+    await attendre(tester, tours: 10);
 
     expect(find.byType(EcranCamera), findsOneWidget);
     expect(find.byType(EcranFinalisation), findsNothing);
