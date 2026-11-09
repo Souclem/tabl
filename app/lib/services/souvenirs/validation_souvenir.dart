@@ -1,3 +1,5 @@
+import 'presentation_finalisation.dart';
+
 /// Règles de validation du formulaire de publication.
 ///
 /// Même convention que `services/auth/validation.dart` : chaque fonction
@@ -19,6 +21,15 @@ class ValidationSouvenir {
   /// maximum (voir B9).
   static String? legende(String valeur) {
     if (valeur.length > 120) return '120 caractères maximum.';
+    return null;
+  }
+
+  /// « Ajouter un mot » de la finalisation : le même texte que la légende,
+  /// mais jusqu'à 300 caractères.
+  static String? mot(String valeur) {
+    if (valeur.length > longueurMaxMot) {
+      return '$longueurMaxMot caractères maximum.';
+    }
     return null;
   }
 }
