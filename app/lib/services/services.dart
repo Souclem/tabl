@@ -57,6 +57,7 @@ export 'souvenirs/audience_souvenir.dart';
 export 'souvenirs/bilan_profil.dart';
 export 'souvenirs/brouillon_local.dart';
 export 'souvenirs/commentaire.dart';
+export 'souvenirs/compteur_visites.dart';
 export 'souvenirs/depot_publication_supabase.dart';
 export 'souvenirs/date_souvenir.dart';
 export 'souvenirs/emotion.dart';
