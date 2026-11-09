@@ -240,6 +240,11 @@ class BrouillonsLocaux {
   }
 
   final Directory _racine;
+
+  /// Le dossier des données locales de l'app : brouillons, corbeille, et la
+  /// file d'envoi (voir [FileEnvoi]).
+  Directory get racine => _racine;
+
   final DateTime Function() _maintenant;
   final String Function() _genererId;
 
@@ -388,7 +393,7 @@ class BrouillonsLocaux {
         );
         await _dossierCorbeille.create(recursive: true);
         await fichierPhoto(id, photoId).rename(_photoCorbeille(photoId).path);
-        await _ecrireAtomique(
+        await ecrireJsonAtomique(
           _jsonCorbeille(photoId),
           _corbeilleVersJson(entree),
         );
@@ -475,7 +480,7 @@ class BrouillonsLocaux {
   }
 
   Future<Brouillon?> _lire(String id) async {
-    final json = await _lireJson(_fichierJson(id));
+    final json = await lireJson(_fichierJson(id));
     if (json == null) return null;
     try {
       return Brouillon.depuisJson(json);
@@ -485,7 +490,7 @@ class BrouillonsLocaux {
   }
 
   Future<void> _ecrire(Brouillon brouillon) =>
-      _ecrireAtomique(_fichierJson(brouillon.id), brouillon.versJson());
+      ecrireJsonAtomique(_fichierJson(brouillon.id), brouillon.versJson());
 
   Future<List<PhotoCorbeille>> _listerCorbeille() async {
     if (!await _dossierCorbeille.exists()) return [];
@@ -503,7 +508,7 @@ class BrouillonsLocaux {
   }
 
   Future<PhotoCorbeille?> _lireCorbeille(String photoId) async {
-    final json = await _lireJson(_jsonCorbeille(photoId));
+    final json = await lireJson(_jsonCorbeille(photoId));
     if (json == null) return null;
     try {
       return PhotoCorbeille(
@@ -533,14 +538,14 @@ class BrouillonsLocaux {
 
 /// Écrit dans un fichier voisin puis le renomme : une coupure en pleine
 /// écriture ne laisse jamais un JSON à moitié écrit.
-Future<void> _ecrireAtomique(File fichier, Map<String, Object?> json) async {
+Future<void> ecrireJsonAtomique(File fichier, Map<String, Object?> json) async {
   await fichier.parent.create(recursive: true);
   final provisoire = File('${fichier.path}.tmp');
   await provisoire.writeAsString(jsonEncode(json), flush: true);
   await provisoire.rename(fichier.path);
 }
 
-Future<Map<String, dynamic>?> _lireJson(File fichier) async {
+Future<Map<String, dynamic>?> lireJson(File fichier) async {
   try {
     final lu = jsonDecode(await fichier.readAsString());
     return lu is Map<String, dynamic> ? lu : null;
