@@ -58,6 +58,15 @@ sont dans `docs/regles.md`.
 - **Reprise après fermeture** : fermer la caméra, « Plus tard » ou quitter
   l'app garde le brouillon ; « + » le retrouve. Un envoi en attente repart
   dès que possible.
+- **Après la cloche** (`suiteApresCloche`, câblé dans `EcranPrincipal`) :
+  publié ou déjà publié → retour au Fil, rechargé de zéro, le nouveau moment
+  en haut, sans message ; « Modifier » → on reste sur la finalisation ;
+  annulé, gardé en brouillon, en attente → rien ne change (on reste sur
+  l'onglet d'où l'on est parti) et un message discret dit que le moment est
+  gardé sur le téléphone (il n'y a pas encore de bandeau de brouillon dans
+  le Fil). Si des Tables n'ont pas pu être associées, le moment est publié
+  et un message discret le dit. Pas encore : la puce « n-ième fois ici »
+  (rien ne la définit : ni texte, ni règle de comptage).
 - **Modifier** (menu « ⋯ ») : rouvre la finalisation prérempli, sans la
   cloche ; **photos et date figées** ; les souvenirs ne sont pas encore
   modifiables.

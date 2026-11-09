@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:app/ecrans/ecran_camera.dart';
 import 'package:app/ecrans/parcours_creation.dart';
 import 'package:app/widgets/widgets.dart';
 import 'package:app/services/services.dart';

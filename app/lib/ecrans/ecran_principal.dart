@@ -31,6 +31,7 @@ class EcranPrincipal extends StatefulWidget {
     this.positionService,
     this.camera,
     this.envois,
+    this.ouvrirParcours,
   });
 
   final AuthService authService;
@@ -57,6 +58,10 @@ class EcranPrincipal extends StatefulWidget {
   /// production (la vraie caméra, `TablBackend.envois`), simulées en test.
   final CameraService? camera;
   final EnvoiPublications? envois;
+
+  /// Remplace le parcours de création (caméra, finalisation, cloche) : un
+  /// test rend directement le [ResultatCloche] dont il veut voir la suite.
+  final Future<ResultatCloche?> Function(BuildContext context)? ouvrirParcours;
 
   /// Route standard vers l'écran principal, une fois connecté. Centralisé
   /// ici (même principe que `EcranAccueil.route`) pour que tous les
@@ -218,30 +223,27 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   }
 
   Future<void> _publier() async {
-    final resultat = await ParcoursCreation.ouvrir(
-      context,
-      souvenirService: widget.souvenirService,
-      abonnementService: widget.abonnementService,
-      camera: widget.camera ?? CameraServiceAppareil(),
-      envois: widget.envois ?? TablBackend.envois,
-      tableService: _tableService,
-      rechercheLieuService: _rechercheLieuService,
-      positionService: _positionService,
-    );
+    final resultat =
+        await (widget.ouvrirParcours?.call(context) ??
+            ParcoursCreation.ouvrir(
+              context,
+              souvenirService: widget.souvenirService,
+              abonnementService: widget.abonnementService,
+              camera: widget.camera ?? CameraServiceAppareil(),
+              envois: widget.envois ?? TablBackend.envois,
+              tableService: _tableService,
+              rechercheLieuService: _rechercheLieuService,
+              positionService: _positionService,
+            ));
     if (resultat == null || !mounted) return;
-    final issue = resultat.issue;
-    if (issue == IssueCloche.publie || issue == IssueCloche.dejaPublie) {
+    final suite = suiteApresCloche(resultat);
+    if (suite.montrerLeFil) {
       setState(() {
         _versionFeed++;
         _onglet = TablOnglet.feed;
       });
     }
-    // Le moment est publié malgré tout (règle 51) : un message discret
-    // plutôt qu'une erreur bloquante.
-    final message = resultat.tablesEnEchec.isNotEmpty
-        ? 'Publié, mais impossible de le partager avec '
-              '${pluriel(resultat.tablesEnEchec.length, 'Table')}.'
-        : messageApresCloche(issue);
+    final message = suite.message;
     if (message != null) afficherMessage(context, message);
   }
 

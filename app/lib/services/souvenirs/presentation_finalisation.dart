@@ -103,12 +103,44 @@ EtapeFinalisation etapeFinalisation({
   return EtapeFinalisation.publier;
 }
 
-/// Ce que la cloche laisse à dire au retour, ou `null` quand la suite parle
-/// d'elle-même (le moment arrive dans le Fil, ou la cloche l'a déjà dit).
-String? messageApresCloche(IssueCloche issue) => switch (issue) {
-  IssueCloche.publie || IssueCloche.dejaPublie || IssueCloche.modifier => null,
-  IssueCloche.annule =>
-    'Publication annulée. Votre moment est gardé sur ce téléphone.',
-  IssueCloche.brouillonGarde => 'Votre moment est gardé sur ce téléphone.',
-  IssueCloche.enAttente => 'Votre moment sera envoyé dès que possible.',
-};
+/// La suite que l'appelant tire d'un [ResultatCloche] : faut-il montrer le
+/// Fil (rafraîchi, le nouveau moment en haut), et ce qu'il reste à dire.
+typedef SuiteCloche = ({bool montrerLeFil, String? message});
+
+/// Le passage de relais après la cloche.
+/// - publié ou déjà publié : le Fil repart de zéro et montre le moment, sans
+///   message (sauf Tables en échec : le moment est publié, on le dit sans
+///   en faire une erreur) ;
+/// - annulé, brouillon gardé, en attente : rien ne change, un message dit où
+///   est le moment ;
+/// - modifier : la finalisation n'a jamais été quittée, rien à faire.
+SuiteCloche suiteApresCloche(ResultatCloche resultat) {
+  final publie =
+      resultat.issue == IssueCloche.publie ||
+      resultat.issue == IssueCloche.dejaPublie;
+  if (publie && resultat.tablesEnEchec.isNotEmpty) {
+    return (
+      montrerLeFil: true,
+      message:
+          'Publié, mais impossible de le partager avec '
+          '${pluriel(resultat.tablesEnEchec.length, 'Table')}.',
+    );
+  }
+  return switch (resultat.issue) {
+    IssueCloche.publie ||
+    IssueCloche.dejaPublie => (montrerLeFil: true, message: null),
+    IssueCloche.modifier => (montrerLeFil: false, message: null),
+    IssueCloche.annule => (
+      montrerLeFil: false,
+      message: 'Publication annulée. Votre moment est gardé sur ce téléphone.',
+    ),
+    IssueCloche.brouillonGarde => (
+      montrerLeFil: false,
+      message: 'Votre moment est gardé sur ce téléphone.',
+    ),
+    IssueCloche.enAttente => (
+      montrerLeFil: false,
+      message: 'Votre moment sera envoyé dès que possible.',
+    ),
+  };
+}
