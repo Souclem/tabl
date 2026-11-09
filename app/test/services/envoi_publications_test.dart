@@ -306,37 +306,34 @@ void main() {
     // statut == null avec commit lancé est ambigu (orpheline nettoyée par un
     // autre téléphone, ou moment publié puis supprimé ailleurs) : dans les deux
     // cas, on garde le brouillon local, l'auteur peut le jeter.
-    test(
-      'app fermée, commit lancé, ligne serveur disparue : brouillon local gardé',
-      () async {
-        var app = ouvrirApp();
-        final brouillon = await brouillonPret(app.brouillons);
-        await preparerSurServeur(brouillon, app.brouillons);
-        // Simule l'envoi interrompu après le commit
-        await laisserEnvoi(
-          app.file,
-          brouillon.id,
-          EtatEnvoi.enCours,
-          commitLance: true,
-        );
-        // Le serveur a nettoyé l'orpheline après 24h : statut=null
-        depot.lignes.remove(brouillon.id);
-        depot.fichiers.removeWhere((k, _) => k.startsWith(brouillon.id));
-        depot.appels.clear();
+    test('app fermée, commit lancé, ligne serveur disparue : brouillon local gardé', () async {
+      var app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await preparerSurServeur(brouillon, app.brouillons);
+      // Simule l'envoi interrompu après le commit
+      await laisserEnvoi(
+        app.file,
+        brouillon.id,
+        EtatEnvoi.enCours,
+        commitLance: true,
+      );
+      // Le serveur a nettoyé l'orpheline après 24h : statut=null
+      depot.lignes.remove(brouillon.id);
+      depot.fichiers.removeWhere((k, _) => k.startsWith(brouillon.id));
+      depot.appels.clear();
 
-        app = ouvrirApp();
-        final resultats = await app.envois.reprendre(auLancement: true);
+      app = ouvrirApp();
+      final resultats = await app.envois.reprendre(auLancement: true);
 
-        // Pas de message à l'auteur
-        expect(resultats, isEmpty);
-        // Le brouillon local est gardé
-        expect(await app.brouillons.charger(brouillon.id), isNotNull);
-        // La ligne de la file est retirée
-        expect(await app.file.lister(), isEmpty);
-        // Rien n'a été envoyé au serveur
-        expect(depot.appels, isEmpty);
-      },
-    );
+      // Pas de message à l'auteur
+      expect(resultats, isEmpty);
+      // Le brouillon local est gardé
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+      // La ligne de la file est retirée
+      expect(await app.file.lister(), isEmpty);
+      // Rien n'a été envoyé au serveur
+      expect(depot.appels, isEmpty);
+    });
   });
 
   group('reprise après fermeture', () {
@@ -456,28 +453,25 @@ void main() {
       expect(depot.lignes[brouillon.id]!['statut'], statutPublie);
     });
 
-    test(
-      'envoi en attente, commit lancé, ligne serveur disparue : brouillon local gardé',
-      () async {
-        var app = ouvrirApp();
-        final brouillon = await brouillonPret(app.brouillons);
-        await laisserEnvoi(
-          app.file,
-          brouillon.id,
-          EtatEnvoi.enAttente,
-          commitLance: true,
-        );
+    test('envoi en attente, commit lancé, ligne serveur disparue : brouillon local gardé', () async {
+      var app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await laisserEnvoi(
+        app.file,
+        brouillon.id,
+        EtatEnvoi.enAttente,
+        commitLance: true,
+      );
 
-        app = ouvrirApp();
-        final resultats = await app.envois.reprendre();
+      app = ouvrirApp();
+      final resultats = await app.envois.reprendre();
 
-        expect(resultats, isEmpty);
-        expect(await app.brouillons.charger(brouillon.id), isNotNull);
-        expect(await app.file.lister(), isEmpty);
-        expect(depot.lignes, isEmpty);
-        expect(depot.appels, isEmpty);
-      },
-    );
+      expect(resultats, isEmpty);
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+      expect(await app.file.lister(), isEmpty);
+      expect(depot.lignes, isEmpty);
+      expect(depot.appels, isEmpty);
+    });
 
     test(
       'envoi en attente, commit passé mais réponse perdue : sans doublon',
@@ -589,6 +583,50 @@ void main() {
         expect(await app.brouillons.charger(brouillon.id), isNotNull);
       },
     );
+
+    test('un autre téléphone nettoie l\'orpheline après le commit : '
+        'le brouillon local du premier est gardé, sans message', () async {
+      // Téléphone A : commit lancé, puis l'app est fermée.
+      var app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await preparerSurServeur(brouillon, app.brouillons);
+      await laisserEnvoi(
+        app.file,
+        brouillon.id,
+        EtatEnvoi.enCours,
+        commitLance: true,
+      );
+      // Le serveur ne voit qu'une ligne `brouillon` vieille de 25 h.
+      depot.lignes[brouillon.id]!['cree_le'] = maintenant.subtract(
+        const Duration(hours: 25),
+      );
+
+      // Téléphone B (même auteur, autre dossier local, aucune file) : sa
+      // reprise voit une orpheline que personne ne réclame et la supprime.
+      final racineB = Directory.systemTemp.createTempSync('envois_test_b');
+      addTearDown(() => racineB.deleteSync(recursive: true));
+      final brouillonsB = BrouillonsLocaux(
+        racineB,
+        maintenant: () => maintenant,
+      );
+      final appB = EnvoiPublications(
+        depot,
+        brouillonsB,
+        FileEnvoi(racineB),
+        maintenant: () => maintenant,
+      );
+      expect(await appB.reprendre(auLancement: true), isEmpty);
+      expect(depot.lignes, isEmpty);
+
+      // Téléphone A rouvre.
+      app = ouvrirApp();
+      final resultats = await app.envois.reprendre(auLancement: true);
+
+      expect(resultats, isEmpty);
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+      expect(await app.file.lister(), isEmpty);
+      expect(depot.lignes, isEmpty);
+    });
 
     test(
       'trop récente (autre téléphone en train de publier) : gardée',
@@ -749,9 +787,8 @@ void main() {
     test('un fichier illisible est ignoré', () async {
       final file = FileEnvoi(racine);
       await laisserEnvoi(file, 'ok', EtatEnvoi.enAttente);
-      File(
-        '${racine.path}/envois/casse.json',
-      ).writeAsStringSync('{pas du json');
+      File('${racine.path}/envois/casse.json')
+          .writeAsStringSync('{pas du json');
 
       expect((await file.lister()).map((e) => e.brouillonId), ['ok']);
     });
