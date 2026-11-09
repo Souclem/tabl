@@ -141,8 +141,13 @@ class DepotPublicationSimule implements DepotPublication {
   Future<void> supprimerLigne(String momentId) async {
     _reseau();
     appels.add('suppression ligne');
-    lignes.remove(momentId);
-    tables.remove(momentId);
+    final ligne = lignes[momentId];
+    if (ligne != null && ligne['statut'] == statutBrouillon) {
+      lignes.remove(momentId);
+      tables.remove(momentId);
+    }
+    // Si le moment est publié (statutPublie), on ne fait rien : la ligne
+    // reste, préservant le moment publié.
   }
 
   @override

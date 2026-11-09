@@ -184,7 +184,14 @@ class DepotPublicationSupabase implements DepotPublication {
   @override
   Future<void> supprimerLigne(String momentId) async {
     // Les lignes liées (photos, empreintes, audience…) suivent.
-    await _client.from('souvenirs').delete().eq('id', momentId);
+    // On ne supprime que si le moment est encore en brouillon : si un autre
+    // téléphone l'a publié entre-temps, la suppression ne fait rien
+    // (0 ligne affectée) et le moment publié est préservé.
+    await _client
+        .from('souvenirs')
+        .delete()
+        .eq('id', momentId)
+        .eq('statut', statutBrouillon);
   }
 
   @override
