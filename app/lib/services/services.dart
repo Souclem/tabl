@@ -76,6 +76,7 @@ export 'souvenirs/publication_en_deux_temps.dart';
 export 'souvenirs/publication_service.dart';
 export 'souvenirs/reprise_publications.dart';
 export 'souvenirs/suivi_publication.dart';
+export 'souvenirs/session_camera.dart';
 export 'souvenirs/souvenir_feed.dart';
 export 'souvenirs/souvenir_service.dart';
 export 'souvenirs/souvenir_service_supabase.dart';
