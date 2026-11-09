@@ -34,6 +34,9 @@ abstract interface class SouvenirService {
   /// tout le reste ([legende], [amisTaguesIds], la boisson) reste
   /// optionnel, conformément à la maquette de finalisation.
   ///
+  /// [notes] : les étoiles facultatives par catégorie (clés de
+  /// `categoriesEtoiles`, de 1 à 5), vides si aucune n'est donnée.
+  ///
   /// [audience] : qui peut voir (voir [AudienceSouvenir]). Ses Tables
   /// (mode "Seulement…") sont des associations, jamais une deuxième
   /// publication — l'expérience créée ici est la seule source (megaprompt
@@ -52,6 +55,7 @@ abstract interface class SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> empreintes = const [],
   });

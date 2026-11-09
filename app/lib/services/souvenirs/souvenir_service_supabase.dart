@@ -18,6 +18,7 @@ import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
 import 'personne_qui_aime.dart';
 import 'precompletion_souvenir.dart';
+import 'publication_service.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
 
@@ -73,6 +74,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> empreintes = const [],
   }) async {
@@ -87,6 +89,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         'legende': legende,
         'emotion': emotion.emoji,
         'impressions': impressions,
+        'notes': notesPourBase(notes),
         // Rien demandé à l'utilisateur pour le moment/la date : on
         // capture l'instant, on ne le fait pas remplir un formulaire
         // pour redire ce que l'horloge sait déjà.
@@ -239,7 +242,7 @@ class SouvenirServiceSupabase implements SouvenirService {
       _client
           .from('souvenirs')
           .select(
-            'legende, emotion, impressions, boisson_texte, restaurant_id, '
+            'legende, emotion, impressions, boisson_texte, notes, restaurant_id, '
             'restaurants(nom, ville, categories, prive)',
           )
           .eq('id', souvenirId)
@@ -265,6 +268,7 @@ class SouvenirServiceSupabase implements SouvenirService {
       amisTaguesIds: actuelle.amisTaguesIds,
       impressions: (ligne['impressions'] as List?)?.cast<String>() ?? const [],
       boissonTexte: ligne['boisson_texte'] as String?,
+      notes: notesDepuisBase(ligne['notes']),
       audience: actuelle.audience,
     );
   }
@@ -283,6 +287,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           'legende': moment.legende,
           'impressions': moment.impressions,
           'boisson_texte': moment.boissonTexte,
+          if (moment.notes case final notes?) 'notes': notesPourBase(notes),
         })
         .eq('id', souvenirId);
 

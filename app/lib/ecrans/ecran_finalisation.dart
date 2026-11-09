@@ -507,6 +507,7 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
         emotion: emotion,
         legende: legende.isEmpty ? null : legende,
         amisTaguesIds: _amisTaguesIds.toList(),
+        notes: Map.of(_etoiles),
         audience: _audience,
         empreintes: [for (final p in lues) ?p.metadonnees.empreinte],
       );
@@ -557,6 +558,7 @@ class _CorpsFinalisationState extends State<_CorpsFinalisation>
           amisTaguesIds: Set.of(_amisTaguesIds),
           impressions: initial.impressions,
           boissonTexte: initial.boissonTexte,
+          notes: initial.notes,
           audience: _audience,
         ),
       );
