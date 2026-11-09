@@ -303,34 +303,11 @@ void main() {
       },
     );
 
+    // statut == null avec commit lancé est ambigu (orpheline nettoyée par un
+    // autre téléphone, ou moment publié puis supprimé ailleurs) : dans les deux
+    // cas, on garde le brouillon local, l'auteur peut le jeter.
     test(
-      'publié puis supprimé par son auteur : on n\'en refait rien',
-      () async {
-        final app = ouvrirApp();
-        final brouillon = await brouillonPret(app.brouillons);
-        await preparerSurServeur(brouillon, app.brouillons);
-        // Publier sur le serveur (statut = 'publie')
-        await PublicationEnDeuxTemps(depot).valider(brouillon.id);
-        depot.appels.clear();
-        await laisserEnvoi(
-          app.file,
-          brouillon.id,
-          EtatEnvoi.enCours,
-          commitLance: true,
-        );
-
-        final resultats = await app.envois.reprendre(auLancement: true);
-
-        expect(resultats.map((r) => r.issue), [IssueReprise.publiee]);
-        expect(depot.lignes[brouillon.id]!['statut'], statutPublie);
-        expect(depot.appels, isEmpty);
-        expect(await app.brouillons.charger(brouillon.id), isNull);
-        expect(await app.file.lister(), isEmpty);
-      },
-    );
-
-    test(
-      'commitLance mais statut=null (orpheline nettoyée) : brouillon local gardé, ligne retirée',
+      'app fermée, commit lancé, ligne serveur disparue : brouillon local gardé',
       () async {
         var app = ouvrirApp();
         final brouillon = await brouillonPret(app.brouillons);
@@ -478,6 +455,29 @@ void main() {
       expect(resultats.map((r) => r.issue), [IssueReprise.publiee]);
       expect(depot.lignes[brouillon.id]!['statut'], statutPublie);
     });
+
+    test(
+      'envoi en attente, commit lancé, ligne serveur disparue : brouillon local gardé',
+      () async {
+        var app = ouvrirApp();
+        final brouillon = await brouillonPret(app.brouillons);
+        await laisserEnvoi(
+          app.file,
+          brouillon.id,
+          EtatEnvoi.enAttente,
+          commitLance: true,
+        );
+
+        app = ouvrirApp();
+        final resultats = await app.envois.reprendre();
+
+        expect(resultats, isEmpty);
+        expect(await app.brouillons.charger(brouillon.id), isNotNull);
+        expect(await app.file.lister(), isEmpty);
+        expect(depot.lignes, isEmpty);
+        expect(depot.appels, isEmpty);
+      },
+    );
 
     test(
       'envoi en attente, commit passé mais réponse perdue : sans doublon',
