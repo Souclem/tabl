@@ -146,6 +146,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> amisTaguesIds = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> impressions = const [],
     List<String> empreintes = const [],

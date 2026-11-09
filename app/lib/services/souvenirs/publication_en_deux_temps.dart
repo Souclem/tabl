@@ -128,7 +128,7 @@ class PublicationEnDeuxTemps implements PublicationService {
       'emotion': demande.emotion.emoji,
       'moment': momentDuJour(demande.priseLe),
       'date_visite': _dateIso(demande.priseLe),
-      'notes': _notes(demande.etoiles),
+      'notes': notesPourBase(demande.etoiles),
     };
     if (statut == null) {
       await _depot.creerBrouillon(demande.id, {
@@ -173,16 +173,6 @@ class PublicationEnDeuxTemps implements PublicationService {
     if (statut != null) await _depot.supprimerLigne(momentId);
     if (fichiers.isNotEmpty) await _depot.supprimerFichiers(fichiers);
   }
-}
-
-/// `{"cuisine": 4}` ; `null` quand aucune catégorie n'est notée.
-Map<String, int>? _notes(Map<String, int> etoiles) {
-  final notes = {
-    for (final categorie in categoriesEtoiles)
-      if (etoiles[categorie] case final note? when note >= 1 && note <= 5)
-        categorie: note,
-  };
-  return notes.isEmpty ? null : notes;
 }
 
 String _dateIso(DateTime date) =>

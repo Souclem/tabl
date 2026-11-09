@@ -27,6 +27,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> empreintes = const [],
   }) async {
@@ -37,6 +38,7 @@ class _FauxSouvenirService implements SouvenirService {
       'legende': legende,
       'amisTaguesIds': amisTaguesIds,
       'impressions': impressions,
+      'notes': notes,
       'audience': audience,
     });
     return const [];
@@ -116,6 +118,7 @@ Brouillon _brouillon({
   bool photo = true,
   LieuRestaurant? lieu,
   Emotion? emotion,
+  Map<String, int> etoiles = const {},
 }) => Brouillon(
   id: 'b1',
   creeLe: DateTime(2026, 8, 20, 12, 30),
@@ -126,6 +129,7 @@ Brouillon _brouillon({
   ],
   lieu: lieu,
   emotion: emotion,
+  etoiles: etoiles,
 );
 
 final _publie = SouvenirFeed(
@@ -372,6 +376,40 @@ void main() {
     },
   );
 
+  testWidgets('publie avec les étoiles du brouillon, vides sinon', (
+    tester,
+  ) async {
+    final brouillons = _FauxBrouillons(
+      _brouillon(
+        lieu: _comptoir,
+        emotion: Emotion.inoubliable,
+        etoiles: {'cuisine': 4, 'service': 2},
+      ),
+    );
+    final service = await _ouvrir(tester, brouillons: brouillons);
+
+    await tester.tap(find.text('Publier'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(service.appelsPublier.single['notes'], {'cuisine': 4, 'service': 2});
+  });
+
+  testWidgets('publie sans étoiles : notes vides', (tester) async {
+    final brouillons = _FauxBrouillons(_brouillon(lieu: _comptoir));
+    final service = await _ouvrir(tester, brouillons: brouillons);
+
+    await tester.tap(find.text('🤩'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Publier'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    expect(service.appelsPublier.single['notes'], isEmpty);
+  });
+
   group('modification d\'un moment publié', () {
     const moment = MomentModifiable(
       lieu: _comptoir,
@@ -406,6 +444,22 @@ void main() {
       expect(service.appelsModifier.single.moment.emotion, Emotion.inoubliable);
       expect(service.appelsPublier, isEmpty);
       expect(find.byType(EcranFinalisation), findsNothing);
+    });
+
+    testWidgets('renvoie les étoiles du moment telles quelles', (tester) async {
+      const notees = MomentModifiable(
+        lieu: _comptoir,
+        emotion: Emotion.satisfait,
+        notes: {'cuisine': 5},
+      );
+      final service = await _ouvrir(tester, aModifier: _publie, moment: notees);
+
+      await tester.tap(find.text('🤩'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Enregistrer'));
+      await tester.pumpAndSettle();
+
+      expect(service.appelsModifier.single.moment.notes, {'cuisine': 5});
     });
 
     testWidgets('fermer après un changement demande confirmation', (
