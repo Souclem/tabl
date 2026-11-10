@@ -39,12 +39,21 @@ async function lireJson(chemin) {
   }
 }
 
-/** Le compte que les agents utilisent (le compte par défaut de Paperclip) et ceux épuisés. */
+// Choix fait dans l'app Mac (liste « Compte des agents ») : auto, compte1, compte2, free.
+const CHOIX = path.join(os.homedir(), ".config", "tabl", "choix_compte.json");
+const LIBELLES_CHOIX = { auto: "Automatique", compte1: "Compte 1", compte2: "Compte 2", free: "Free Claude Code" };
+
+/** Le compte que les agents utilisent (le compte par défaut de Paperclip), ceux
+ *  épuisés, le choix du propriétaire, et les agents passés sur Free Claude Code. */
 async function compte() {
   const reglages = await lireJson(COMPTES);
   if (!reglages || !Array.isArray(reglages.ordre)) return { installe: false };
   const bascule = (await lireJson(ETAT_BASCULE)) || {};
   const numero = (id) => reglages.ordre.indexOf(id) + 1 || null;
+  const choix = ((await lireJson(CHOIX)) || {}).choix;
+  // Détail par agent noté par la bascule à chaque passage (clé "affichage").
+  const detail = (bascule.affichage || []).map((l) => ({ nom: l.nom, source: l.source, force: l.force || "" }));
+  const surFree = detail.filter((l) => l.source.startsWith("Free")).map((l) => l.nom);
 
   let actif = null;
   try {
@@ -63,7 +72,10 @@ async function compte() {
     .filter(([, fin]) => Date.parse(fin) > maintenant)
     .map(([id, fin]) => ({ numero: numero(id), jusqua: fin }))
     .sort((a, b) => a.numero - b.numero);
-  return { installe: true, actif: numero(actif), epuises, tousEpuises: bascule.tous_epuises_signale === true };
+  return {
+    installe: true, actif: numero(actif), epuises, tousEpuises: bascule.tous_epuises_signale === true,
+    choix: LIBELLES_CHOIX[choix] || LIBELLES_CHOIX.auto, surFree, detail,
+  };
 }
 
 // Point d'avancement : posté dans la conversation du propriétaire avec le Chef
@@ -113,7 +125,8 @@ function ligneCompte(c) {
     .filter((e) => e.numero !== c.actif)
     .map((e) => `le ${e.numero} revient à ${heure(new Date(e.jusqua))}`);
   const suite = retours.length ? ` (${retours.join(", ")})` : "";
-  return c.tousEpuises ? `Comptes Claude : tous épuisés${suite}` : `Compte Claude ${c.actif}${suite}`;
+  const free = c.surFree?.length ? ` · sur Free Claude Code : ${c.surFree.join(", ")}` : "";
+  return (c.tousEpuises ? `Comptes Claude : tous épuisés${suite}` : `Compte Claude ${c.actif}${suite}`) + free;
 }
 
 async function composerPoint({ api, societe }, depuis) {

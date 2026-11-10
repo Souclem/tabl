@@ -1,7 +1,8 @@
 // Plugin Paperclip « Garde-fous Tabl » : deux entrées dans la barre latérale.
 // - Garde-fous : ouvre l'app Mac « Garde-fous Tabl » et montre combien de
 //   garde-fous sont actifs.
-// - Compte Claude : le compte Claude que les agents utilisent en ce moment, posé
+// - Compte Claude : le compte Claude que les agents utilisent en ce moment (et
+//   ceux passés sur Free Claude Code), posé
 //   par la bascule automatique (~/.config/tabl/bascule_comptes.py, hors dépôt).
 // Et un job : le point d'avancement posté toutes les 15 minutes dans la
 // conversation du propriétaire avec le Chef de projet (voir worker.js).
@@ -15,7 +16,7 @@
 const manifest = {
   id: "tabl.garde-fous",
   apiVersion: 1,
-  version: "1.2.1",
+  version: "1.3.1",
   displayName: "Garde-fous Tabl",
   description: "Ouvre l'app Garde-fous Tabl (ce que les agents ont le droit de faire), montre le compte Claude utilisé par les agents et poste un point d'avancement dans le Chat.",
   author: "Tabl",
