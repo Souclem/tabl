@@ -29,6 +29,10 @@ class DepotPublicationSimule implements DepotPublication {
   bool horsLigne = false;
   Set<String> tablesRefusees = {};
 
+  /// Appelé juste avant la suppression de la ligne : de quoi simuler un
+  /// autre téléphone qui agit entre la lecture du statut et la suppression.
+  void Function()? avantSuppressionLigne;
+
   void _reseau() {
     if (horsLigne) throw const SocketException('hors ligne');
   }
@@ -139,11 +143,15 @@ class DepotPublicationSimule implements DepotPublication {
   }
 
   @override
-  Future<void> supprimerLigne(String momentId) async {
+  Future<bool> supprimerLigne(String momentId) async {
     _reseau();
     appels.add('suppression ligne');
+    avantSuppressionLigne?.call();
+    final ligne = lignes[momentId];
+    if (ligne == null || ligne['statut'] != statutBrouillon) return false;
     lignes.remove(momentId);
     tables.remove(momentId);
+    return true;
   }
 
   @override
