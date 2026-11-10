@@ -299,12 +299,22 @@ void main() {
       return reprendre;
     }
 
-    Future<void> geste(WidgetTester tester, Finder cible) async {
-      await tester.runAsync(() async {
-        await tester.tap(cible);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      });
-      await tester.pump();
+    /// Touche [cible], puis laisse la vraie entrée-sortie (fichiers du
+    /// brouillon) se terminer jusqu'à ce que [jusqua] soit à l'écran : sa
+    /// durée dépend de la charge de la machine.
+    Future<void> geste(
+      WidgetTester tester,
+      Finder cible, {
+      required Finder jusqua,
+    }) async {
+      await tester.tap(cible);
+      for (var i = 0; i < 400 && jusqua.evaluate().isEmpty; i++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 25)),
+        );
+        await tester.pump();
+      }
+      expect(jusqua, findsOneWidget, reason: 'jamais affiché après le geste');
     }
 
     testWidgets('la première photo est la couverture', (tester) async {
@@ -323,9 +333,12 @@ void main() {
       await creer(tester, 3);
       await ouvrir(tester);
 
-      await geste(tester, find.byTooltip('Retirer de la publication').at(1));
+      await geste(
+        tester,
+        find.byTooltip('Retirer de la publication').at(1),
+        jusqua: find.text('2 / 10 à publier'),
+      );
 
-      expect(find.text('2 / 10 à publier'), findsOneWidget);
       expect(find.text('Pas dans la publication'), findsOneWidget);
       final relu = await tester.runAsync(
         () => brouillons.charger(brouillon.id),
@@ -333,24 +346,29 @@ void main() {
       expect(relu!.photos, hasLength(3));
       expect(relu.horsPublicationIds, {brouillon.photos[1].id});
 
-      await geste(tester, find.byTooltip('Remettre dans la publication'));
-      expect(find.text('3 / 10 à publier'), findsOneWidget);
+      await geste(
+        tester,
+        find.byTooltip('Remettre dans la publication'),
+        jusqua: find.text('3 / 10 à publier'),
+      );
     });
 
     testWidgets('supprimer propose d\'annuler', (tester) async {
       await creer(tester, 3);
       await ouvrir(tester);
 
-      await geste(tester, find.byTooltip('Supprimer la photo').first);
-
-      expect(
-        find.text('Photo supprimée · récupérable 30 jours'),
-        findsOneWidget,
+      await geste(
+        tester,
+        find.byTooltip('Supprimer la photo').first,
+        jusqua: find.text('Photo supprimée · récupérable 30 jours'),
       );
       expect(find.text('2 / 10 à publier'), findsOneWidget);
 
-      await geste(tester, find.text('Annuler'));
-      expect(find.text('3 / 10 à publier'), findsOneWidget);
+      await geste(
+        tester,
+        find.text('Annuler'),
+        jusqua: find.text('3 / 10 à publier'),
+      );
       expect(find.text('Photo supprimée · récupérable 30 jours'), findsNothing);
       await tester.pump(const Duration(seconds: 7));
     });
@@ -375,10 +393,17 @@ void main() {
         isNull,
       );
 
-      await geste(tester, find.byTooltip('Retirer de la publication').first);
-      await geste(tester, find.byTooltip('Retirer de la publication').first);
+      await geste(
+        tester,
+        find.byTooltip('Retirer de la publication').first,
+        jusqua: find.text('11 / 10 à publier'),
+      );
+      await geste(
+        tester,
+        find.byTooltip('Retirer de la publication').first,
+        jusqua: find.text('10 / 10 à publier'),
+      );
 
-      expect(find.text('10 / 10 à publier'), findsOneWidget);
       expect(
         tester
             .widget<TablBouton>(find.widgetWithText(TablBouton, 'Valider'))
