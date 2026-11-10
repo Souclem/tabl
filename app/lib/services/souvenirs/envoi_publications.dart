@@ -378,8 +378,11 @@ class EnvoiPublications {
       return IssueReprise.publiee;
     }
     if (statut == null && envoi.commitLance) {
-      // Publié, puis supprimé par son auteur : rien à renvoyer.
-      await _terminer(id);
+      // Ambigu : orpheline nettoyée par un autre téléphone, ou moment publié
+      // puis supprimé ailleurs. Dans les deux cas on garde le brouillon local
+      // (mieux vaut un brouillon de trop qu'un souvenir perdu) et on retire
+      // seulement la ligne de la file.
+      await _file.retirer(id);
       return null;
     }
     final resultat = await _tenter(id, auPremierPlan: false);
@@ -409,7 +412,11 @@ class EnvoiPublications {
     if (envoi.etat == EtatEnvoi.enCours && envoi.commitLance) {
       // L'ordre de publier est parti : on le mène à terme, une seule fois.
       if (statut == null) {
-        await _terminer(id);
+        // Ambigu : orpheline nettoyée par un autre téléphone, ou moment publié
+        // puis supprimé ailleurs. Dans les deux cas on garde le brouillon local
+        // (mieux vaut un brouillon de trop qu'un souvenir perdu) et on retire
+        // seulement la ligne de la file.
+        await _file.retirer(id);
         return null;
       }
       try {
