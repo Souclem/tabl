@@ -10,6 +10,9 @@ import 'publication_service.dart';
 /// [PublicationEnDeuxTemps] ; l'implémentation Supabase est un simple
 /// relais, et les tests branchent un dépôt en mémoire.
 abstract interface class DepotPublication {
+  /// Vrai quand une session est ouverte : sans elle, [monId] n'existe pas.
+  bool get connecte;
+
   /// L'identifiant de l'auteur connecté : le dossier de ses photos.
   String get monId;
 
@@ -59,6 +62,10 @@ abstract interface class DepotPublication {
   /// Les fichiers déposés pour ce moment, retrouvés par leur nom — même si
   /// la ligne n'a jamais été écrite.
   Future<List<String>> fichiersDuMoment(String momentId);
+
+  /// Les moments de l'auteur encore au statut brouillon, avec leur date de
+  /// création : de quoi retrouver ceux qu'aucune file n'attend plus.
+  Future<List<({String id, DateTime creeLe})>> brouillonsDuServeur();
 
   Future<void> supprimerLigne(String momentId);
   Future<void> supprimerFichiers(List<String> chemins);
@@ -128,7 +135,7 @@ class PublicationEnDeuxTemps implements PublicationService {
       'emotion': demande.emotion.emoji,
       'moment': momentDuJour(demande.priseLe),
       'date_visite': _dateIso(demande.priseLe),
-      'notes': _notes(demande.etoiles),
+      'notes': notesPourBase(demande.etoiles),
     };
     if (statut == null) {
       await _depot.creerBrouillon(demande.id, {
@@ -173,16 +180,6 @@ class PublicationEnDeuxTemps implements PublicationService {
     if (statut != null) await _depot.supprimerLigne(momentId);
     if (fichiers.isNotEmpty) await _depot.supprimerFichiers(fichiers);
   }
-}
-
-/// `{"cuisine": 4}` ; `null` quand aucune catégorie n'est notée.
-Map<String, int>? _notes(Map<String, int> etoiles) {
-  final notes = {
-    for (final categorie in categoriesEtoiles)
-      if (etoiles[categorie] case final note? when note >= 1 && note <= 5)
-        categorie: note,
-  };
-  return notes.isEmpty ? null : notes;
 }
 
 String _dateIso(DateTime date) =>

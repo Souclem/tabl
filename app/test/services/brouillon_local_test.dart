@@ -418,6 +418,58 @@ void main() {
     });
   });
 
+  group('photos retirées de la publication', () {
+    late Brouillon trois;
+
+    setUp(() async {
+      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
+      await brouillons.ajouterPhoto(octets: octets(2), priseLe: midi);
+      trois = await brouillons.ajouterPhoto(octets: octets(3), priseLe: midi);
+    });
+
+    test(
+      'elles restent dans le brouillon mais pas dans la publication',
+      () async {
+        final retiree = trois.photos[0].id;
+        await brouillons.mettreAJour(
+          trois.id,
+          (b) => b.copieAvec(horsPublicationIds: {retiree}),
+        );
+
+        final relu = (await ouvrir().charger(trois.id))!;
+        expect(relu.photos, hasLength(3));
+        expect(relu.horsPublicationIds, {retiree});
+        expect(relu.photosAPublier.map((p) => p.id), [
+          trois.photos[1].id,
+          trois.photos[2].id,
+        ]);
+      },
+    );
+
+    test('la couverture est la première photo à publier', () async {
+      await brouillons.mettreAJour(
+        trois.id,
+        (b) => b.copieAvec(horsPublicationIds: {trois.photos[0].id}),
+      );
+
+      final relu = (await brouillons.charger(trois.id))!;
+      expect(relu.photosAPublier.first.id, trois.photos[1].id);
+    });
+
+    test('supprimer une photo retirée l\'oublie aussi', () async {
+      final retiree = trois.photos[1].id;
+      await brouillons.mettreAJour(
+        trois.id,
+        (b) => b.copieAvec(horsPublicationIds: {retiree}),
+      );
+
+      await brouillons.supprimerPhoto(trois.id, retiree);
+
+      final relu = (await brouillons.charger(trois.id))!;
+      expect(relu.horsPublicationIds, isEmpty);
+    });
+  });
+
   group('corbeille', () {
     late Brouillon trois;
 

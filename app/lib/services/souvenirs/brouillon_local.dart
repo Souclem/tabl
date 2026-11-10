@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -51,6 +52,7 @@ class Brouillon {
     this.etoiles = const {},
     this.avecQuiIds = const {},
     this.audience = AudienceSouvenir.toutLeMonde,
+    this.horsPublicationIds = const {},
   });
 
   final String id;
@@ -77,6 +79,16 @@ class Brouillon {
   final Map<String, int> etoiles;
   final Set<String> avecQuiIds;
   final AudienceSouvenir audience;
+
+  /// Les photos gardées dans le brouillon mais retirées de la publication.
+  final Set<String> horsPublicationIds;
+
+  /// Les photos qui seront publiées, dans l'ordre : la première est la
+  /// couverture.
+  List<PhotoBrouillon> get photosAPublier => [
+    for (final p in photos)
+      if (!horsPublicationIds.contains(p.id)) p,
+  ];
 
   /// Le moment de la dernière photo : c'est lui qu'une nouvelle photo
   /// compare à [delaiRegroupementRepas].
@@ -105,6 +117,7 @@ class Brouillon {
     Map<String, int>? etoiles,
     Set<String>? avecQuiIds,
     AudienceSouvenir? audience,
+    Set<String>? horsPublicationIds,
   }) => Brouillon(
     id: id,
     creeLe: creeLe,
@@ -118,6 +131,7 @@ class Brouillon {
     etoiles: etoiles ?? this.etoiles,
     avecQuiIds: avecQuiIds ?? this.avecQuiIds,
     audience: audience ?? this.audience,
+    horsPublicationIds: horsPublicationIds ?? this.horsPublicationIds,
   );
 
   Map<String, Object?> versJson() => {
@@ -145,6 +159,7 @@ class Brouillon {
       'tableIds': audience.tableIds.toList()..sort(),
       'personneIds': audience.personneIds.toList()..sort(),
     },
+    'horsPublicationIds': horsPublicationIds.toList()..sort(),
   };
 
   /// Relit un brouillon écrit par [versJson]. Lève une erreur si le JSON
@@ -193,6 +208,9 @@ class Brouillon {
                     .cast<String>(),
               },
             ),
+      horsPublicationIds: {
+        ...((json['horsPublicationIds'] as List?) ?? const []).cast<String>(),
+      },
     );
   }
 }
@@ -240,6 +258,11 @@ class BrouillonsLocaux {
   }
 
   final Directory _racine;
+
+  /// Le dossier des données locales de l'app : brouillons, corbeille, et la
+  /// file d'envoi (voir [FileEnvoi]).
+  Directory get racine => _racine;
+
   final DateTime Function() _maintenant;
   final String Function() _genererId;
 
@@ -253,6 +276,14 @@ class BrouillonsLocaux {
   /// Le fichier d'une photo, à afficher (`Image.file`) ou à envoyer.
   File fichierPhoto(String brouillonId, String photoId) =>
       File('${_dossier(brouillonId).path}/$photoId.jpg');
+
+  /// La photo à afficher, lue depuis son fichier.
+  ImageProvider imagePhoto(String brouillonId, String photoId) =>
+      FileImage(fichierPhoto(brouillonId, photoId));
+
+  /// Le contenu d'une photo, à envoyer.
+  Future<Uint8List> octetsPhoto(String brouillonId, String photoId) =>
+      fichierPhoto(brouillonId, photoId).readAsBytes();
 
   File _photoCorbeille(String photoId) =>
       File('${_dossierCorbeille.path}/$photoId.jpg');
@@ -388,7 +419,7 @@ class BrouillonsLocaux {
         );
         await _dossierCorbeille.create(recursive: true);
         await fichierPhoto(id, photoId).rename(_photoCorbeille(photoId).path);
-        await _ecrireAtomique(
+        await ecrireJsonAtomique(
           _jsonCorbeille(photoId),
           _corbeilleVersJson(entree),
         );
@@ -396,6 +427,7 @@ class BrouillonsLocaux {
           actuel.copieAvec(
             modifieLe: maintenant,
             photos: [...actuel.photos]..removeAt(rang),
+            horsPublicationIds: {...actuel.horsPublicationIds}..remove(photoId),
           ),
         );
         return entree;
@@ -475,7 +507,7 @@ class BrouillonsLocaux {
   }
 
   Future<Brouillon?> _lire(String id) async {
-    final json = await _lireJson(_fichierJson(id));
+    final json = await lireJson(_fichierJson(id));
     if (json == null) return null;
     try {
       return Brouillon.depuisJson(json);
@@ -485,7 +517,7 @@ class BrouillonsLocaux {
   }
 
   Future<void> _ecrire(Brouillon brouillon) =>
-      _ecrireAtomique(_fichierJson(brouillon.id), brouillon.versJson());
+      ecrireJsonAtomique(_fichierJson(brouillon.id), brouillon.versJson());
 
   Future<List<PhotoCorbeille>> _listerCorbeille() async {
     if (!await _dossierCorbeille.exists()) return [];
@@ -503,7 +535,7 @@ class BrouillonsLocaux {
   }
 
   Future<PhotoCorbeille?> _lireCorbeille(String photoId) async {
-    final json = await _lireJson(_jsonCorbeille(photoId));
+    final json = await lireJson(_jsonCorbeille(photoId));
     if (json == null) return null;
     try {
       return PhotoCorbeille(
@@ -533,14 +565,14 @@ class BrouillonsLocaux {
 
 /// Écrit dans un fichier voisin puis le renomme : une coupure en pleine
 /// écriture ne laisse jamais un JSON à moitié écrit.
-Future<void> _ecrireAtomique(File fichier, Map<String, Object?> json) async {
+Future<void> ecrireJsonAtomique(File fichier, Map<String, Object?> json) async {
   await fichier.parent.create(recursive: true);
   final provisoire = File('${fichier.path}.tmp');
   await provisoire.writeAsString(jsonEncode(json), flush: true);
   await provisoire.rename(fichier.path);
 }
 
-Future<Map<String, dynamic>?> _lireJson(File fichier) async {
+Future<Map<String, dynamic>?> lireJson(File fichier) async {
   try {
     final lu = jsonDecode(await fichier.readAsString());
     return lu is Map<String, dynamic> ? lu : null;

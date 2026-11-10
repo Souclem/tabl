@@ -8,7 +8,7 @@ import 'package:app/services/services.dart';
 
 import 'package:app/ecrans/ecran_creer_instant.dart';
 
-/// Même principe que le faux d'`ecran_publier_test.dart` : jamais de
+/// Même principe que le faux de `ecran_finalisation_test.dart` : jamais de
 /// vraie caméra dans les tests.
 class _FauxImagePickerPlatform extends ImagePickerPlatform {
   _FauxImagePickerPlatform({this.octetsPhoto});
@@ -59,7 +59,7 @@ class _FauxInstantService implements InstantService {
 
 // PNG 1×1 valide : le viewer/la prévisualisation décode réellement le
 // contenu, un contenu invalide fait planter le codec de manière
-// asynchrone (même fixture que `ecran_publier_test.dart`).
+// asynchrone (même fixture que `ecran_finalisation_test.dart`).
 final _octetsPhoto = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY'
   '42YAAAAASUVORK5CYII=',

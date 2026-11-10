@@ -19,6 +19,9 @@ class DepotPublicationSupabase implements DepotPublication {
   final RegistreRestaurants _restaurants;
 
   @override
+  bool get connecte => _client.auth.currentSession != null;
+
+  @override
   String get monId => _client.auth.currentSession!.user.id;
 
   @override
@@ -162,6 +165,19 @@ class DepotPublicationSupabase implements DepotPublication {
     return [
       for (final f in fichiers)
         if (f.name.startsWith('$momentId-')) '$monId/${f.name}',
+    ];
+  }
+
+  @override
+  Future<List<({String id, DateTime creeLe})>> brouillonsDuServeur() async {
+    final lignes = await _client
+        .from('souvenirs')
+        .select('id, cree_le')
+        .eq('auteur_id', monId)
+        .eq('statut', statutBrouillon);
+    return [
+      for (final l in lignes)
+        (id: l['id'] as String, creeLe: DateTime.parse(l['cree_le'] as String)),
     ];
   }
 

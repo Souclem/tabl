@@ -13,8 +13,6 @@ sont dans `docs/regles.md`.
   issues : couper « Confirm email » dans le dashboard (recommandé pour la
   bêta) ou un SMTP perso avec un domaine. Le code gère déjà les messages
   d'erreur (`messageErreurAuth`).
-- **Brouillons (« Plus tard »)** : écrits en base, mais aucun écran ne les
-  relit.
 - **Constellation** : globe 3D essayé dans un prototype seulement ; plan des
   villes (rues, eau, parcs) pas fait ; performance sur un vrai iPhone avec
   beaucoup de restos jamais mesurée.
@@ -43,13 +41,37 @@ sont dans `docs/regles.md`.
 
 ## Publier un moment
 
-- **Un seul écran** : photos en grand (jusqu'à 10, page d'ajout après la
-  dernière), restaurant proposé d'après les photos localisées sinon la
-  position du téléphone (« à 40 m de vous »), émotion obligatoire, options en
-  lignes (Avec qui ?, Ce qui ressort, Une boisson ?), « Qui peut voir »,
-  bouton « Garder ce moment. ».
-- **Modifier** (menu « ⋯ ») : rouvre le même écran prérempli ; photos et date
-  non modifiables ; les souvenirs ne sont pas encore modifiables.
+- **Un brouillon local, plusieurs photos** : « + » ouvre la caméra ; chaque
+  photo prise s'ajoute à un brouillon gardé sur le téléphone. « Continuer »
+  mène à la finalisation, puis la publication passe par la cloche.
+  Parcours : caméra → finalisation → cloche (`ParcoursCreation`). Chaque
+  écran remplace le précédent : la caméra ne reste pas sous la finalisation,
+  et « Reprendre des photos » ramène à la caméra.
+- **Finalisation** : photos en grand, restaurant proposé d'après les photos
+  localisées sinon la position du téléphone (« à 40 m de vous »), **émotion
+  à 5 visages obligatoire**, options en lignes (Avec qui ?, Où et quand,
+  Ajouter un mot), « Qui peut voir ». **Les étoiles sont facultatives** et ne
+  sont jamais agrégées (pas de moyenne, pas de note globale).
+- **Publication en deux temps** : le moment est d'abord envoyé invisible
+  (brouillon côté base), puis publié d'un coup (commit) une fois toutes les
+  photos arrivées. Un envoi interrompu ne montre jamais un moment à moitié.
+- **Reprise après fermeture** : fermer la caméra, « Plus tard » ou quitter
+  l'app garde le brouillon ; « + » le retrouve. Un envoi en attente repart
+  dès que possible.
+- **Après la cloche** (`suiteApresCloche`, câblé dans `EcranPrincipal`) :
+  publié ou déjà publié → retour au Fil, rechargé de zéro, le nouveau moment
+  en haut, sans message ; « Modifier » → on reste sur la finalisation ;
+  annulé, gardé en brouillon, en attente → rien ne change (on reste sur
+  l'onglet d'où l'on est parti) et un message discret dit que le moment est
+  gardé sur le téléphone (il n'y a pas encore de bandeau de brouillon dans
+  le Fil). Si des Tables n'ont pas pu être associées, le moment est publié
+  et un message discret le dit. Pas encore : la puce « n-ième fois ici »
+  (rien ne la définit : ni texte, ni règle de comptage).
+- **Modifier** (menu « ⋯ ») : rouvre la finalisation prérempli, sans la
+  cloche ; **photos et date figées** ; les souvenirs ne sont pas encore
+  modifiables.
+- Pas encore : « Sans photo », pastille « N brouillons », import de photos de
+  plus de 24 h.
 - **Qui peut voir ?** : une feuille, jamais une page. Trois choix : Tout le
   monde / Seulement… (Tables et/ou personnes) / Tout le monde sauf…
   (personnes). Une Table choisie inclut ses futurs membres. Taguer quelqu'un

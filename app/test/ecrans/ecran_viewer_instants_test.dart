@@ -98,8 +98,7 @@ void main() {
         final service = _FauxInstantService({'exp-1': [_instant('i1')]});
 
         // Poussé sur une pile réelle (pour que Navigator.pop() ait un
-        // écran en dessous, comme en vrai — même principe que
-        // `_ouvrirEcranPublier` dans ecran_publier_test.dart).
+        // écran en dessous, comme en vrai).
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(

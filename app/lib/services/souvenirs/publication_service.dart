@@ -3,16 +3,25 @@ import 'dart:typed_data';
 import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'emotion.dart';
+import 'presentation_finalisation.dart';
 
-/// Les cinq catégories d'étoiles facultatives d'un moment, dans l'ordre
-/// d'affichage. Ce sont les clés de `souvenirs.notes`.
-const categoriesEtoiles = [
-  'cuisine',
-  'ambiance',
-  'service',
-  'lieu',
-  'qualite_prix',
-];
+/// `{"cuisine": 4}` pour `souvenirs.notes` ; `null` quand aucune catégorie
+/// n'est notée. Les autres clés et les notes hors de 1 à 5 sont écartées.
+Map<String, int>? notesPourBase(Map<String, int> etoiles) {
+  final notes = {
+    for (final categorie in categoriesEtoiles)
+      if (etoiles[categorie.cle] case final note? when note >= 1 && note <= 5)
+        categorie.cle: note,
+  };
+  return notes.isEmpty ? null : notes;
+}
+
+/// Les notes lues dans `souvenirs.notes` (jsonb, `null` si aucune).
+Map<String, int> notesDepuisBase(Object? json) => {
+  if (json is Map)
+    for (final e in json.entries)
+      if (e.key is String && e.value is int) e.key as String: e.value as int,
+};
 
 /// Tout ce qu'il faut pour publier un moment : le contenu de l'écran de
 /// finalisation, plus l'[id] généré sur le téléphone à la création du

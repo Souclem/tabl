@@ -8,8 +8,8 @@ import 'ecran_carte.dart';
 import 'ecran_feed.dart';
 import 'ecran_notifications.dart';
 import 'ecran_profil.dart';
-import 'ecran_publier.dart';
 import 'ecran_tables.dart';
+import 'parcours_creation.dart';
 
 /// Coquille de l'app une fois connecté : barre de navigation en bas
 /// (Feed, Explorer, publier, Wishlist, Profil). Wishlist attend encore
@@ -29,6 +29,9 @@ class EcranPrincipal extends StatefulWidget {
     this.notificationsSysteme,
     this.rechercheLieuService,
     this.positionService,
+    this.camera,
+    this.envois,
+    this.ouvrirParcours,
   });
 
   final AuthService authService;
@@ -50,6 +53,15 @@ class EcranPrincipal extends StatefulWidget {
   final NotificationsSysteme? notificationsSysteme;
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
+
+  /// La caméra et la file d'envoi de la création d'un moment : `null` en
+  /// production (la vraie caméra, `TablBackend.envois`), simulées en test.
+  final CameraService? camera;
+  final EnvoiPublications? envois;
+
+  /// Remplace le parcours de création (caméra, finalisation, cloche) : un
+  /// test rend directement le [ResultatCloche] dont il veut voir la suite.
+  final Future<ResultatCloche?> Function(BuildContext context)? ouvrirParcours;
 
   /// Route standard vers l'écran principal, une fois connecté. Centralisé
   /// ici (même principe que `EcranAccueil.route`) pour que tous les
@@ -211,22 +223,28 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   }
 
   Future<void> _publier() async {
-    final publie = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => EcranPublier(
-          souvenirService: widget.souvenirService,
-          abonnementService: widget.abonnementService,
-          tableService: _tableService,
-          rechercheLieuService: _rechercheLieuService,
-          positionService: _positionService,
-        ),
-      ),
-    );
-    if (publie != true || !mounted) return;
-    setState(() {
-      _versionFeed++;
-      _onglet = TablOnglet.feed;
-    });
+    final resultat =
+        await (widget.ouvrirParcours?.call(context) ??
+            ParcoursCreation.ouvrir(
+              context,
+              souvenirService: widget.souvenirService,
+              abonnementService: widget.abonnementService,
+              camera: widget.camera ?? CameraServiceAppareil(),
+              envois: widget.envois ?? TablBackend.envois,
+              tableService: _tableService,
+              rechercheLieuService: _rechercheLieuService,
+              positionService: _positionService,
+            ));
+    if (resultat == null || !mounted) return;
+    final suite = suiteApresCloche(resultat);
+    if (suite.montrerLeFil) {
+      setState(() {
+        _versionFeed++;
+        _onglet = TablOnglet.feed;
+      });
+    }
+    final message = suite.message;
+    if (message != null) afficherMessage(context, message);
   }
 
   @override
