@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:app/services/services.dart';
-import 'package:app/widgets/widgets.dart';
 
-import 'package:app/ecrans/ecran_feed.dart';
 import 'package:app/ecrans/ecran_principal.dart';
 
 class _FauxAbonnementService implements AbonnementService {
