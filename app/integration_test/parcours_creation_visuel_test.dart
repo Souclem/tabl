@@ -67,6 +67,7 @@ class _FauxEnvois implements EnvoiPublications {
     await Future<void>.delayed(const Duration(seconds: 6));
     return const ResultatEnvoi(StatutEnvoi.publie);
   }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
@@ -79,7 +80,9 @@ Future<void> _pause(WidgetTester t, String nom) async {
 
 Future<void> _attendre(WidgetTester t, {int tours = 20}) async {
   for (var i = 0; i < tours; i++) {
-    await t.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 25)));
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 25)),
+    );
     await t.pump(const Duration(milliseconds: 50));
   }
 }
@@ -91,30 +94,35 @@ void main() {
     final racine = Directory.systemTemp.createTempSync('parcours_visuel');
     final maintenant = DateTime.now();
     final brouillons = BrouillonsLocaux(racine, maintenant: () => maintenant);
-    final camera = FausseCamera(octetsPhoto: _png, maintenant: () => maintenant);
+    final camera = FausseCamera(
+      octetsPhoto: _png,
+      maintenant: () => maintenant,
+    );
     final envois = _FauxEnvois(brouillons);
 
-    await tester.pumpWidget(MaterialApp(
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: TextButton(
-              onPressed: () => ParcoursCreation.ouvrir(
-                context,
-                souvenirService: _FauxSouvenirService(),
-                abonnementService: _FauxAbonnementService(),
-                camera: camera,
-                envois: envois,
-                rechercheLieuService: _FausseRechercheLieu(),
-                positionService: _PositionFixe(),
-                maintenant: () => maintenant,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: TextButton(
+                onPressed: () => ParcoursCreation.ouvrir(
+                  context,
+                  souvenirService: _FauxSouvenirService(),
+                  abonnementService: _FauxAbonnementService(),
+                  camera: camera,
+                  envois: envois,
+                  rechercheLieuService: _FausseRechercheLieu(),
+                  positionService: _PositionFixe(),
+                  maintenant: () => maintenant,
+                ),
+                child: const Text('Fil'),
               ),
-              child: const Text('Fil'),
             ),
           ),
         ),
       ),
-    ));
+    );
     await tester.tap(find.text('Fil'));
     await _attendre(tester);
     await _pause(tester, 'parcours_1_camera');

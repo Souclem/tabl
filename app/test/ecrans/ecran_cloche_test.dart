@@ -21,6 +21,11 @@ class _FauxEnvois implements EnvoiPublications {
   final essais = <_Essai>[];
   final appelsGarder = <String>[];
   final appelsAttente = <String>[];
+  final appelsDetacher = <String>[];
+  final appelsEtat = <String>[];
+
+  /// Ce que l'envoi relit au retour de l'arrière-plan.
+  EtatReel etat = EtatReel.enCours;
 
   /// `false` : le moment s'est publié avant l'annulation.
   bool annulationPossible = true;
@@ -51,6 +56,17 @@ class _FauxEnvois implements EnvoiPublications {
   }
 
   @override
+  Future<void> detacher(String brouillonId) async {
+    appelsDetacher.add(brouillonId);
+  }
+
+  @override
+  Future<EtatReel> etatReel(String brouillonId) async {
+    appelsEtat.add(brouillonId);
+    return etat;
+  }
+
+  @override
   Future<bool> mettreEnAttente(String brouillonId) async {
     appelsAttente.add(brouillonId);
     return true;
@@ -66,7 +82,10 @@ void main() {
   var ferme = false;
 
   /// Une page d'accueil qui ouvre la cloche et garde ce qu'elle rend.
-  Future<void> ouvrir(WidgetTester tester) async {
+  Future<void> ouvrir(
+    WidgetTester tester, {
+    Duration delaiSuspendu = delaiEnvoiSuspendu,
+  }) async {
     resultat = null;
     ferme = false;
     await tester.pumpWidget(
@@ -81,6 +100,7 @@ void main() {
                       brouillonId: 'b1',
                       envois: envois,
                       pauseFinale: const Duration(milliseconds: 200),
+                      delaiSuspendu: delaiSuspendu,
                     ),
                   ),
                 );
@@ -406,6 +426,255 @@ void main() {
 
     expect(find.byType(EcranCloche), findsOneWidget);
     expect(ferme, isFalse);
+  });
+
+  group('envoi suspendu (délai maximal)', () {
+    const delai = Duration(seconds: 5);
+
+    testWidgets('le délai par défaut est de 45 s', (tester) async {
+      expect(delaiEnvoiSuspendu, const Duration(seconds: 45));
+    });
+
+    testWidgets('sans progression : échec, boutons prévus, brouillon gardé', (
+      tester,
+    ) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      envois.essai.surProgression!(0, 2);
+
+      await pomper(tester, 4500);
+      expect(bouton('Annuler'), findsOneWidget);
+      expect(find.textContaining('n\'a pas abouti'), findsNothing);
+
+      await pomper(tester, 1500);
+      expect(find.textContaining('n\'a pas abouti'), findsOneWidget);
+      expect(bouton('Garder en brouillon'), findsOneWidget);
+      expect(bouton('Réessayer'), findsOneWidget);
+      expect(find.text('Annuler'), findsNothing);
+      expect(envois.appelsDetacher, ['b1']);
+      expect(ferme, isFalse);
+    });
+
+    testWidgets('une photo qui part relance le compte', (tester) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      envois.essai.surProgression!(0, 3);
+      await pomper(tester, 4000);
+
+      envois.essai.surProgression!(1, 3);
+      await pomper(tester, 4000);
+      envois.essai.surProgression!(2, 3);
+      await pomper(tester, 4000);
+
+      expect(envois.appelsDetacher, isEmpty);
+      expect(bouton('Annuler'), findsOneWidget);
+
+      await pomper(tester, 2000);
+      expect(envois.appelsDetacher, ['b1']);
+      expect(bouton('Réessayer'), findsOneWidget);
+    });
+
+    testWidgets('la validation qui ne répond pas est suspendue aussi', (
+      tester,
+    ) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      envois.essai.surProgression!(2, 2);
+      await pomper(tester, 3000);
+      expect(find.byType(EcranCloche), findsOneWidget);
+      expect(find.text('Annuler'), findsNothing);
+      expect(find.text('Réessayer'), findsNothing);
+
+      await pomper(tester, 5000);
+
+      expect(envois.appelsDetacher, ['b1']);
+      expect(bouton('Réessayer'), findsOneWidget);
+    });
+
+    testWidgets('Réessayer repart, et l\'ancien essai lâché ne parle plus', (
+      tester,
+    ) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      final ancien = envois.essai;
+      await pomper(tester, 5500);
+      await appuyer(tester, 'Réessayer');
+      await tester.pump();
+      expect(envois.essais, hasLength(2));
+
+      ancien.reponse.complete(const ResultatEnvoi(StatutEnvoi.annule));
+      await pomper(tester, 500);
+      expect(ferme, isFalse);
+      expect(bouton('Annuler'), findsOneWidget);
+
+      envois.essai.surProgression!(2, 2);
+      envois.essai.reponse.complete(const ResultatEnvoi(StatutEnvoi.publie));
+      await pomper(tester, 5000);
+      expect(resultat!.issue, IssueCloche.publie);
+    });
+
+    testWidgets('Garder en brouillon après la suspension', (tester) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      await pomper(tester, 5500);
+
+      await appuyer(tester, 'Garder en brouillon');
+      await pomper(tester, 100);
+
+      expect(envois.appelsGarder, ['b1']);
+      expect(resultat!.issue, IssueCloche.brouillonGarde);
+    });
+
+    testWidgets('l\'ancien essai lâché qui publie quand même : publié', (
+      tester,
+    ) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      final ancien = envois.essai;
+      await pomper(tester, 5500);
+      expect(bouton('Réessayer'), findsOneWidget);
+
+      ancien.reponse.complete(const ResultatEnvoi(StatutEnvoi.publie));
+      await pomper(tester, 3000);
+
+      expect(ferme, isTrue);
+      expect(resultat!.issue, IssueCloche.publie);
+    });
+  });
+
+  group('arrière-plan', () {
+    const delai = Duration(seconds: 5);
+
+    Future<void> mettreEnPause(WidgetTester tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+    }
+
+    Future<void> reprendre(WidgetTester tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+    }
+
+    testWidgets('la mise en pause ne touche pas à l\'envoi', (tester) async {
+      await ouvrir(tester);
+
+      await mettreEnPause(tester);
+      await pomper(tester, 500);
+
+      expect(envois.appelsGarder, isEmpty);
+      expect(envois.appelsAttente, isEmpty);
+      expect(envois.appelsDetacher, isEmpty);
+      expect(bouton('Annuler'), findsOneWidget);
+    });
+
+    testWidgets('le temps passé dehors n\'est pas une suspension', (
+      tester,
+    ) async {
+      await ouvrir(tester, delaiSuspendu: delai);
+      envois.essai.surProgression!(0, 2);
+      await pomper(tester, 1000);
+
+      await mettreEnPause(tester);
+      await tester.pump(const Duration(minutes: 2));
+      await reprendre(tester);
+      await pomper(tester, 1000);
+
+      expect(envois.appelsEtat, ['b1']);
+      expect(envois.appelsDetacher, isEmpty);
+      expect(bouton('Annuler'), findsOneWidget);
+
+      await pomper(tester, 5000);
+      expect(envois.appelsDetacher, ['b1']);
+    });
+
+    testWidgets('retour : l\'envoi tourne encore, rien ne change', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.essai.surProgression!(1, 2);
+      await pomper(tester, 2000);
+      final avant = pourcentage(tester);
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 100);
+
+      expect(envois.appelsEtat, ['b1']);
+      expect(pourcentage(tester), greaterThanOrEqualTo(avant));
+      expect(bouton('Annuler'), findsOneWidget);
+      expect(ferme, isFalse);
+    });
+
+    testWidgets('retour : le moment s\'est publié pendant l\'absence', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.etat = EtatReel.publie;
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 5000);
+
+      expect(ferme, isTrue);
+      expect(resultat!.issue, IssueCloche.publie);
+    });
+
+    testWidgets('retour : l\'envoi a échoué pendant l\'absence', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.etat = EtatReel.echec;
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 100);
+
+      expect(find.textContaining('n\'a pas abouti'), findsOneWidget);
+      expect(bouton('Réessayer'), findsOneWidget);
+      expect(bouton('Garder en brouillon'), findsOneWidget);
+    });
+
+    testWidgets('retour : l\'envoi a été coupé, mis en attente', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.etat = EtatReel.coupe;
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 200);
+
+      expect(envois.appelsAttente, ['b1']);
+      expect(ferme, isTrue);
+      expect(resultat!.issue, IssueCloche.enAttente);
+    });
+
+    testWidgets('retour : brouillon disparu, la cloche se referme', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.etat = EtatReel.introuvable;
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 200);
+
+      expect(ferme, isTrue);
+      expect(resultat!.issue, IssueCloche.annule);
+    });
+
+    testWidgets('retour : un envoi déjà conclu n\'est pas relu', (
+      tester,
+    ) async {
+      await ouvrir(tester);
+      envois.essai.reponse.complete(
+        ResultatEnvoi(StatutEnvoi.echec, erreur: StateError('refusé')),
+      );
+      await pomper(tester, 100);
+      envois.etat = EtatReel.coupe;
+
+      await mettreEnPause(tester);
+      await reprendre(tester);
+      await pomper(tester, 100);
+
+      expect(envois.appelsEtat, isEmpty);
+      expect(envois.appelsAttente, isEmpty);
+      expect(bouton('Réessayer'), findsOneWidget);
+    });
   });
 
   testWidgets('l\'écran est sombre quel que soit le thème', (tester) async {

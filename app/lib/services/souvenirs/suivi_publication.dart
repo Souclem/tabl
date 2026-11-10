@@ -6,6 +6,11 @@ import 'package:flutter/foundation.dart';
 
 import 'envoi_publications.dart';
 
+/// Au-delà de ce temps sans progression (ni photo envoyée, ni réponse du
+/// serveur), la cloche cesse d'attendre et passe à l'échec : l'auteur choisit
+/// de réessayer ou de garder le brouillon.
+const delaiEnvoiSuspendu = Duration(seconds: 45);
+
 /// Où en est la publication que la cloche suit.
 enum PhaseCloche {
   /// Les photos partent (0 → 90 %) : Modifier et Annuler sont possibles.
@@ -81,11 +86,23 @@ class ResultatCloche {
 /// L'horloge vient de l'écran, qui appelle [avancer] à chaque image : le
 /// suivi n'a ni minuteur ni animation propre, et un test le pilote à la
 /// main.
+///
+/// Deux cas où l'envoi ne répond plus :
+/// - **suspendu** : pas de progression pendant [delaiSuspendu] (l'écran
+///   compte les images, donc pas le temps passé en arrière-plan) → phase
+///   [PhaseCloche.echec], l'envoi est lâché ([EnvoiPublications.detacher]) ;
+/// - **arrière-plan** : à la mise en pause l'envoi continue tant que l'OS le
+///   permet ([miseEnPause]) ; au retour ([auRetour]) l'état réel est relu.
 class SuiviPublication extends ChangeNotifier {
-  SuiviPublication(this._envois, this.brouillonId);
+  SuiviPublication(
+    this._envois,
+    this.brouillonId, {
+    this.delaiSuspendu = delaiEnvoiSuspendu,
+  });
 
   final EnvoiPublications _envois;
   final String brouillonId;
+  final Duration delaiSuspendu;
 
   PhaseCloche _phase = PhaseCloche.envoi;
   PhaseCloche get phase => _phase;
@@ -153,6 +170,11 @@ class SuiviPublication extends ChangeNotifier {
   Duration? _dernierInstant;
   Duration? _debutEssai;
   Duration? _debutValidation;
+  Duration? _dernierProgres;
+  bool _progresVu = false;
+  bool _enPause = false;
+  bool _rebaser = false;
+  bool _suspendu = false;
 
   // Les moments de la courbe : (millisecondes, pourcentage). Elle atteint
   // 90 % en 2,7 s si le réseau suit.
@@ -180,12 +202,18 @@ class SuiviPublication extends ChangeNotifier {
   /// Fait avancer le trait ; [ecoule] est le temps écoulé depuis un point
   /// fixe (celui du `Ticker` de l'écran).
   void avancer(Duration ecoule) {
+    if (_enPause) return;
     final precedent = _dernierInstant ?? ecoule;
     _dernierInstant = ecoule;
     _debutEssai ??= ecoule;
     final dt = math.min(64.0, (ecoule - precedent).inMicroseconds / 1000);
     final ms = (ecoule - _debutEssai!).inMicroseconds / 1000;
     final avant = (_affiche, _reseauLent, _phase);
+    if (_dernierProgres == null || _progresVu || _rebaser) {
+      _dernierProgres = ecoule;
+      _progresVu = false;
+      _rebaser = false;
+    }
 
     switch (_phase) {
       case PhaseCloche.envoi:
@@ -198,6 +226,7 @@ class SuiviPublication extends ChangeNotifier {
         if (_photosParties && _affiche >= 88.6) {
           _phase = PhaseCloche.validation;
           _debutValidation = ecoule;
+          _dernierProgres = ecoule;
         }
       case PhaseCloche.validation:
         final depuis = (ecoule - (_debutValidation ?? ecoule)).inMicroseconds;
@@ -214,10 +243,85 @@ class SuiviPublication extends ChangeNotifier {
         _reseauLent = false;
     }
 
+    if (!_suspendu &&
+        (_phase == PhaseCloche.envoi || _phase == PhaseCloche.validation) &&
+        ecoule - _dernierProgres! > delaiSuspendu) {
+      unawaited(_suspendre());
+      return;
+    }
+
     if (avant != (_affiche, _reseauLent, _phase) || _resultat != null) {
       notifyListeners();
     }
   }
+
+  /// Plus de progression depuis [delaiSuspendu] : l'envoi est lâché et la
+  /// cloche passe à l'échec (sauf si l'auteur est déjà en train de quitter :
+  /// lâcher l'envoi libère alors son « Annuler »).
+  Future<void> _suspendre() async {
+    _suspendu = true;
+    _essai++;
+    final enAttenteDuChoix = !_quitte;
+    if (enAttenteDuChoix) {
+      _phase = PhaseCloche.echec;
+      _occupe = true;
+      notifyListeners();
+    }
+    try {
+      await _envois.detacher(brouillonId);
+    } catch (_) {
+      // Le brouillon est intact ; l'auteur peut quand même choisir.
+    }
+    if (enAttenteDuChoix && _resultat == null) {
+      _occupe = false;
+      notifyListeners();
+    }
+  }
+
+  // --- Arrière-plan -------------------------------------------------
+
+  /// L'app passe en arrière-plan : l'envoi continue tant que l'OS le permet,
+  /// seul le compte du temps s'arrête (l'écran ne reçoit plus d'images).
+  void miseEnPause() => _enPause = true;
+
+  /// L'app revient au premier plan : le temps passé dehors ne compte pas
+  /// comme une suspension, et l'état réel du brouillon est relu au lieu de
+  /// rester figé sur ce que la cloche croyait.
+  Future<void> auRetour() async {
+    _enPause = false;
+    _rebaser = true;
+    if (!_enCours) return;
+    final essai = _essai;
+    final EtatReel etat;
+    try {
+      etat = await _envois.etatReel(brouillonId);
+    } catch (_) {
+      // Serveur injoignable : l'état est inconnu, le délai de suspension
+      // reste le filet.
+      return;
+    }
+    if (essai != _essai || !_enCours) return;
+    switch (etat) {
+      case EtatReel.enCours:
+        break;
+      case EtatReel.publie:
+        _issueFinale ??= const ResultatCloche(IssueCloche.publie);
+        _phase = PhaseCloche.publie;
+        notifyListeners();
+      case EtatReel.echec:
+        _echouer(null);
+      case EtatReel.coupe:
+        await _mettreEnAttente();
+      case EtatReel.introuvable:
+        _terminer(const ResultatCloche(IssueCloche.annule));
+    }
+  }
+
+  /// Un envoi est attendu et rien n'a encore conclu.
+  bool get _enCours =>
+      _resultat == null &&
+      !_occupe &&
+      (_phase == PhaseCloche.envoi || _phase == PhaseCloche.validation);
 
   void _lisser(double dt, double tau) {
     _affiche += (_cible - _affiche) * (1 - math.exp(-dt / tau));
@@ -234,9 +338,16 @@ class SuiviPublication extends ChangeNotifier {
   bool _quitte = false;
   bool _arrete = false;
 
+  /// Le numéro de l'essai suivi : un essai lâché (suspendu) ne parle plus.
+  int _essai = 0;
+
   /// Lance (ou relance) l'envoi. Se termine avec l'essai, jamais sur une
   /// erreur : l'issue passe par [phase] et [resultat].
   Future<void> demarrer() async {
+    final essai = ++_essai;
+    _suspendu = false;
+    _dernierProgres = null;
+    _progresVu = false;
     _phase = PhaseCloche.envoi;
     _affiche = 0;
     _cible = 0;
@@ -254,18 +365,27 @@ class SuiviPublication extends ChangeNotifier {
       resultat = await _envois.envoyer(
         brouillonId,
         surProgression: (envoyees, total) {
+          if (essai != _essai) return;
+          _progresVu = true;
           _envoyees = envoyees;
           _total = total;
           _photosParties = envoyees >= total;
         },
       );
     } catch (e) {
-      if (!_arrete) _echouer(e);
+      if (!_arrete && essai == _essai) _echouer(e);
       return;
     }
     // L'auteur a quitté (Modifier, Annuler) pendant l'envoi : c'est
     // [_quitter] qui conclut.
-    if (_quitte || _arrete) return;
+    if (_quitte || _arrete || _resultat != null) return;
+    // Un essai lâché qui aboutit quand même : seul son succès compte (le
+    // moment est publié), le reste est déjà dépassé.
+    if (essai != _essai && resultat.statut != StatutEnvoi.publie) return;
+    // Déjà constaté publié (retour d'arrière-plan) : seul un succès précise.
+    if (_phase == PhaseCloche.publie && resultat.statut != StatutEnvoi.publie) {
+      return;
+    }
 
     switch (resultat.statut) {
       case StatutEnvoi.publie:
@@ -344,6 +464,10 @@ class SuiviPublication extends ChangeNotifier {
         !gestes.contains(GesteCloche.envoyerDesQuePossible)) {
       return;
     }
+    await _mettreEnAttente();
+  }
+
+  Future<void> _mettreEnAttente() async {
     _occupe = true;
     notifyListeners();
     try {

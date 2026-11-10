@@ -698,6 +698,120 @@ void main() {
     });
   });
 
+  group('envoi suspendu (detacher)', () {
+    test('libère « Garder en brouillon » sans attendre l\'envoi', () async {
+      final serveur = _DepotLent();
+      final app = ouvrirApp(serveur);
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final envoi = app.envois.envoyer(brouillon.id);
+      await serveur.depotCommence.future;
+      final garde = app.envois.garderEnBrouillon(brouillon.id);
+      await app.envois.detacher(brouillon.id);
+
+      expect(await garde, isTrue);
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+
+      serveur.feuVert.complete();
+      expect((await envoi).statut, StatutEnvoi.annule);
+      expect(serveur.appels, isNot(contains('commit')));
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+    });
+
+    test('la file passe en échec, le brouillon est intact', () async {
+      final serveur = _DepotLent();
+      final app = ouvrirApp(serveur);
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final envoi = app.envois.envoyer(brouillon.id);
+      await serveur.depotCommence.future;
+      await app.envois.detacher(brouillon.id);
+
+      expect((await app.file.lire(brouillon.id))!.etat, EtatEnvoi.echec);
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+      serveur.feuVert.complete();
+      await envoi;
+    });
+
+    test('« Réessayer » repart malgré l\'ancien essai, qui s\'arrête sans '
+        'commit', () async {
+      final serveur = _DepotLent();
+      final app = ouvrirApp(serveur);
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final ancien = app.envois.envoyer(brouillon.id);
+      await serveur.depotCommence.future;
+      await app.envois.detacher(brouillon.id);
+      final nouveau = app.envois.envoyer(brouillon.id);
+      serveur.feuVert.complete();
+
+      expect((await nouveau).statut, StatutEnvoi.publie);
+      expect((await ancien).statut, StatutEnvoi.annule);
+      expect(
+        serveur.appels.where((a) => a == 'commit'),
+        hasLength(1),
+        reason: 'un seul commit : jamais deux moments',
+      );
+      expect(serveur.lignes[brouillon.id]!['statut'], statutPublie);
+    });
+
+    test('sans envoi en cours : sans effet', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await app.envois.detacher(brouillon.id);
+      expect(await app.file.lire(brouillon.id), isNull);
+    });
+  });
+
+  group('etatReel (retour d\'arrière-plan)', () {
+    test('un envoi tourne : en cours', () async {
+      final serveur = _DepotLent();
+      final app = ouvrirApp(serveur);
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final envoi = app.envois.envoyer(brouillon.id);
+      await serveur.depotCommence.future;
+
+      expect(await app.envois.etatReel(brouillon.id), EtatReel.enCours);
+      serveur.feuVert.complete();
+      await envoi;
+    });
+
+    test('envoi laissé en cours, plus rien ne tourne : coupé', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await laisserEnvoi(app.file, brouillon.id, EtatEnvoi.enCours);
+
+      expect(await app.envois.etatReel(brouillon.id), EtatReel.coupe);
+      expect(await app.brouillons.charger(brouillon.id), isNotNull);
+    });
+
+    test('la file attend le choix de l\'auteur : échec', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await laisserEnvoi(app.file, brouillon.id, EtatEnvoi.echec);
+
+      expect(await app.envois.etatReel(brouillon.id), EtatReel.echec);
+    });
+
+    test('publié sur le serveur : publié, le brouillon local oublié', () async {
+      final app = ouvrirApp();
+      final brouillon = await brouillonPret(app.brouillons);
+      await laisserEnvoi(app.file, brouillon.id, EtatEnvoi.enCours);
+      await preparerSurServeur(brouillon, app.brouillons);
+      await PublicationEnDeuxTemps(depot).valider(brouillon.id);
+
+      expect(await app.envois.etatReel(brouillon.id), EtatReel.publie);
+      expect(await app.brouillons.charger(brouillon.id), isNull);
+      expect(await app.file.lire(brouillon.id), isNull);
+    });
+
+    test('brouillon disparu, rien de publié : introuvable', () async {
+      final app = ouvrirApp();
+      expect(await app.envois.etatReel('inconnu'), EtatReel.introuvable);
+    });
+  });
+
   group('FileEnvoi', () {
     test('relue telle quelle, la plus ancienne d\'abord', () async {
       final file = FileEnvoi(racine);

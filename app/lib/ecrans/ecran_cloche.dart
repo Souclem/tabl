@@ -20,6 +20,7 @@ class EcranCloche extends StatefulWidget {
     required this.brouillonId,
     required this.envois,
     this.pauseFinale = const Duration(milliseconds: 900),
+    this.delaiSuspendu = delaiEnvoiSuspendu,
   });
 
   final String brouillonId;
@@ -28,12 +29,15 @@ class EcranCloche extends StatefulWidget {
   /// Combien de temps la cloche reste à 100 % avant de se refermer.
   final Duration pauseFinale;
 
+  /// Sans progression pendant ce temps, l'envoi est jugé suspendu (échec).
+  final Duration delaiSuspendu;
+
   @override
   State<EcranCloche> createState() => _EcranClocheState();
 }
 
 class _EcranClocheState extends State<EcranCloche>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final SuiviPublication _suivi;
   late final Ticker _horloge;
   var _ferme = false;
@@ -41,17 +45,34 @@ class _EcranClocheState extends State<EcranCloche>
   @override
   void initState() {
     super.initState();
-    _suivi = SuiviPublication(widget.envois, widget.brouillonId)
-      ..addListener(_siFini);
+    _suivi = SuiviPublication(
+      widget.envois,
+      widget.brouillonId,
+      delaiSuspendu: widget.delaiSuspendu,
+    )..addListener(_siFini);
+    WidgetsBinding.instance.addObserver(this);
     _horloge = createTicker(_suivi.avancer)..start();
     unawaited(_suivi.demarrer());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _horloge.dispose();
     _suivi.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+        _suivi.miseEnPause();
+      case AppLifecycleState.resumed:
+        unawaited(_suivi.auRetour());
+      default:
+        break;
+    }
   }
 
   void _siFini() {
