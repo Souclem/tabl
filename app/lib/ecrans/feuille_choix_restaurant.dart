@@ -12,8 +12,10 @@ import 'recherche_lieu_en_direct.dart';
 /// carte, ses lieux personnels (« Mes lieux »), la recherche au fil de
 /// la frappe — triée autour des endroits, sinon du téléphone
 /// ([positionService]) —, la saisie à la main en dernier recours, ou un
-/// nouveau lieu personnel (d'emblée avec [lieuPersonnelDAbord]). `null` :
-/// fermée sans choisir.
+/// nouveau lieu personnel. `null` : fermée sans choisir.
+///
+/// Un restaurant saisi à la main n'a de position que si on place
+/// soi-même son épingle sur la carte : jamais celle du téléphone.
 Future<LieuRestaurant?> choisirRestaurant(
   BuildContext context, {
   required RechercheLieuService? rechercheLieuService,
@@ -22,7 +24,6 @@ Future<LieuRestaurant?> choisirRestaurant(
   List<List<LieuRestaurant>> prochesParEndroit = const [],
   RepereDistance repere = RepereDistance.photo,
   LieuRestaurant? choisi,
-  bool lieuPersonnelDAbord = false,
 }) {
   final c = TablCouleurs.of(context);
   return showModalBottomSheet<LieuRestaurant>(
@@ -33,31 +34,16 @@ Future<LieuRestaurant?> choisirRestaurant(
     builder: (_) => _FeuilleRestaurant(
       rechercheLieuService: rechercheLieuService,
       positionService: endroits.isNotEmpty
-          ? _PositionFixe(endroits.first)
+          ? PositionFixe(endroits.first)
           : positionService,
       endroits: endroits,
       prochesParEndroit: prochesParEndroit,
       repere: repere,
       choisi: choisi,
-      lieuPersonnelDAbord: lieuPersonnelDAbord,
     ),
   );
 }
 
-/// Une position qui ne bouge pas : celle des photos (ou du téléphone au
-/// moment d'ouvrir), pour trier la recherche autour d'elle.
-class _PositionFixe implements PositionService {
-  const _PositionFixe(this.position);
-
-  final Coordonnees position;
-
-  @override
-  Future<Coordonnees?> positionActuelle() async => position;
-}
-
-/// « Quel restaurant ? » : ceux près des photos d'abord, en liste ou
-/// sur la carte (avec l'endroit de chaque photo), la recherche au fil
-/// de la frappe, et la saisie à la main en dernier recours.
 class _FeuilleRestaurant extends StatefulWidget {
   const _FeuilleRestaurant({
     required this.rechercheLieuService,
@@ -66,7 +52,6 @@ class _FeuilleRestaurant extends StatefulWidget {
     required this.prochesParEndroit,
     required this.repere,
     required this.choisi,
-    required this.lieuPersonnelDAbord,
   });
 
   final RechercheLieuService? rechercheLieuService;
@@ -82,7 +67,6 @@ class _FeuilleRestaurant extends StatefulWidget {
   final LieuRestaurant? choisi;
 
   /// S'ouvre sur « Créer un lieu personnel ».
-  final bool lieuPersonnelDAbord;
 
   @override
   State<_FeuilleRestaurant> createState() => _FeuilleRestaurantState();
@@ -102,8 +86,12 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
   String? _erreurNom;
   String? _erreurVille;
 
+  /// L'épingle du restaurant saisi à la main, placée par soi-même ;
+  /// `null` : il n'ira sur aucune carte.
+  Coordonnees? _epingle;
+
   /// « Créer un lieu personnel » : seulement un nom.
-  late bool _nouveauLieuPersonnel = widget.lieuPersonnelDAbord;
+  bool _nouveauLieuPersonnel = false;
   final _nomLieuPersonnel = TextEditingController();
   String? _erreurLieuPersonnel;
 
@@ -154,11 +142,7 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
 
   void _validerLieuPersonnel() {
     final nom = _nomLieuPersonnel.text.trim();
-    final erreur = nom.isEmpty
-        ? 'Donnez-lui un nom.'
-        : nom.length > 60
-        ? '60 caractères au plus.'
-        : null;
+    final erreur = erreurNomLieuPersonnel(nom);
     setState(() => _erreurLieuPersonnel = erreur);
     if (erreur != null) return;
     // Le même nom qu'un de ses lieux : c'est lui.
@@ -196,11 +180,31 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
       _erreurVille = erreurVille;
     });
     if (erreurNom != null || erreurVille != null) return;
-    // Sans position : celle du téléphone placerait le restaurant au
-    // mauvais endroit sur la carte, on n'y est plus.
+    // La position, seulement si on a placé l'épingle : celle du téléphone
+    // pourrait être chez soi.
     Navigator.of(context).pop(
-      LieuRestaurant.manuel(nom: _nom.text.trim(), ville: _ville.text.trim()),
+      LieuRestaurant.manuel(
+        nom: _nom.text.trim(),
+        ville: _ville.text.trim(),
+        latitude: _epingle?.latitude,
+        longitude: _epingle?.longitude,
+      ),
     );
+  }
+
+  Future<void> _placerEpingle() async {
+    FocusScope.of(context).unfocus();
+    final placee = await placerEpingle(
+      context,
+      nom: _nom.text,
+      depart: departEpingle(
+        epingle: _epingle,
+        endroits: widget.endroits,
+        position: position,
+      ),
+      reperes: widget.endroits,
+    );
+    if (placee != null && mounted) setState(() => _epingle = placee);
   }
 
   /// La carte a bougé : les restaurants de la zone regardée s'ajoutent.
@@ -317,7 +321,29 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
           actionClavier: TextInputAction.done,
           onSoumis: (_) => _validerALaMain(),
         ),
-        const SizedBox(height: TablTokens.espaceL),
+        const SizedBox(height: TablTokens.espaceM),
+        Text(
+          _epingle == null
+              ? 'Facultatif : sans épingle, il n\'apparaît sur aucune carte.'
+              : 'Ce lieu sera visible sur la carte par vos abonnés.',
+          style: TablCouleurs.of(context).legende.copyWith(fontSize: 13),
+        ),
+        Wrap(
+          children: [
+            TablBoutonTexte(
+              libelle: _epingle == null
+                  ? 'Placer sur la carte'
+                  : 'Déplacer l\'épingle',
+              onPresse: _placerEpingle,
+            ),
+            if (_epingle != null)
+              TablBoutonTexte(
+                libelle: 'Retirer l\'épingle',
+                onPresse: () => setState(() => _epingle = null),
+              ),
+          ],
+        ),
+        const SizedBox(height: TablTokens.espaceM),
         TablBouton(libelle: 'Valider', onPresse: _validerALaMain),
       ],
     );
@@ -520,4 +546,78 @@ class _FeuilleRestaurantState extends State<_FeuilleRestaurant>
       ],
     );
   }
+}
+
+/// D'où part la carte de l'épingle : l'épingle déjà placée, l'endroit des
+/// photos, là où l'on est, ou Bruxelles faute de mieux.
+Coordonnees departEpingle({
+  Coordonnees? epingle,
+  List<Coordonnees> endroits = const [],
+  Coordonnees? position,
+}) =>
+    epingle ??
+    endroits.firstOrNull ??
+    position ??
+    (latitude: 50.8467, longitude: 4.3525);
+
+/// Placer soi-même un restaurant qui n'est pas dans Tabl : une carte,
+/// l'épingle fixe au centre, on déplace la carte dessous (les [reperes] :
+/// les endroits des photos). Seule façon de donner une position à un lieu
+/// saisi à la main : jamais celle du téléphone. `null` : rien de placé.
+Future<Coordonnees?> placerEpingle(
+  BuildContext context, {
+  required String nom,
+  required Coordonnees depart,
+  List<Coordonnees> reperes = const [],
+}) {
+  final c = TablCouleurs.of(context);
+  // Le centre après le dernier déplacement (gardé hors de la construction).
+  Coordonnees? centre;
+  final titre = nom.trim();
+  return showModalBottomSheet<Coordonnees>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: c.surface,
+    showDragHandle: true,
+    builder: (contexteFeuille) {
+      return SizedBox(
+        height: MediaQuery.sizeOf(contexteFeuille).height * 0.85,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: TablCarteMapbox(
+                geojsonLieux: geojsonChoixLieux(
+                  const <LieuRestaurant>[],
+                  reperes: reperes,
+                ),
+                latitudeInitiale: depart.latitude,
+                longitudeInitiale: depart.longitude,
+                zoomInitial: 17,
+                onTapLieu: (_) {},
+                onZoneVisible: (sud, ouest, nord, est, _) => centre = (
+                  latitude: (sud + nord) / 2,
+                  longitude: (ouest + est) / 2,
+                ),
+                avecMaPosition: reperes.isEmpty,
+                dansUneFeuille: true,
+              ),
+            ),
+            const Positioned.fill(child: TablEpingleCentre()),
+            Positioned(
+              left: TablTokens.espaceM,
+              right: TablTokens.espaceM,
+              bottom: TablTokens.espaceL,
+              child: TablCarteChoixLieu(
+                nom: titre.isEmpty ? 'Votre restaurant' : titre,
+                detail: 'Ce lieu sera visible sur la carte par vos abonnés.',
+                libelleBouton: 'Placer ici',
+                onChoisir: () =>
+                    Navigator.of(contexteFeuille).pop(centre ?? depart),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }

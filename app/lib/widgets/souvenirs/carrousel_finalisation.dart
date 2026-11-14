@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import '../../theme/tokens.dart';
 
 /// Les photos d'un moment en cours de création, plein écran : on glisse de
-/// l'une à l'autre, un trait par photo en haut montre où l'on en est.
-/// Sans photo, un fond uni. Toujours sombre : le dégradé du haut et du bas
-/// garde le texte posé dessus lisible.
+/// l'une à l'autre. Pas de traits en haut : on publie, ce n'est pas une
+/// story.
+/// Sans photo, un fond uni. Toujours sombre : le voile du haut (de hauteur
+/// fixe, il couvre tout l'en-tête : lieu, date, mot sur deux lignes) et le
+/// dégradé du bas gardent le texte blanc lisible, même sur une photo
+/// claire.
 class TablCarrouselFinalisation extends StatefulWidget {
   const TablCarrouselFinalisation({
     super.key,
@@ -22,6 +25,10 @@ class TablCarrouselFinalisation extends StatefulWidget {
   State<TablCarrouselFinalisation> createState() =>
       _TablCarrouselFinalisationState();
 }
+
+/// Sous la zone sûre : « Plus tard », puis l'en-tête (lieu, date, mot sur
+/// deux lignes), avec de quoi s'effacer.
+const _hauteurVoileHaut = 300.0;
 
 class _TablCarrouselFinalisationState extends State<TablCarrouselFinalisation> {
   late final PageController _controleur = PageController(
@@ -61,40 +68,39 @@ class _TablCarrouselFinalisationState extends State<TablCarrouselFinalisation> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  c.fond.withValues(alpha: 0.55),
-                  c.fond.withValues(alpha: 0),
                   c.fond.withValues(alpha: 0),
                   c.fond.withValues(alpha: 0.92),
                 ],
-                stops: const [0, 0.2, 0.42, 1],
+                stops: const [0.42, 1],
               ),
             ),
           ),
         ),
-        if (images.length > 1)
-          Positioned(
-            left: TablTokens.espaceM,
-            right: TablTokens.espaceM,
-            top: MediaQuery.paddingOf(context).top + TablTokens.espaceS,
-            child: Row(
-              children: [
-                for (var i = 0; i < images.length; i++)
-                  Expanded(
-                    child: Container(
-                      key: ValueKey('trait-photo-$i'),
-                      height: 3,
-                      margin: const EdgeInsets.symmetric(horizontal: 2),
-                      decoration: BoxDecoration(
-                        color: c.texte.withValues(
-                          alpha: i == widget.page ? 0.95 : 0.35,
-                        ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-              ],
+        // Le haut : sombre derrière le texte, puis s'efface en douceur.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: MediaQuery.paddingOf(context).top + _hauteurVoileHaut,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    c.fond.withValues(alpha: 0.72),
+                    c.fond.withValues(alpha: 0.66),
+                    c.fond.withValues(alpha: 0.5),
+                    c.fond.withValues(alpha: 0.2),
+                    c.fond.withValues(alpha: 0),
+                  ],
+                  stops: const [0, 0.5, 0.72, 0.88, 1],
+                ),
+              ),
             ),
           ),
+        ),
       ],
     );
   }

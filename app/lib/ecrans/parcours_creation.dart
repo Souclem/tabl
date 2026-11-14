@@ -2,19 +2,25 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
+import 'package:app/widgets/widgets.dart';
 
 import 'ecran_camera.dart';
 import 'ecran_finalisation.dart';
-import 'feuille_photos_moment.dart';
+import 'feuille_brouillons.dart';
 
 /// Le parcours de création d'un moment : la caméra, la finalisation, puis la
 /// cloche (ouverte par la finalisation). Chaque étape remplace la précédente
 /// dans la pile : la caméra ne reste pas ouverte sous la finalisation, et
-/// « Reprendre des photos » ramène à la caméra.
+/// « Reprendre des photos » ramène à la caméra, sur le même brouillon.
+///
+/// Sans brouillon en cours, « + » ouvre directement la caméra. Sinon, il
+/// propose d'abord « Brouillons » : en reprendre un (la caméra s'ouvre
+/// avec ses photos) ou, en dernier, « Nouveau moment » — au plus
+/// [nombreMaxBrouillons] brouillons.
 ///
 /// [ouvrir] rend le [ResultatCloche] quand la cloche s'est refermée, ou
-/// `null` si l'on est sorti avant (caméra fermée, « Plus tard ») : le moment
-/// est alors gardé sur le téléphone.
+/// `null` si l'on est sorti avant (liste fermée, caméra fermée, « Plus
+/// tard ») : le moment est alors gardé sur le téléphone.
 class ParcoursCreation {
   ParcoursCreation._({
     required this.navigateur,
@@ -69,8 +75,62 @@ class ParcoursCreation {
       positionService: positionService,
       maintenant: maintenant,
     );
-    parcours._ouvrirCamera(remplace: false);
+    unawaited(parcours._commencer(context));
     return parcours._fin.future;
+  }
+
+  /// La liste des brouillons s'il y en a, puis la caméra.
+  Future<void> _commencer(BuildContext context) async {
+    // La file d'envoi illisible : aucun brouillon n'est tenu pour « en
+    // attente », ils comptent tous dans la limite.
+    var enAttente = <String>{};
+    try {
+      enAttente = {
+        for (final e in await envois.enAttenteDEnvoi()) e.brouillonId,
+      };
+    } catch (e) {
+      debugPrint('ParcoursCreation: file d\'envoi : $e');
+    }
+    List<Brouillon> aReprendre;
+    try {
+      aReprendre = brouillonsAReprendre(
+        await _brouillons.lister(),
+        enAttente: enAttente,
+      );
+      final enTrop = brouillonsEnTrop(aReprendre);
+      for (final b in enTrop) {
+        await _brouillons.supprimerBrouillon(b.id);
+      }
+      if (enTrop.isNotEmpty) {
+        aReprendre = aReprendre.sublist(0, nombreMaxBrouillons);
+      }
+    } catch (e) {
+      // Sans savoir combien il y a de brouillons, pas de nouveau moment :
+      // ce serait peut-être le quatrième.
+      debugPrint('ParcoursCreation: brouillons : $e');
+      if (context.mounted) afficherMessage(context, messageErreurGenerique);
+      _terminer(null);
+      return;
+    }
+    if (!context.mounted) {
+      _terminer(null);
+      return;
+    }
+    if (aReprendre.isEmpty) {
+      _ouvrirCamera(remplace: false);
+      return;
+    }
+    final choix = await ouvrirFeuilleBrouillons(
+      context,
+      brouillons: _brouillons,
+      aReprendre: aReprendre,
+      maintenant: maintenant,
+    );
+    if (choix == null || !context.mounted) {
+      _terminer(null);
+      return;
+    }
+    _ouvrirCamera(remplace: false, brouillon: choix.brouillon);
   }
 
   void _aller<T extends Object?>(
@@ -91,13 +151,16 @@ class ParcoursCreation {
     if (!_fin.isCompleted) _fin.complete(resultat);
   }
 
-  void _ouvrirCamera({required bool remplace}) {
+  /// [brouillon] : celui que les photos rejoignent ; `null`, un nouveau
+  /// moment.
+  void _ouvrirCamera({required bool remplace, Brouillon? brouillon}) {
     _aller<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
         builder: (_) => EcranCamera(
           camera: camera,
           brouillons: _brouillons,
+          brouillon: brouillon,
           positionService: positionService,
           maintenant: maintenant,
           surContinuer: _ouvrirFinalisation,
@@ -121,7 +184,7 @@ class ParcoursCreation {
           rechercheLieuService: rechercheLieuService,
           positionService: positionService,
           maintenant: maintenant ?? DateTime.now,
-          ouvrirPhotos: (contexte) => _choisirPhotos(contexte, brouillon),
+          reprendrePhotos: () => _reprendrePhotos(brouillon),
         ),
       ),
       remplace: true,
@@ -129,20 +192,10 @@ class ParcoursCreation {
     );
   }
 
-  /// « Photos du moment » ; « Reprendre des photos » rouvre la caméra à la
-  /// place de la finalisation.
-  Future<void> _choisirPhotos(
-    BuildContext contexte,
-    Brouillon brouillon,
-  ) async {
-    final actuel = await _brouillons.charger(brouillon.id) ?? brouillon;
-    if (!contexte.mounted) return;
-    final reprendre = await ouvrirFeuillePhotos(
-      contexte,
-      brouillons: _brouillons,
-      brouillon: actuel,
-      peutReprendre: true,
-    );
-    if (reprendre && contexte.mounted) _ouvrirCamera(remplace: true);
+  /// Le bouton appareil photo de la finalisation : la caméra revient à sa
+  /// place, sur le brouillon tel que la finalisation l'a laissé.
+  Future<void> _reprendrePhotos(Brouillon brouillon) async {
+    final aJour = await _brouillons.charger(brouillon.id) ?? brouillon;
+    _ouvrirCamera(remplace: true, brouillon: aJour);
   }
 }

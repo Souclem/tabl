@@ -20,7 +20,7 @@ class Precompletion {
 
   final DateSouvenir? date;
 
-  /// `'midi'` ou `'soir'`, `null` si l'heure ne le dit pas.
+  /// `'matin'`, `'midi'` ou `'soir'`, `null` si l'heure ne le dit pas.
   final String? moment;
 
   /// Le centre de l'endroit où la plupart des photos ont été prises.
@@ -133,20 +133,26 @@ LieuRestaurant aDistanceDesEndroits(
   return meilleur ?? lieu;
 }
 
-/// Déjeuner de 10 h à 17 h, dîner de 17 h à 3 h du matin ; entre les
-/// deux, l'heure ne dit rien de sûr.
+/// Petit-déjeuner de 5 h à 10 h, déjeuner de 10 h à 17 h, dîner de 17 h
+/// à 3 h du matin ; entre 3 h et 5 h, l'heure ne dit rien de sûr.
 String? momentDApresHeure(DateTime heure) {
   final h = heure.hour;
+  if (h >= 5 && h < 10) return 'matin';
   if (h >= 10 && h < 17) return 'midi';
   if (h >= 17 || h < 3) return 'soir';
   return null;
 }
 
-/// Le moment d'un repas pris maintenant : avant 17 h, c'est midi. Toujours
-/// l'un ou l'autre — contrairement à [momentDApresHeure], l'heure d'un
-/// moment publié sur place ne laisse pas de doute.
-String momentDuJour(DateTime maintenant) =>
-    maintenant.hour < 17 ? 'midi' : 'soir';
+/// Le moment d'un repas pris maintenant : le matin de 5 h à 10 h, midi
+/// jusqu'à 17 h, le soir ensuite (et la nuit). Toujours l'un des trois —
+/// contrairement à [momentDApresHeure], l'heure d'un moment publié sur
+/// place ne laisse pas de doute.
+String momentDuJour(DateTime maintenant) {
+  final h = maintenant.hour;
+  if (h >= 5 && h < 10) return 'matin';
+  if (h >= 10 && h < 17) return 'midi';
+  return 'soir';
+}
 
 /// "20 h 41".
 String heureLisible(DateTime heure) =>

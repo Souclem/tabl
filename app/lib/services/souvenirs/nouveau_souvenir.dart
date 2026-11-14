@@ -32,7 +32,7 @@ class NouveauSouvenir {
   final Emotion? emotion;
   final String? legende;
 
-  /// `'midi'` ou `'soir'`.
+  /// `'matin'`, `'midi'` ou `'soir'`.
   final String? moment;
   final AudienceSouvenir audience;
 

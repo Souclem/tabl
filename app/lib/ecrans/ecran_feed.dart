@@ -414,8 +414,9 @@ class _EcranFeedState extends State<EcranFeed>
           contexte: ContextePublication.feed,
           onOuvrirLieu: () => ouvrirRestaurant(souvenir),
           // Ses propres moments : les modifier, choisir qui les voit,
-          // les supprimer, depuis le Feed aussi.
-          onOptions: souvenir.estAMoi
+          // les supprimer, depuis le Feed aussi. Un moment chez moi : en
+          // retirer mon nom.
+          onOptions: souvenir.estAMoi || souvenir.jeSuisLHote
               ? () => optionsPublication(souvenir)
               : null,
           signal: signal,

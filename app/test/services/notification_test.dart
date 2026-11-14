@@ -175,11 +175,14 @@ void main() {
       ),
     ], vuesLe: vues);
 
-    expect([for (final l in r.autres) _phrase(l)], [
-      'Emma et Martin ont aimé votre commentaire : « Superbe »',
-      'Louise a répondu à votre commentaire : « Je confirme »',
-      'Arthur a aimé votre commentaire : « Bof »',
-    ]);
+    expect(
+      [for (final l in r.autres) _phrase(l)],
+      [
+        'Emma et Martin ont aimé votre commentaire : « Superbe »',
+        'Louise a répondu à votre commentaire : « Je confirme »',
+        'Arthur a aimé votre commentaire : « Bof »',
+      ],
+    );
   });
 
   test('la pastille : au moins une notification depuis la dernière visite', () {
@@ -188,5 +191,30 @@ void main() {
     expect(aDesNouvelles(n, vuesLe: DateTime(2026, 10, 1)), isTrue);
     expect(aDesNouvelles(n), isTrue);
     expect(aDesNouvelles([]), isFalse);
+  });
+
+  test('« chez vous » : un moment publié chez moi, ou mon moment chez moi', () {
+    final chezVous = rangerNotifications([
+      _n(
+        TypeNotification.chezVous,
+        'Emma',
+        DateTime(2026, 11, 14, 20),
+        souvenir: 's1',
+        restaurant: 'Chez quelqu\'un',
+      ),
+    ]).autres.single;
+    expect(_phrase(chezVous), 'Emma a publié un moment chez vous.');
+
+    final reaction = rangerNotifications([
+      NotificationTabl(
+        type: TypeNotification.reaction,
+        acteur: (id: 'Emma', pseudo: 'Emma', photoUrl: null),
+        creeLe: DateTime(2026, 11, 14, 21),
+        souvenirId: 's2',
+        restaurantNom: 'Chez moi',
+        restaurantGenre: 'domicile',
+      ),
+    ]).autres.single;
+    expect(_phrase(reaction), 'Emma a aimé votre moment chez vous.');
   });
 }

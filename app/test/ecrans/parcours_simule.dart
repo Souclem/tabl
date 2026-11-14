@@ -19,6 +19,9 @@ const comptoirTest = LieuRestaurant(
 
 class FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 

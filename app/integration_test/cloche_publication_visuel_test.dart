@@ -72,6 +72,9 @@ class _FauxAbonnements implements AbonnementService {
 }
 
 class _FauxSouvenirs implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   var publie = false;
 
   @override
@@ -295,21 +298,6 @@ void main() {
     expect(envois.appels, 2);
     expect(find.byType(EcranCloche), findsNothing);
     expect(find.textContaining('Le meilleur moment'), findsOneWidget);
-    handle.dispose();
-  });
-
-  testWidgets('annulation pendant l\'envoi', (t) async {
-    final handle = t.ensureSemantics();
-    final envois = await _jusquaLaCloche(t, [
-      (p) =>
-          _lent(p, fin: const ResultatEnvoi(StatutEnvoi.publie), secondes: 30),
-    ]);
-    await _avancer(t, ms: 1000);
-    expect(find.text('Annuler'), findsOneWidget);
-    await _tapper(t, find.text('Annuler'), ms: 3000);
-    expect(envois.garder, 1);
-    expect(find.byType(EcranCloche), findsNothing);
-    await _capture(t, 'cloche_4_apres_annulation');
     handle.dispose();
   });
 

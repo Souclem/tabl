@@ -167,4 +167,42 @@ void main() {
       expect(distanceSurTuile(50), isNotNull);
     });
   });
+
+  group('après une recherche, la zone où se rendre', () {
+    // Une rue de Liège, environ 1 km de côté, où personne n'est allé.
+    const rue = ZoneCarte(sud: 50.632, nord: 50.648, ouest: 5.562, est: 5.578);
+
+    test('telle quelle quand on y trouve déjà une adresse', () {
+      final zone = zoneAvecDesLieux(rue, [_lieu('Bibo')]);
+      expect(zone, same(rue));
+    });
+
+    test('vide : élargie autour du même point jusqu\'aux 3 adresses les '
+        'plus proches, pas au-delà', () {
+      final lieux = [
+        _lieu('À 2 km', latitude: 50.658, longitude: 5.57),
+        _lieu('À 3 km', latitude: 50.613, longitude: 5.57),
+        _lieu('À 4 km', latitude: 50.64, longitude: 5.627),
+        _lieu('À 9 km', latitude: 50.72, longitude: 5.57),
+      ];
+      final zone = zoneAvecDesLieux(rue, lieux);
+      expect(
+        [
+          for (final l in lieux)
+            if (zone.contient(l.latitude, l.longitude)) l.nom,
+        ],
+        ['À 2 km', 'À 3 km', 'À 4 km'],
+      );
+      // Toujours centrée sur la rue cherchée.
+      expect((zone.sud + zone.nord) / 2, closeTo(50.64, 1e-9));
+      expect((zone.ouest + zone.est) / 2, closeTo(5.57, 1e-9));
+    });
+
+    test('telle quelle quand rien n\'est assez proche (la ville d\'à '
+        'côté ne compte pas)', () {
+      final namur = _lieu('Namur', latitude: 50.46, longitude: 4.87);
+      expect(zoneAvecDesLieux(rue, [namur]), same(rue));
+      expect(zoneAvecDesLieux(rue, const []), same(rue));
+    });
+  });
 }

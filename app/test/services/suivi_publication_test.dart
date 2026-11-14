@@ -126,7 +126,8 @@ void main() {
       expect(suivi.pourcentage, lessThanOrEqualTo(30));
       expect(suivi.pourcentage, greaterThan(20));
       expect(suivi.reseauLent, isTrue);
-      expect(suivi.gestes, [GesteCloche.modifier, GesteCloche.annuler]);
+      // Rien à toucher : ni Modifier ni Annuler.
+      expect(suivi.gestes, isEmpty);
 
       serveur.feuVertPhotos!.complete();
       var precedent = suivi.pourcentage;
@@ -159,11 +160,11 @@ void main() {
       final suivi = SuiviPublication(envois, id);
       final demarrage = suivi.demarrer();
 
-      avancerSec(suivi, Duration.zero, 5);
+      final t = avancerSec(suivi, Duration.zero, 5);
       expect(suivi.pourcentage, lessThanOrEqualTo(30));
 
       serveur.feuVertPhotos!.complete();
-      await suivi.annuler();
+      await faireTourner(suivi, () => suivi.resultat != null, depuis: t);
       await demarrage;
     });
 
@@ -188,84 +189,6 @@ void main() {
       await faireTourner(suivi, () => suivi.resultat != null, depuis: fin);
       await demarrage;
       expect(suivi.resultat!.issue, IssueCloche.publie);
-    });
-  });
-
-  group('annuler et modifier', () {
-    test('pendant l\'envoi : rien n\'est publié, le brouillon reste', () async {
-      serveur.feuVertPhotos = Completer<void>();
-      final id = (await brouillonPret()).id;
-      final suivi = SuiviPublication(envois, id);
-      final demarrage = suivi.demarrer();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      avancerSec(suivi, Duration.zero, 1);
-
-      final annulation = suivi.annuler();
-      expect(suivi.occupe, isTrue);
-      serveur.feuVertPhotos!.complete();
-      await annulation;
-      await demarrage;
-
-      expect(suivi.resultat!.issue, IssueCloche.annule);
-      expect(serveur.lignes, isEmpty);
-      expect(serveur.fichiers, isEmpty);
-      expect(await brouillons.charger(id), isNotNull);
-      expect(await file.lister(), isEmpty);
-    });
-
-    test('« Modifier » défait de même, et le dit à l\'appelant', () async {
-      serveur.feuVertPhotos = Completer<void>();
-      final id = (await brouillonPret()).id;
-      final suivi = SuiviPublication(envois, id);
-      final demarrage = suivi.demarrer();
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-
-      final modification = suivi.modifier();
-      serveur.feuVertPhotos!.complete();
-      await modification;
-      await demarrage;
-
-      expect(suivi.resultat!.issue, IssueCloche.modifier);
-      expect(serveur.lignes, isEmpty);
-      expect(await brouillons.charger(id), isNotNull);
-    });
-
-    test('plus possible une fois l\'ordre de publier donné', () async {
-      serveur.feuVertCommit = Completer<void>();
-      final id = (await brouillonPret()).id;
-      final suivi = SuiviPublication(envois, id);
-      final demarrage = suivi.demarrer();
-      await serveur.commitDemande.future;
-      await faireTourner(suivi, () => suivi.phase == PhaseCloche.validation);
-
-      await suivi.annuler();
-      await suivi.modifier();
-
-      expect(suivi.resultat, isNull);
-      expect(suivi.occupe, isFalse);
-      serveur.feuVertCommit!.complete();
-      await demarrage;
-      expect(serveur.lignes[id]!['statut'], statutPublie);
-    });
-
-    test('trop tard : le moment se publie pendant l\'annulation, la cloche le '
-        'dit', () async {
-      serveur.feuVertCommit = Completer<void>();
-      final id = (await brouillonPret()).id;
-      final suivi = SuiviPublication(envois, id);
-      final demarrage = suivi.demarrer();
-      await serveur.commitDemande.future;
-      // L'écran n'a pas encore vu les 90 % : le geste est encore offert.
-      expect(suivi.phase, PhaseCloche.envoi);
-
-      final annulation = suivi.annuler();
-      serveur.feuVertCommit!.complete();
-      await annulation;
-      await demarrage;
-
-      expect(suivi.resultat!.issue, IssueCloche.dejaPublie);
-      expect(suivi.annulationTropTard, isTrue);
-      expect(serveur.lignes[id]!['statut'], statutPublie);
     });
   });
 

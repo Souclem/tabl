@@ -129,6 +129,11 @@ abstract interface class SouvenirService {
   /// Réservé à l'auteur (RLS).
   Future<void> supprimer(String souvenirId);
 
+  /// On a publié un moment « chez moi » ([SouvenirFeed.jeSuisLHote]) : je
+  /// retire mon nom de ce lieu, qui devient « Chez quelqu'un » sur tous
+  /// les moments qui y sont. Réservé à l'hôte (RLS).
+  Future<void> retirerMonNomDuLieu(String restaurantId);
+
   /// Ajoute sa réaction ("j'aime") si [reagir] est vrai, la retire sinon.
   Future<void> basculerReaction(String souvenirId, {required bool reagir});
 

@@ -5,55 +5,16 @@ import '../position/position_service.dart';
 import 'brouillon_local.dart';
 import 'metadonnees_photo.dart';
 import 'nouveau_souvenir.dart';
-import 'precompletion_souvenir.dart';
 
-/// Revenir sur un brouillon après au moins ce délai : la caméra propose
-/// de le reprendre.
-const delaiCarteReprise = Duration(minutes: 10);
-
-/// Ce que l'écran caméra trouve à son ouverture.
-class OuvertureCamera {
-  const OuvertureCamera({this.actif, this.aRejoindre, this.reprise = false});
-
-  static const vide = OuvertureCamera();
-
-  /// Le brouillon que les prochaines photos rejoignent (moins de 3 h après
-  /// sa dernière photo).
-  final Brouillon? actif;
-
-  /// Un brouillon plus ancien (3 h ou plus) : les prochaines photos
-  /// commencent un nouveau repas, sauf si l'on dit que c'en est la suite.
-  final Brouillon? aRejoindre;
-
-  /// Le retour se fait après 10 min ou plus sur [actif] : carte de reprise.
-  final bool reprise;
-}
-
-/// Ce que la caméra propose d'après les [brouillons] du téléphone : seuls
-/// ceux qui ont des photos comptent, le plus récemment modifié d'abord.
-OuvertureCamera ouvertureCamera(
-  List<Brouillon> brouillons,
-  DateTime maintenant,
-) {
-  Brouillon? recent;
-  for (final b in brouillons) {
-    if (b.photos.isEmpty) continue;
-    if (recent == null || b.modifieLe.isAfter(recent.modifieLe)) recent = b;
-  }
-  if (recent == null) return OuvertureCamera.vide;
-  if (!recent.accueille(maintenant)) return OuvertureCamera(aRejoindre: recent);
-  return OuvertureCamera(
-    actif: recent,
-    reprise: maintenant.difference(recent.modifieLe) >= delaiCarteReprise,
-  );
-}
-
-/// Une séance sur l'écran caméra : vers quel brouillon vont les photos
-/// prises ou importées. Les ajouts se font l'un après l'autre, donc des
-/// déclenchements rapprochés se rangent dans le même brouillon.
+/// Une séance sur l'écran caméra, sur un seul brouillon : celui choisi en
+/// ouvrant la caméra ([actif]), ou un nouveau, créé à la première photo.
+/// Toutes les photos prises ou importées s'y ajoutent, à la suite, quelle
+/// que soit leur date. Les ajouts se font l'un après l'autre, donc des
+/// déclenchements rapprochés ne se marchent pas dessus.
 class SessionCamera {
   SessionCamera(
     this._brouillons, {
+    this.actif,
     this.positionService,
     DateTime Function()? maintenant,
   }) : _maintenant = maintenant ?? DateTime.now;
@@ -68,34 +29,9 @@ class SessionCamera {
   Future<void>? _positionEnCours;
   PositionPrise? _position;
 
-  /// Le brouillon qui reçoit la prochaine photo ; `null` : un nouveau repas.
+  /// Le brouillon qui reçoit les photos ; `null` jusqu'à la première d'un
+  /// nouveau moment.
   Brouillon? actif;
-
-  /// Voir [OuvertureCamera.aRejoindre].
-  Brouillon? aRejoindre;
-
-  /// Lit les brouillons du téléphone et choisit celui qui reçoit les
-  /// prochaines photos.
-  Future<OuvertureCamera> ouvrir() async {
-    final ouverture = ouvertureCamera(
-      await _brouillons.lister(),
-      _maintenant(),
-    );
-    actif = ouverture.actif;
-    aRejoindre = ouverture.aRejoindre;
-    unawaited(actualiserPosition());
-    return ouverture;
-  }
-
-  /// « Autre repas » : les prochaines photos commencent un nouveau brouillon.
-  void autreRepas() => actif = null;
-
-  /// « C'est la suite de … » : les prochaines photos rejoignent le repas
-  /// plus ancien.
-  void rejoindre() {
-    actif = aRejoindre ?? actif;
-    aRejoindre = null;
-  }
 
   /// Relève où l'on est, pour la prochaine photo. Une seule demande à la
   /// fois ; sans autorisation, la photo n'a simplement pas de position.
@@ -112,24 +48,20 @@ class SessionCamera {
         .whenComplete(() => _positionEnCours = null);
   }
 
-  /// Garde une photo prise par la caméra, dans le brouillon actif — ou un
-  /// nouveau si c'est un autre repas.
+  /// Garde une photo prise par la caméra, à la fin du brouillon.
   Future<Brouillon> ajouter({
     required Uint8List octets,
     required DateTime priseLe,
   }) {
     final position = _position;
     final resultat = _enchainer(() async {
-      final cible = actif;
       final b = await _brouillons.ajouterPhoto(
         octets: octets,
         priseLe: priseLe,
         position: position,
-        brouillonId: cible?.id,
-        nouveauRepas: cible == null,
+        brouillonId: actif?.id,
       );
       actif = b;
-      aRejoindre = null;
       return b;
     });
     unawaited(actualiserPosition());
@@ -137,9 +69,8 @@ class SessionCamera {
   }
 
   /// Garde les photos choisies dans la photothèque, avec leur date et leur
-  /// position, la plus ancienne d'abord. Chacune rejoint le brouillon actif
-  /// si elle date de moins de 3 h de sa dernière photo, sinon un nouveau
-  /// repas commence. `null` si rien n'a été choisi.
+  /// position, à la suite de celles du brouillon (les choisies, de la plus
+  /// ancienne à la plus récente). `null` si rien n'a été choisi.
   Future<Brouillon?> ajouterImportees(List<PhotoChoisie> photos) {
     final maintenant = _maintenant();
     final triees = [...photos]
@@ -152,20 +83,15 @@ class SessionCamera {
       Brouillon? dernier;
       for (final photo in triees) {
         final m = photo.metadonnees;
-        final priseLe = m.prisLe ?? maintenant;
-        final cible = actif;
-        final suite = cible != null && cible.accueille(priseLe) ? cible : null;
         dernier = await _brouillons.ajouterPhoto(
           octets: photo.octets,
-          priseLe: priseLe,
+          priseLe: m.prisLe ?? maintenant,
           position: m.aUnePosition
               ? (latitude: m.latitude!, longitude: m.longitude!)
               : null,
-          brouillonId: suite?.id,
-          nouveauRepas: suite == null,
+          brouillonId: actif?.id,
         );
         actif = dernier;
-        aRejoindre = null;
       }
       return dernier;
     });
@@ -180,6 +106,16 @@ class SessionCamera {
     if (entree == null) return null;
     actif = await _brouillons.charger(cible.id) ?? cible;
     return entree;
+  });
+
+  /// Change l'ordre des photos du brouillon ; [ordre] liste exactement
+  /// leurs identifiants. `null` si rien n'a changé.
+  Future<Brouillon?> reordonner(List<String> ordre) => _enchainer(() async {
+    final cible = actif;
+    if (cible == null) return null;
+    final b = await _brouillons.reordonnerPhotos(cible.id, ordre);
+    if (b != null) actif = b;
+    return b;
   });
 
   /// Remet une photo retirée à sa place. `null` si elle n'est plus dans la
@@ -203,30 +139,12 @@ class SessionCamera {
   }
 }
 
-/// « Suite du repas de 12 h 30 » : le brouillon actif accueille la photo.
-String libelleSuiteDuRepas(Brouillon brouillon) =>
-    'Suite du repas de ${heureLisible(brouillon.priseLe)}';
-
-/// « C'est la suite de 12 h 30 » : le repas plus ancien, à rejoindre.
-String libelleRepasARejoindre(Brouillon brouillon) =>
-    "C'est la suite de ${heureLisible(brouillon.priseLe)}";
-
-/// Le lieu du brouillon, ou « Repas en cours » tant qu'il n'est pas choisi.
-String titreReprise(Brouillon brouillon) =>
-    brouillon.lieu?.nom ?? 'Repas en cours';
-
-/// « Votre moment de 12 h 30 · 3 photos ».
-String detailReprise(Brouillon brouillon) {
-  final n = brouillon.photos.length;
-  return 'Votre moment de ${heureLisible(brouillon.priseLe)} · '
-      '$n photo${n > 1 ? 's' : ''}';
-}
-
 /// « Continuer · 3 ».
 String libelleContinuer(int nombrePhotos) => 'Continuer · $nombrePhotos';
 
 /// Ce que dit le compteur après une photo : « photo gardée » jusqu'à 9,
-/// « le maximum publiable » à 10, au-delà on prévient du plafond.
+/// « le maximum publiable » à 10 ; au-delà, combien en retirer pour
+/// continuer.
 String libelleCompteurPhotos(int nombrePhotos) {
   if (nombrePhotos < nombreMaxPhotosSouvenir) {
     return nombrePhotos > 1 ? 'photos gardées' : 'photo gardée';
@@ -234,5 +152,18 @@ String libelleCompteurPhotos(int nombrePhotos) {
   if (nombrePhotos == nombreMaxPhotosSouvenir) {
     return 'photos · le maximum publiable';
   }
-  return 'photos · vous en publierez $nombreMaxPhotosSouvenir';
+  return 'photos · retirez-en ${nombrePhotos - nombreMaxPhotosSouvenir} '
+      'pour continuer';
+}
+
+/// « Continuer » ne mène à la suite qu'avec dix photos au plus.
+bool peutContinuerCamera(int nombrePhotos) =>
+    nombrePhotos >= 1 && nombrePhotos <= nombreMaxPhotosSouvenir;
+
+/// Le message d'un « Continuer » refusé : « 10 photos au maximum :
+/// retirez-en 3. » ([nombrePhotos] au-delà de 10).
+String libelleTropDePhotos(int nombrePhotos) {
+  final enTrop = nombrePhotos - nombreMaxPhotosSouvenir;
+  return '$nombreMaxPhotosSouvenir photos au maximum : retirez-en $enTrop '
+      '(touchez la pile, puis ×).';
 }

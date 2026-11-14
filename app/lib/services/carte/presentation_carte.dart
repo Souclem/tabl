@@ -118,6 +118,58 @@ String? cuisineOuLieu(LieuCarte lieu) {
 /// (« 8 955 km ») : on la tait.
 const double distanceMaxSurTuile = 50000;
 
+/// La zone où se rendre après une recherche : [zone] telle quelle si au
+/// moins un lieu s'y trouve. Sinon, la même, centrée sur le même point,
+/// élargie juste assez pour montrer les [minimum] lieux les plus proches
+/// à moins de [rayonMaxMetres] — une rue où personne n'est allé montre
+/// les adresses du quartier. Rien dans ce rayon : [zone] telle quelle
+/// (mieux vaut « rien ici » qu'une carte de tout le pays).
+ZoneCarte zoneAvecDesLieux(
+  ZoneCarte zone,
+  List<LieuCarte> lieux, {
+  int minimum = 3,
+  double rayonMaxMetres = 25000,
+}) {
+  if (lieux.any((l) => zone.contient(l.latitude, l.longitude))) return zone;
+  final latitude = (zone.sud + zone.nord) / 2;
+  final longitude = (zone.ouest + zone.est) / 2;
+  final proches =
+      [
+          for (final l in lieux)
+            (
+              lieu: l,
+              metres: distanceEnMetres(
+                latitude,
+                longitude,
+                l.latitude,
+                l.longitude,
+              ),
+            ),
+        ].where((p) => p.metres <= rayonMaxMetres).toList()
+        ..sort((a, b) => a.metres.compareTo(b.metres));
+  if (proches.isEmpty) return zone;
+  // Un peu de marge : les lieux ne tombent pas pile au bord de l'écran.
+  const marge = 1.25;
+  var demiHauteur = (zone.nord - zone.sud) / 2;
+  var demiLargeur = (zone.est - zone.ouest) / 2;
+  for (final p in proches.take(minimum)) {
+    demiHauteur = math.max(
+      demiHauteur,
+      (p.lieu.latitude - latitude).abs() * marge,
+    );
+    demiLargeur = math.max(
+      demiLargeur,
+      (p.lieu.longitude - longitude).abs() * marge,
+    );
+  }
+  return ZoneCarte(
+    sud: latitude - demiHauteur,
+    nord: latitude + demiHauteur,
+    ouest: longitude - demiLargeur,
+    est: longitude + demiLargeur,
+  );
+}
+
 /// "50 m", "1,4 km" ; `null` si on ne sait pas ou si c'est trop loin.
 String? distanceSurTuile(double? metres) =>
     metres == null || metres > distanceMaxSurTuile

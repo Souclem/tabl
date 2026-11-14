@@ -29,14 +29,21 @@ abstract interface class RechercheEndroitService {
 }
 
 /// [RechercheEndroitService] par le géocodage de Mapbox, le service de
-/// la carte : villes, quartiers et adresses, en français.
+/// la carte : villes, quartiers, rues, adresses et codes postaux, en
+/// français.
 class RechercheEndroitMapbox implements RechercheEndroitService {
   RechercheEndroitMapbox(this._jeton);
 
   final String _jeton;
 
-  /// Autour d'un point sans contour connu (une adresse) : environ 1 km.
+  /// Autour d'un point sans contour connu (une rue, une adresse) :
+  /// environ 1 km.
   static const _demiCote = 0.008;
+
+  /// Ce que Mapbox peut renvoyer. Sans `street`, un nom de rue sans
+  /// numéro (« rue Saint-Gilles ») ne donnait rien.
+  static const types =
+      'place,locality,neighborhood,district,street,address,postcode';
 
   @override
   Future<List<EndroitTrouve>> chercher(
@@ -50,7 +57,7 @@ class RechercheEndroitMapbox implements RechercheEndroitService {
       'q': q,
       'language': 'fr',
       'limit': '6',
-      'types': 'place,locality,neighborhood,district,address',
+      'types': types,
       'proximity': ?(latitude != null && longitude != null
           ? '$longitude,$latitude'
           : null),

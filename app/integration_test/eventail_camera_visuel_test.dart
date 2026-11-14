@@ -30,16 +30,23 @@ void main() {
       octetsPhoto: _png,
       maintenant: () => maintenant,
     );
-    await tester.runAsync(() async {
+    final brouillon = await tester.runAsync(() async {
+      Brouillon? b;
       for (var i = 0; i < 4; i++) {
-        await brouillons.ajouterPhoto(octets: _png, priseLe: maintenant);
+        b = await brouillons.ajouterPhoto(
+          octets: _png,
+          priseLe: maintenant,
+          brouillonId: b?.id,
+        );
       }
+      return b;
     });
     await tester.pumpWidget(
       MaterialApp(
         home: EcranCamera(
           camera: camera,
           brouillons: brouillons,
+          brouillon: brouillon,
           maintenant: () => maintenant,
           choisirPhotos: (_) async => const [],
           surContinuer: (_) {},
@@ -72,6 +79,6 @@ void main() {
     await _pause(tester, 'eventail_3_toast');
     await tester.pump(const Duration(seconds: 2));
     await _pause(tester, 'eventail_4_apres');
-    expect(find.text('Photo supprimée · récupérable 30 jours'), findsOneWidget);
+    expect(find.text('Photo supprimée'), findsOneWidget);
   });
 }

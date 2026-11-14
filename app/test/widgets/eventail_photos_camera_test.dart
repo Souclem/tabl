@@ -32,6 +32,7 @@ void main() {
   group('EventailPhotosCamera', () {
     late List<String> ouvertes;
     late List<String> supprimees;
+    late List<List<String>> ordres;
     var importations = 0;
     var fermetures = 0;
 
@@ -42,6 +43,7 @@ void main() {
     }) async {
       ouvertes = [];
       supprimees = [];
+      ordres = [];
       importations = 0;
       fermetures = 0;
       tester.view.physicalSize = const Size(800, 600);
@@ -63,6 +65,7 @@ void main() {
                     indice: indice,
                     onOuvrir: ouvertes.add,
                     onSupprimer: (id) async => supprimees.add(id),
+                    onReordonner: (ordre) async => ordres.add(ordre),
                     onImporter: () => importations++,
                     onFermer: () => fermetures++,
                   ),
@@ -162,22 +165,112 @@ void main() {
 
       expect(supprimees, isEmpty);
       expect(ouvertes, isEmpty);
+      expect(ordres, isEmpty);
       expect(tuile('p0'), findsOneWidget);
     });
 
-    testWidgets('un appui plus court que 280 ms ne soulève pas', (
-      tester,
-    ) async {
+    testWidgets('appui long puis glisser à la place d\'une autre photo : '
+        'nouvel ordre', (tester) async {
       await afficher(tester);
+      final placeDeP2 = tester.getCenter(tuile('p2'));
       final geste = await tester.startGesture(tester.getCenter(tuile('p0')));
 
-      await tester.pump(const Duration(milliseconds: 100));
-      await geste.moveTo(const Offset(744, 356));
+      await tester.pump(delaiSaisieEventail + const Duration(milliseconds: 40));
+      await geste.moveTo(placeDeP2);
       await tester.pump(const Duration(milliseconds: 50));
       await geste.up();
       await tester.pump(const Duration(seconds: 1));
 
+      expect(ordres, [
+        ['p1', 'p2', 'p0'],
+      ]);
       expect(supprimees, isEmpty);
+      expect(ouvertes, isEmpty);
+    });
+
+    testWidgets('pendant le glissement, les autres photos s\'écartent', (
+      tester,
+    ) async {
+      await afficher(tester);
+      final placeDeP0 = tester.getCenter(tuile('p0'));
+      final placeDeP1 = tester.getCenter(tuile('p1'));
+      final placeDeP2 = tester.getCenter(tuile('p2'));
+      final geste = await tester.startGesture(placeDeP0);
+
+      await tester.pump(delaiSaisieEventail + const Duration(milliseconds: 40));
+      await geste.moveTo(placeDeP2);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // p1 et p2 ont avancé d'une place ; rien n'est encore rendu.
+      expect(tester.getCenter(tuile('p1')), offsetMoreOrLessEquals(placeDeP0));
+      expect(tester.getCenter(tuile('p2')), offsetMoreOrLessEquals(placeDeP1));
+      expect(ordres, isEmpty);
+
+      await geste.up();
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('revenir à sa place avant de lâcher : rien ne change', (
+      tester,
+    ) async {
+      await afficher(tester);
+      final placeDeP0 = tester.getCenter(tuile('p0'));
+      final geste = await tester.startGesture(placeDeP0);
+
+      await tester.pump(delaiSaisieEventail + const Duration(milliseconds: 40));
+      await geste.moveTo(tester.getCenter(tuile('p2')));
+      await tester.pump(const Duration(milliseconds: 50));
+      await geste.moveTo(placeDeP0);
+      await tester.pump(const Duration(milliseconds: 50));
+      await geste.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(ordres, isEmpty);
+    });
+
+    testWidgets('glisser tout de suite, sans appui long, déplace aussi', (
+      tester,
+    ) async {
+      await afficher(tester);
+      final placeDeP2 = tester.getCenter(tuile('p2'));
+      final depart = tester.getCenter(tuile('p0'));
+      final geste = await tester.startGesture(depart);
+
+      // Le doigt part sans attendre, par petits pas, comme un vrai glissé.
+      await tester.pump(const Duration(milliseconds: 16));
+      for (var i = 1; i <= 10; i++) {
+        await geste.moveTo(Offset.lerp(depart, placeDeP2, i / 10)!);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await geste.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(ordres, [
+        ['p1', 'p2', 'p0'],
+      ]);
+      expect(ouvertes, isEmpty);
+    });
+
+    testWidgets('glisser tout de suite vers la corbeille supprime', (
+      tester,
+    ) async {
+      await afficher(tester);
+      final depart = tester.getCenter(tuile('p0'));
+      final geste = await tester.startGesture(depart);
+
+      await tester.pump(const Duration(milliseconds: 16));
+      for (var i = 1; i <= 10; i++) {
+        await geste.moveTo(
+          Offset.lerp(depart, const Offset(744, 356), i / 10)!,
+        );
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await geste.up();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(supprimees, ['p0']);
     });
 
     testWidgets('l\'indice s\'efface tout seul', (tester) async {

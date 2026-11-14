@@ -52,17 +52,21 @@ class RechercheLieuServiceSupabase implements RechercheLieuService {
   Future<List<LieuRestaurant>> mesLieuxPersonnels() async {
     final moi = _client.auth.currentUser?.id;
     if (moi == null) return const [];
+    // Sans « Chez moi » ni les personnes de Tabl : proposés à part.
     final lignes = await _client
         .from('restaurants')
-        .select('id, nom')
+        .select('id, nom, genre')
         .eq('prive', true)
         .eq('cree_par', moi)
+        .isFilter('hote_id', null)
+        .or('genre.is.null,genre.neq.domicile')
         .order('nom');
     return [
       for (final l in lignes)
         LieuRestaurant.personnel(
           nom: l['nom'] as String,
           restaurantId: l['id'] as String,
+          genre: GenreLieu.depuisBase(l['genre'] as String?, prive: true),
         ),
     ];
   }

@@ -4,6 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
+/// Une position qui ne bouge pas : celle des photos (ou du téléphone au
+/// moment d'ouvrir), pour trier la recherche autour d'elle.
+class PositionFixe implements PositionService {
+  const PositionFixe(this.position);
+
+  final Coordonnees position;
+
+  @override
+  Future<Coordonnees?> positionActuelle() async => position;
+}
+
 /// La recherche d'un restaurant au fil de la frappe, partagée par les
 /// écrans où l'on choisit un lieu (publier un moment, ajouter un
 /// souvenir) : quelques lettres suffisent, la réponse arrive triée par

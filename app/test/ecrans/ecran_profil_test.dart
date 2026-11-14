@@ -12,6 +12,9 @@ import 'package:app/ecrans/ecran_profil.dart';
 /// implémentées ; toute autre lève, ce qui signale un appel inattendu.
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
       throw UnimplementedError();
   _FauxSouvenirService(this.mesSouvenirs);

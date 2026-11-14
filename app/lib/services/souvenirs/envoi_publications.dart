@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'brouillon_local.dart';
+import 'brouillons_a_reprendre.dart';
 import 'file_envoi.dart';
 import 'metadonnees_photo.dart';
 import 'publication_en_deux_temps.dart';
 import 'publication_service.dart';
+import 'rappels_brouillons.dart';
 
 /// Une ligne `brouillon` du serveur que rien ne réclame (ni file d'envoi ni
 /// envoi en cours) n'est supprimée qu'après ce délai : un autre téléphone du
@@ -123,13 +125,22 @@ class EnvoiPublications {
     this._file, {
     PublicationService? service,
     DateTime Function()? maintenant,
+    this._rappels,
   }) : _service = service ?? PublicationEnDeuxTemps(_depot),
        _maintenant = maintenant ?? DateTime.now;
 
   /// Ouvre les brouillons du téléphone et leur file d'envoi.
-  static Future<EnvoiPublications> ouvrir(DepotPublication depot) async {
+  static Future<EnvoiPublications> ouvrir(
+    DepotPublication depot, {
+    RappelsSysteme? rappels,
+  }) async {
     final brouillons = await BrouillonsLocaux.ouvrir();
-    return EnvoiPublications(depot, brouillons, FileEnvoi(brouillons.racine));
+    return EnvoiPublications(
+      depot,
+      brouillons,
+      FileEnvoi(brouillons.racine),
+      rappels: rappels,
+    );
   }
 
   final DepotPublication _depot;
@@ -137,6 +148,46 @@ class EnvoiPublications {
   final FileEnvoi _file;
   final PublicationService _service;
   final DateTime Function() _maintenant;
+  final RappelsSysteme? _rappels;
+
+  /// Les ordres de rappels partent dans l'ordre où ils sont donnés : un
+  /// retour au premier plan qui suit de près un départ les retire bien.
+  Future<void> _ordresRappels = Future.value();
+
+  Future<void> _rappeler(Future<void> Function(RappelsSysteme r) ordre) {
+    final rappels = _rappels;
+    if (rappels == null) return Future.value();
+    return _ordresRappels = _ordresRappels.then((_) async {
+      try {
+        await ordre(rappels);
+      } catch (e) {
+        debugPrint('EnvoiPublications: rappels : $e');
+      }
+    });
+  }
+
+  /// L'app passe en arrière-plan : chaque brouillon à reprendre (pas ceux
+  /// que la file envoie ou va envoyer) programme ses rappels encore à
+  /// venir, 2 h et 5 h après sa dernière modification.
+  Future<void> programmerRappels() => _rappeler((rappels) async {
+    final confies = {
+      for (final e in await _file.lister())
+        if (e.etat != EtatEnvoi.aAbandonner) e.brouillonId,
+      ..._actifs.keys,
+    };
+    final aReprendre = brouillonsAReprendre(
+      await _brouillons.lister(),
+      enAttente: confies,
+    );
+    await rappels.remplacer(
+      rappelsBrouillons(aReprendre, maintenant: _maintenant()),
+    );
+  });
+
+  /// L'app est au premier plan : aucun rappel ne sonne pendant qu'on s'en
+  /// sert.
+  Future<void> retirerRappels() =>
+      _rappeler((rappels) => rappels.remplacer(const []));
 
   /// Les brouillons du téléphone, ceux que cette file publie : l'écran qui
   /// les modifie doit partager cette instance, pour que leurs écritures
@@ -186,6 +237,7 @@ class EnvoiPublications {
     String brouillonId, {
     void Function(int envoyees, int total)? surProgression,
   }) async {
+    unawaited(_rappeler((rappels) => rappels.annuler(brouillonId)));
     final resultat = await _verrouiller(brouillonId, () {
       final jeton = _jetons[brouillonId] = Completer<void>();
       return _tenter(
@@ -242,6 +294,7 @@ class EnvoiPublications {
   /// brouillon n'existe plus.
   Future<bool> mettreEnAttente(String brouillonId) async {
     if (await _brouillons.charger(brouillonId) == null) return false;
+    unawaited(_rappeler((rappels) => rappels.annuler(brouillonId)));
     final modifie = await _file.modifier(
       brouillonId,
       (e) => e.copieAvec(etat: EtatEnvoi.enAttente),
@@ -491,7 +544,7 @@ class EnvoiPublications {
     MomentPrepare prepare;
     try {
       final octets = [
-        for (final p in brouillon.photosAPublier)
+        for (final p in brouillon.photos)
           await _brouillons.fichierPhoto(id, p.id).readAsBytes(),
       ];
       final demande = DemandePublication(
@@ -548,6 +601,7 @@ class EnvoiPublications {
   Future<void> _terminer(String id) async {
     await _brouillons.supprimerBrouillon(id);
     await _file.retirer(id);
+    unawaited(_rappeler((rappels) => rappels.annuler(id)));
   }
 
   /// Supprime du serveur ce qui a été envoyé. Faux si le moment est déjà

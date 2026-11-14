@@ -1,14 +1,15 @@
 import '../restaurants/categories_lieu.dart';
 import '../social/profil_public.dart';
-import 'nouveau_souvenir.dart';
 import 'precompletion_souvenir.dart';
 
 /// Le repas qu'on dit avoir fait quand l'heure de la prise ne dit rien de
-/// sûr (« Où et quand ») : midi à 12 h 30, soir à 20 h.
+/// sûr (« Où et quand ») : le matin à 8 h 30, midi à 12 h 30, le soir à
+/// 20 h.
+const _heureMatin = (heure: 8, minute: 30);
 const _heureMidi = (heure: 12, minute: 30);
 const _heureSoir = (heure: 20, minute: 0);
 
-/// Le moment stocké (`midi` / `soir`) d'un moment en création.
+/// Le moment stocké (`matin` / `midi` / `soir`) d'un moment en création.
 String momentDuBrouillon(DateTime priseLe) => momentDuJour(priseLe);
 
 /// L'heure de repas à garder quand on choisit [moment] : inchangée si la
@@ -16,7 +17,11 @@ String momentDuBrouillon(DateTime priseLe) => momentDuJour(priseLe);
 /// repas.
 DateTime priseLePourMoment(DateTime priseLe, String moment) {
   if (momentDuBrouillon(priseLe) == moment) return priseLe;
-  final heure = moment == 'midi' ? _heureMidi : _heureSoir;
+  final heure = switch (moment) {
+    'matin' => _heureMatin,
+    'midi' => _heureMidi,
+    _ => _heureSoir,
+  };
   return DateTime(
     priseLe.year,
     priseLe.month,
@@ -24,33 +29,6 @@ DateTime priseLePourMoment(DateTime priseLe, String moment) {
     heure.heure,
     heure.minute,
   );
-}
-
-/// Un moment se publie avec une à dix photos.
-bool nombrePhotosPublicable(int nombre) =>
-    nombre >= 1 && nombre <= nombreMaxPhotosSouvenir;
-
-/// Le nom d'une photo dans « Photos du moment » : la première est la
-/// couverture.
-String titrePhotoMoment(int rang) =>
-    rang == 0 ? 'Couverture' : 'Photo ${rang + 1}';
-
-/// « 3 / 10 à publier ».
-String compteurPhotosAPublier(int aPublier) =>
-    '$aPublier / $nombreMaxPhotosSouvenir à publier';
-
-/// Ce qui empêche de valider « Photos du moment », ou `null` : trop de
-/// photos à publier (le choix), ou aucune.
-String? consignePhotos({required int aPublier, required int total}) {
-  if (aPublier > nombreMaxPhotosSouvenir) {
-    final enTrop = aPublier - nombreMaxPhotosSouvenir;
-    return 'Un moment garde $nombreMaxPhotosSouvenir photos au plus : '
-        'retirez-en $enTrop de la publication.';
-  }
-  if (aPublier == 0 && total > 0) {
-    return 'Gardez au moins une photo à publier.';
-  }
-  return null;
 }
 
 /// Les personnes dont le pseudo contient [texte] (sans accent ni casse) ;
@@ -65,4 +43,35 @@ List<ProfilPublic> filtrerPersonnes(
     for (final p in personnes)
       if (normaliserPourRecherche(p.pseudo).contains(cherche)) p,
   ];
+}
+
+/// « Chez qui ? » dans « Où et quand » : les personnes que je suis,
+/// celles qui étaient à table ([prioritairesIds]) d'abord, puis par
+/// pseudo. Sans recherche, [max] au plus (`null` : toutes), plus celle
+/// déjà choisie ([choisieId]) si elle n'y est pas ; avec, toutes celles
+/// qui correspondent.
+List<ProfilPublic> personnesChezQui(
+  List<ProfilPublic> suivis, {
+  String recherche = '',
+  Set<String> prioritairesIds = const {},
+  String? choisieId,
+  int? max,
+}) {
+  final triees = [...filtrerPersonnes(suivis, recherche)]
+    ..sort((a, b) {
+      final avant =
+          (prioritairesIds.contains(a.id) ? 0 : 1) -
+          (prioritairesIds.contains(b.id) ? 0 : 1);
+      if (avant != 0) return avant;
+      return normaliserPourRecherche(
+        a.pseudo,
+      ).compareTo(normaliserPourRecherche(b.pseudo));
+    });
+  if (max == null || recherche.trim().isNotEmpty || triees.length <= max) {
+    return triees;
+  }
+  final premieres = triees.take(max).toList();
+  final choisie = triees.where((p) => p.id == choisieId).firstOrNull;
+  if (choisie != null && !premieres.contains(choisie)) premieres.add(choisie);
+  return premieres;
 }

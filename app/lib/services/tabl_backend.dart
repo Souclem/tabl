@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'notifications/notifications_systeme.dart';
 import 'souvenirs/depot_publication_supabase.dart';
 import 'souvenirs/envoi_publications.dart';
 import 'souvenirs/reprise_publications.dart';
@@ -25,6 +26,7 @@ class TablBackend {
   static Future<void> demarrerEnvois() async {
     final envois = await EnvoiPublications.ouvrir(
       DepotPublicationSupabase(client),
+      rappels: RappelsSystemeIos(),
     );
     _envois = envois;
     ReprisePublications(envois).demarrer();

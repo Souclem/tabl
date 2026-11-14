@@ -45,6 +45,9 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
       const [];
 

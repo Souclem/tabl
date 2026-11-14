@@ -1,4 +1,5 @@
 import '../avis/avis.dart';
+import '../restaurants/lieu_restaurant.dart';
 import '../souvenirs/presentation_souvenir.dart';
 
 /// Ce qui m'arrive, dans l'ordre où la base le dit.
@@ -28,7 +29,10 @@ enum TypeNotification {
   demandeAvis('demande_avis'),
 
   /// On a répondu à ma demande d'avis.
-  avisRecu('avis_recu');
+  avisRecu('avis_recu'),
+
+  /// On a publié un moment chez moi (je suis cité, jamais localisé).
+  chezVous('chez_vous');
 
   const TypeNotification(this.valeur);
 
@@ -56,6 +60,7 @@ class NotificationTabl {
     this.reponse,
     this.demandeId,
     this.commentaireId,
+    this.restaurantGenre,
   });
 
   final TypeNotification type;
@@ -77,6 +82,10 @@ class NotificationTabl {
   final String? souvenirPhotoUrl;
   final String? restaurantNom;
 
+  /// `restaurants.genre` : « domicile », « chez », « ailleurs », ou rien
+  /// pour un restaurant.
+  final String? restaurantGenre;
+
   /// Le commentaire, la question posée, ou le mot de la réponse.
   final String? texte;
 }
@@ -97,6 +106,7 @@ class LigneNotification {
     this.texte,
     this.reponse,
     this.demandeId,
+    this.restaurantGenre,
   });
 
   final TypeNotification type;
@@ -111,6 +121,7 @@ class LigneNotification {
   final String? souvenirPhotoUrl;
   final String? restaurantId;
   final String? restaurantNom;
+  final String? restaurantGenre;
   final String? texte;
   final ReponseAvis? reponse;
   final String? demandeId;
@@ -135,6 +146,7 @@ rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
     souvenirPhotoUrl: n.souvenirPhotoUrl,
     restaurantId: n.restaurantId,
     restaurantNom: n.restaurantNom,
+    restaurantGenre: n.restaurantGenre,
     texte: n.texte,
     reponse: n.reponse,
     demandeId: n.demandeId,
@@ -175,6 +187,7 @@ rangerNotifications(List<NotificationTabl> notifications, {DateTime? vuesLe}) {
           souvenirPhotoUrl: ligne.souvenirPhotoUrl,
           restaurantId: ligne.restaurantId,
           restaurantNom: ligne.restaurantNom,
+          restaurantGenre: ligne.restaurantGenre,
           texte: ligne.texte,
         );
         continue;
@@ -211,7 +224,10 @@ List<({String texte, bool gras})> phraseNotification(LigneNotification l) {
     normal(' et ${pluriel(autres, 'autre')}');
   }
   final plusieurs = noms.length > 1;
-  final ou = l.restaurantNom == null ? '' : ' chez ${l.restaurantNom}';
+  // « chez Bibo », « chez vous » (mon moment chez moi), rien pour un
+  // pique-nique.
+  final chez = chezDansUnePhrase(l.restaurantNom, l.restaurantGenre);
+  final ou = chez == null ? '' : ' $chez';
   switch (l.type) {
     case TypeNotification.demandeSuivi:
       normal(' souhaite vous suivre.');
@@ -247,6 +263,8 @@ List<({String texte, bool gras})> phraseNotification(LigneNotification l) {
       normal(' a répondu$ou : ');
       gras(reponse == null ? 'Réponse' : '${reponse.emoji} ${reponse.libelle}');
       if (mot != null && mot.isNotEmpty) normal(' — « $mot »');
+    case TypeNotification.chezVous:
+      normal(' a publié un moment chez vous.');
   }
   return morceaux;
 }

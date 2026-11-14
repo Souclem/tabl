@@ -29,55 +29,11 @@ void main() {
 
   tearDown(() => racine.deleteSync(recursive: true));
 
-  group('ouverture', () {
-    test('sans brouillon : rien à reprendre ni à rejoindre', () async {
-      final ouverture = await session().ouvrir();
-      expect(ouverture.actif, isNull);
-      expect(ouverture.aRejoindre, isNull);
-      expect(ouverture.reprise, isFalse);
-    });
-
-    test(
-      'retour avant 10 min : suite du repas, sans carte de reprise',
-      () async {
-        maintenant = midi;
-        await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-        maintenant = midi.add(const Duration(minutes: 9));
-        final ouverture = await session().ouvrir();
-        expect(ouverture.actif, isNotNull);
-        expect(ouverture.reprise, isFalse);
-      },
-    );
-
-    test('retour à 10 min ou plus : carte de reprise', () async {
-      maintenant = midi;
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      maintenant = midi.add(delaiCarteReprise);
-      final ouverture = await session().ouvrir();
-      expect(ouverture.actif, isNotNull);
-      expect(ouverture.reprise, isTrue);
-    });
-
-    test('brouillon de 3 h ou plus : à rejoindre, pas actif', () async {
-      maintenant = midi;
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      maintenant = midi.add(const Duration(hours: 4));
-      final s = session();
-      final ouverture = await s.ouvrir();
-      expect(ouverture.actif, isNull);
-      expect(ouverture.aRejoindre, isNotNull);
-      expect(ouverture.reprise, isFalse);
-
-      s.rejoindre();
-      expect(s.actif?.id, ouverture.aRejoindre!.id);
-      expect(s.aRejoindre, isNull);
-    });
-  });
-
   group('ajout', () {
-    test('deux photos rapprochées partagent un brouillon', () async {
+    test('sans brouillon : la première photo en crée un, les suivantes '
+        's\'y ajoutent', () async {
       final s = session();
-      await s.ouvrir();
+      expect(s.actif, isNull);
       final a = s.ajouter(octets: octets(1), priseLe: midi);
       final b = s.ajouter(
         octets: octets(2),
@@ -90,17 +46,24 @@ void main() {
       expect(await brouillons.lister(), hasLength(1));
     });
 
-    test('« Autre repas » commence un nouveau brouillon', () async {
-      final s = session();
-      await s.ouvrir();
-      final premier = await s.ajouter(octets: octets(1), priseLe: midi);
-      s.autreRepas();
-      final second = await s.ajouter(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(minutes: 1)),
+    test('sur un brouillon repris : les photos s\'ajoutent à la suite, même '
+        'des heures plus tard', () async {
+      final repris = await brouillons.ajouterPhoto(
+        octets: octets(1),
+        priseLe: midi,
       );
-      expect(second.id, isNot(premier.id));
-      expect(await brouillons.lister(), hasLength(2));
+      final s = SessionCamera(
+        brouillons,
+        actif: repris,
+        maintenant: () => maintenant,
+      );
+      final b = await s.ajouter(
+        octets: octets(2),
+        priseLe: midi.add(const Duration(hours: 5)),
+      );
+      expect(b.id, repris.id);
+      expect(b.photos, hasLength(2));
+      expect(await brouillons.lister(), hasLength(1));
     });
 
     test('la position relevée est gardée avec la photo', () async {
@@ -109,7 +72,6 @@ void main() {
         positionService: _PositionFixe(),
         maintenant: () => maintenant,
       );
-      await s.ouvrir();
       await s.actualiserPosition();
       final b = await s.ajouter(octets: octets(1), priseLe: midi);
       expect(b.photos.single.position, (latitude: 50.63, longitude: 5.57));
@@ -117,12 +79,25 @@ void main() {
 
     test('terminer attend les photos en cours', () async {
       final s = session();
-      await s.ouvrir();
       final enCours = s.ajouter(octets: octets(1), priseLe: midi);
       final fini = await s.terminer();
       expect(fini, isNotNull);
       expect(fini!.photos, hasLength(1));
       await enCours;
+    });
+
+    test('reordonner change l\'ordre du brouillon', () async {
+      final s = session();
+      await s.ajouter(octets: octets(1), priseLe: midi);
+      final b = await s.ajouter(octets: octets(2), priseLe: midi);
+      final ids = [for (final p in b.photos) p.id];
+
+      final range = await s.reordonner(ids.reversed.toList());
+
+      expect([for (final p in range!.photos) p.id], ids.reversed);
+      expect(s.actif!.photos.first.id, ids.last);
+      final relu = await brouillons.charger(b.id);
+      expect([for (final p in relu!.photos) p.id], ids.reversed);
     });
   });
 
@@ -138,7 +113,6 @@ void main() {
 
     test('garde la date et la position, la plus ancienne d\'abord', () async {
       final s = session();
-      await s.ouvrir();
       final b = await s.ajouterImportees([
         photo(2, midi.add(const Duration(minutes: 5)), gps: true),
         photo(1, midi),
@@ -152,19 +126,42 @@ void main() {
       expect(b.photos.first.position, isNull);
     });
 
-    test('une photo d\'un autre repas commence un nouveau brouillon', () async {
+    test(
+      'des photos de jours différents restent dans le même brouillon',
+      () async {
+        final s = session();
+        await s.ajouterImportees([
+          photo(1, midi),
+          photo(2, midi.add(const Duration(days: 2))),
+        ]);
+        final liste = await brouillons.lister();
+        expect(liste, hasLength(1));
+        expect(liste.single.photos, hasLength(2));
+      },
+    );
+
+    test('un deuxième import s\'ajoute aux photos déjà là, sans les '
+        'remplacer', () async {
+      // Le bug : trois photos importées, puis une quatrième d'un autre
+      // jour, et les trois premières disparaissaient de la caméra (elles
+      // partaient dans un autre brouillon).
       final s = session();
-      await s.ouvrir();
       await s.ajouterImportees([
         photo(1, midi),
-        photo(2, midi.add(const Duration(hours: 5))),
+        photo(2, midi.add(const Duration(minutes: 5))),
+        photo(3, midi.add(const Duration(minutes: 10))),
       ]);
-      expect(await brouillons.lister(), hasLength(2));
+      final b = await s.ajouterImportees([
+        photo(4, midi.subtract(const Duration(days: 3))),
+      ]);
+
+      expect(b!.photos, hasLength(4));
+      expect(s.actif!.photos, hasLength(4));
+      expect(await brouillons.lister(), hasLength(1));
     });
 
     test('rien de choisi : rien de gardé', () async {
       final s = session();
-      await s.ouvrir();
       expect(await s.ajouterImportees(const []), isNull);
       expect(await brouillons.lister(), isEmpty);
     });
@@ -175,7 +172,16 @@ void main() {
       expect(libelleCompteurPhotos(1), 'photo gardée');
       expect(libelleCompteurPhotos(4), 'photos gardées');
       expect(libelleCompteurPhotos(10), 'photos · le maximum publiable');
-      expect(libelleCompteurPhotos(12), contains('10'));
+      expect(libelleCompteurPhotos(13), 'photos · retirez-en 3 pour continuer');
+    });
+
+    test('dix photos au plus pour continuer', () {
+      expect(peutContinuerCamera(0), isFalse);
+      expect(peutContinuerCamera(1), isTrue);
+      expect(peutContinuerCamera(10), isTrue);
+      expect(peutContinuerCamera(13), isFalse);
+      expect(libelleTropDePhotos(13), startsWith('10 photos au maximum : '));
+      expect(libelleTropDePhotos(13), contains('retirez-en 3'));
     });
 
     test('continuer', () => expect(libelleContinuer(3), 'Continuer · 3'));

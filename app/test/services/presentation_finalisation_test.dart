@@ -75,45 +75,17 @@ void main() {
   });
 
   group('etapeFinalisation', () {
-    EtapeFinalisation etape({
-      bool modification = false,
-      bool photos = true,
-      bool lieu = true,
-    }) => etapeFinalisation(
-      modification: modification,
-      aDesPhotos: photos,
-      aUnLieu: lieu,
-    );
-
-    test('photos d\'abord, puis le lieu, puis publier', () {
+    test('publier, même sans lieu ; en modification, enregistrer', () {
+      expect(etapeFinalisation(modification: false), EtapeFinalisation.publier);
       expect(
-        etape(photos: false, lieu: false),
-        EtapeFinalisation.choisirPhotos,
-      );
-      expect(etape(photos: false), EtapeFinalisation.choisirPhotos);
-      expect(etape(lieu: false), EtapeFinalisation.choisirLieu);
-      expect(etape(), EtapeFinalisation.publier);
-    });
-
-    test('en modification : enregistrer', () {
-      expect(etape(modification: true), EtapeFinalisation.enregistrer);
-      expect(
-        etape(modification: true, photos: false, lieu: false),
+        etapeFinalisation(modification: true),
         EtapeFinalisation.enregistrer,
       );
     });
 
-    test('seules publier et enregistrer exigent l\'émotion', () {
-      expect(EtapeFinalisation.choisirPhotos.exigeEmotion, isFalse);
-      expect(EtapeFinalisation.choisirLieu.exigeEmotion, isFalse);
-      expect(EtapeFinalisation.publier.exigeEmotion, isTrue);
-      expect(EtapeFinalisation.enregistrer.exigeEmotion, isTrue);
-    });
-
     test('libellés', () {
-      expect(EtapeFinalisation.choisirPhotos.libelle, 'Choisir les photos');
-      expect(EtapeFinalisation.choisirLieu.libelle, 'Où étiez-vous ?');
       expect(EtapeFinalisation.publier.libelle, 'Publier');
+      expect(EtapeFinalisation.enregistrer.libelle, 'Enregistrer');
     });
   });
 }

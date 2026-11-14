@@ -12,7 +12,8 @@ import 'verre_camera.dart';
 /// Combien de photos l'éventail déploie au plus (les plus récentes).
 const nombreMaxEventail = 6;
 
-/// Appui long avant qu'une photo ne se soulève pour être glissée.
+/// Appui long qui soulève une photo sans la bouger (la glisser tout de suite
+/// la soulève aussi).
 const delaiSaisieEventail = Duration(milliseconds: 280);
 
 /// Une photo de l'éventail ou de la visionneuse : son identifiant (rendu aux
@@ -35,15 +36,21 @@ const _marge = 7.0;
 const _rayon = 190.0;
 const _rayonCorbeille = 34.0;
 
+/// Une photo soulevée à moins de cette distance d'une place la prend.
+const _rayonPlace = 70.0;
+
 /// L'éventail de la pile : les photos du moment se déploient en arc au-dessus
 /// de la pile, suivies de « Importer ». Toucher une photo l'agrandit, le ×
-/// la supprime, et un appui long (280 ms) la soulève : on la glisse alors
-/// vers la corbeille qui apparaît en bas à droite.
+/// la supprime. La glisser (tout de suite, ou après un appui long de
+/// 280 ms) la soulève : on la pose à une autre place de l'arc (les autres
+/// s'écartent pour la laisser passer), ou dans la corbeille qui apparaît en
+/// bas à droite.
 ///
 /// À poser sur tout l'écran (`Positioned.fill`) : [ancre] est le centre de la
-/// pile dans ce repère. Les photos sont rendues déjà choisies et ordonnées
-/// (la plus récente d'abord) ; une suppression part en callback, c'est à
-/// l'écran de retirer la photo de [vignettes].
+/// pile dans ce repère. Les photos sont rendues déjà choisies, dans l'ordre
+/// de publication (la première en haut de l'arc) ; une suppression ou un
+/// nouvel ordre part en callback, c'est à l'écran de mettre [vignettes] à
+/// jour.
 class EventailPhotosCamera extends StatefulWidget {
   const EventailPhotosCamera({
     super.key,
@@ -55,6 +62,7 @@ class EventailPhotosCamera extends StatefulWidget {
     required this.libelleCorbeille,
     required this.onOuvrir,
     required this.onSupprimer,
+    required this.onReordonner,
     required this.onImporter,
     required this.onFermer,
     this.indice,
@@ -86,6 +94,11 @@ class EventailPhotosCamera extends StatefulWidget {
 
   /// Rendue quand la suppression est faite : la photo reste cachée jusque-là.
   final Future<void> Function(String id) onSupprimer;
+
+  /// Une photo a changé de place : le nouvel ordre de toutes les
+  /// [vignettes]. Rendue quand l'écran l'a appliqué : l'éventail montre le
+  /// nouvel ordre jusque-là.
+  final Future<void> Function(List<String> ordre) onReordonner;
   final VoidCallback onImporter;
 
   /// Toucher à côté des photos.
@@ -119,6 +132,13 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
     duration: const Duration(milliseconds: 340),
   );
 
+  /// Les photos qui s'écartent quand la photo soulevée change de place.
+  late final AnimationController _glissement = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 200),
+    value: 1,
+  );
+
   Timer? _delaiIndice;
   var _indiceVisible = false;
   var _initialise = false;
@@ -138,6 +158,20 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
   String? _retourId;
   var _retourDe = Offset.zero;
 
+  /// L'ordre affiché, avant tout déplacement en cours.
+  var _affichees = const <String>[];
+
+  /// Le nouvel ordre lâché, montré jusqu'à ce que l'écran l'ait appliqué.
+  List<String>? _ordreLocal;
+
+  /// La place que prendrait la photo soulevée si on la lâchait.
+  int? _place;
+
+  /// Où chaque photo a été peinte en dernier, et d'où elle part quand les
+  /// photos s'écartent.
+  final _peintes = <String, ({Offset centre, double angle})>{};
+  var _departs = const <String, ({Offset centre, double angle})>{};
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -155,9 +189,13 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
   @override
   void didUpdateWidget(EventailPhotosCamera ancienne) {
     super.didUpdateWidget(ancienne);
-    final avant = [for (final v in ancienne.vignettes) v.id];
-    final apres = [for (final v in widget.vignettes) v.id];
-    if (avant.join(',') != apres.join(',')) _jouerOuverture();
+    // Un nouvel ordre ne rejoue pas l'ouverture : les photos y sont déjà.
+    final avant = [for (final v in ancienne.vignettes) v.id]..sort();
+    final apres = [for (final v in widget.vignettes) v.id]..sort();
+    if (avant.join(',') != apres.join(',')) {
+      _ordreLocal = null;
+      _jouerOuverture();
+    }
   }
 
   @override
@@ -167,6 +205,7 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
     _sortie.dispose();
     _retour.dispose();
     _gloutonne.dispose();
+    _glissement.dispose();
     super.dispose();
   }
 
@@ -202,6 +241,7 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
     HapticFeedback.lightImpact();
     setState(() {
       _enLevee = id;
+      _place = _affichees.indexOf(id);
       _doigt = _local(global);
       _corbeilleVisible = true;
       _indiceVisible = false;
@@ -209,20 +249,58 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
     });
   }
 
+  /// L'ordre affiché, la photo soulevée posée à sa [_place].
+  List<String> _ordreAvecPlace() {
+    final id = _enLevee, place = _place;
+    if (id == null || place == null) return _affichees;
+    final ordre = [..._affichees]..remove(id);
+    return ordre..insert(place.clamp(0, ordre.length), id);
+  }
+
+  /// La place la plus proche du doigt, si elle est assez près ; sinon la
+  /// photo garde la sienne.
+  int _placeSous(Offset doigt) {
+    final total = _affichees.length + 1;
+    var plusProche = _affichees.indexOf(_enLevee!);
+    var distance = _rayonPlace;
+    for (var rang = 0; rang < _affichees.length; rang++) {
+      final d = (doigt - _centrePhoto(rang, total)).distance;
+      if (d < distance) {
+        distance = d;
+        plusProche = rang;
+      }
+    }
+    return plusProche;
+  }
+
   void _glisser(Offset global, Size taille) {
-    if (_enLevee == null) return;
+    final id = _enLevee;
+    if (id == null) return;
     final doigt = _local(global);
     final survol = (doigt - _centreCorbeille(taille)).distance < 64;
     if (survol && !_survol) HapticFeedback.selectionClick();
+    final place = survol ? _affichees.indexOf(id) : _placeSous(doigt);
+    if (place != _place) {
+      if (!survol) HapticFeedback.selectionClick();
+      _departs = Map.of(_peintes);
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _glissement.value = 1;
+      } else {
+        _glissement.forward(from: 0);
+      }
+    }
     setState(() {
       _doigt = doigt;
       _survol = survol;
+      _place = place;
     });
   }
 
   void _lacher(Size taille) {
     final id = _enLevee;
     if (id == null) return;
+    final ordre = _ordreAvecPlace();
+    _place = null;
     if (_survol) {
       _lancerSortie(
         id,
@@ -234,13 +312,21 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
       );
       return;
     }
+    final deplacee = ordre.join(',') != _affichees.join(',');
     setState(() {
       _enLevee = null;
       _survol = false;
       _corbeilleVisible = false;
       _retourId = id;
       _retourDe = _doigt;
+      if (deplacee) _ordreLocal = ordre;
     });
+    if (deplacee) {
+      HapticFeedback.mediumImpact();
+      widget.onReordonner(ordre).whenComplete(() {
+        if (mounted) setState(() => _ordreLocal = null);
+      });
+    }
     if (MediaQuery.disableAnimationsOf(context)) {
       setState(() => _retourId = null);
       return;
@@ -308,10 +394,18 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
 
   @override
   Widget build(BuildContext context) {
-    final vignettes = [
+    final parId = {
       for (final v in widget.vignettes)
-        if (!_masquees.contains(v.id)) v,
-    ];
+        if (!_masquees.contains(v.id)) v.id: v,
+    };
+    final local = _ordreLocal;
+    _affichees =
+        local != null &&
+            local.length == parId.length &&
+            local.every(parId.containsKey)
+        ? local
+        : [...parId.keys];
+    final vignettes = [for (final id in _ordreAvecPlace()) parId[id]!];
     final total = vignettes.length + 1;
     return LayoutBuilder(
       builder: (context, contrainte) {
@@ -345,10 +439,8 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
                             child: Text(
                               widget.indice!,
                               maxLines: 1,
-                              style: TextStyle(
-                                color: TablCouleurs.sombre.texte,
+                              style: TablTokens.policeCreation.copyWith(
                                 fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -368,11 +460,16 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
                 ),
               ),
               AnimatedBuilder(
-                animation: Listenable.merge([_ouverture, _sortie, _retour]),
+                animation: Listenable.merge([
+                  _ouverture,
+                  _sortie,
+                  _retour,
+                  _glissement,
+                ]),
                 builder: (context, _) => Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    // La plus récente (rang 0) est dessus : on peint à l'envers,
+                    // La première (rang 0) est dessus : on peint à l'envers,
                     // la photo soulevée en dernier.
                     for (var rang = total - 1; rang >= 0; rang--)
                       if (rang < vignettes.length &&
@@ -426,9 +523,16 @@ class _EventailPhotosCameraState extends State<EventailPhotosCamera>
       echelle = 1.12 + (1 - 1.12) * t;
       angle = angleBase;
       opacite = 1;
-    } else if (_enLevee != null) {
-      opacite *= 0.35;
+    } else {
+      final depart = _departs[v.id];
+      if (depart != null && _glissement.value < 1) {
+        final t = Curves.easeOutCubic.transform(_glissement.value);
+        centre = Offset.lerp(depart.centre, centre, t)!;
+        angle = depart.angle + (angle - depart.angle) * t;
+      }
+      if (_enLevee != null) opacite *= 0.55;
     }
+    _peintes[v.id] = (centre: centre, angle: angle);
     return Positioned(
       key: ValueKey(v.id),
       left: centre.dx - (_largeurPhoto / 2 + _marge),
@@ -520,6 +624,8 @@ class _TuilePhoto extends StatelessWidget {
               TapGestureRecognizer.new,
               (r) => r.onTap = onTap,
             ),
+        // Deux façons de soulever : maintenir sans bouger, ou glisser tout
+        // de suite. Le premier des deux gagne, l'autre s'efface.
         LongPressGestureRecognizer:
             GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
               () => LongPressGestureRecognizer(duration: delaiSaisieEventail),
@@ -528,6 +634,15 @@ class _TuilePhoto extends StatelessWidget {
                 ..onLongPressMoveUpdate = ((d) => onGlisser(d.globalPosition))
                 ..onLongPressEnd = ((_) => onLacher())
                 ..onLongPressCancel = onLacher,
+            ),
+        PanGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+              PanGestureRecognizer.new,
+              (r) => r
+                ..onStart = ((d) => onSoulever(d.globalPosition))
+                ..onUpdate = ((d) => onGlisser(d.globalPosition))
+                ..onEnd = ((_) => onLacher())
+                ..onCancel = onLacher,
             ),
       },
       child: Semantics(
@@ -667,11 +782,7 @@ class _TuileImporter extends StatelessWidget {
                     Text(
                       libelle,
                       maxLines: 1,
-                      style: TextStyle(
-                        color: c.texte,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TablTokens.policeCreation.copyWith(fontSize: 11),
                     ),
                   ],
                 ),
@@ -747,11 +858,7 @@ class _Corbeille extends StatelessWidget {
                       Text(
                         libelle,
                         maxLines: 1,
-                        style: TextStyle(
-                          color: c.texte,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TablTokens.policeCreation.copyWith(fontSize: 10),
                       ),
                     ],
                   ),

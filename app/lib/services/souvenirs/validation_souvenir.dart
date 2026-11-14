@@ -8,12 +8,12 @@ class ValidationSouvenir {
   const ValidationSouvenir._();
 
   static String? nomRestaurant(String valeur) {
-    if (valeur.trim().isEmpty) return 'Entre le nom du restaurant.';
+    if (valeur.trim().isEmpty) return 'Entrez le nom du restaurant.';
     return null;
   }
 
   static String? ville(String valeur) {
-    if (valeur.trim().isEmpty) return 'Entre la ville.';
+    if (valeur.trim().isEmpty) return 'Entrez la ville.';
     return null;
   }
 

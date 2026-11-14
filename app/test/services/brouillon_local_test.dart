@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -120,6 +121,51 @@ void main() {
       expect(relu.legende, isNull);
     });
 
+    test('chez quelqu\'un de Tabl se relit, sans jamais de position', () async {
+      final cree = await brouillons.creer();
+      await brouillons.mettreAJour(
+        cree.id,
+        (b) => b.copieAvec(
+          lieu: () => const LieuRestaurant.chezQuelquun(
+            hoteId: 'emma',
+            hotePseudo: 'emma',
+          ),
+        ),
+      );
+
+      final relu = (await ouvrir().charger(cree.id))!.lieu!;
+      expect(relu.genre, GenreLieu.chez);
+      expect(relu.hoteId, 'emma');
+      expect(relu.libelle, 'Chez emma');
+    });
+
+    test(
+      'un brouillon d\'avant les genres : « personnel », sans position',
+      () async {
+        final cree = await brouillons.creer();
+        final fichier = File(
+          '${racine.path}/brouillons/${cree.id}/brouillon.json',
+        );
+        final json =
+            jsonDecode(fichier.readAsStringSync()) as Map<String, dynamic>;
+        json['lieu'] = {
+          'nom': 'Chez mes parents',
+          'ville': 'Liège',
+          'latitude': 50.6,
+          'longitude': 5.5,
+          'categories': <String>[],
+          'personnel': true,
+        };
+        fichier.writeAsStringSync(jsonEncode(json));
+
+        final relu = (await ouvrir().charger(cree.id))!.lieu!;
+        expect(relu.genre, GenreLieu.chez);
+        expect(relu.nom, 'Chez mes parents');
+        expect(relu.latitude, isNull);
+        expect(relu.ville, '');
+      },
+    );
+
     test('un brouillon sans photo (« Sans photo ») est gardé', () async {
       final cree = await brouillons.creer();
 
@@ -154,6 +200,20 @@ void main() {
       );
 
       expect((await ouvrir().charger(cree.id))!.etoiles, {'cuisine': 4});
+    });
+
+    test('un plat écrit est relu même sans note, dans l\'ordre', () async {
+      final cree = await brouillons.creer();
+      await brouillons.mettreAJour(
+        cree.id,
+        (b) => b.copieAvec(
+          etoiles: {'plat:Risotto': 0, 'cuisine': 4, 'plat:Tiramisu': 3},
+        ),
+      );
+
+      final relu = (await ouvrir().charger(cree.id))!.etoiles;
+      expect(relu, {'plat:Risotto': 0, 'cuisine': 4, 'plat:Tiramisu': 3});
+      expect(relu.keys.toList(), ['plat:Risotto', 'cuisine', 'plat:Tiramisu']);
     });
 
     test('un JSON illisible est ignoré, sans gêner les autres', () async {
@@ -224,8 +284,23 @@ void main() {
     });
   });
 
-  group('regroupement des photos', () {
-    test('moins de 3 h après la précédente : même brouillon', () async {
+  group('ajout des photos', () {
+    test('sans brouillonId : un nouveau brouillon à chaque fois', () async {
+      final premier = await brouillons.ajouterPhoto(
+        octets: octets(1),
+        priseLe: midi,
+      );
+      final second = await brouillons.ajouterPhoto(
+        octets: octets(2),
+        priseLe: midi.add(const Duration(minutes: 1)),
+      );
+
+      expect(second.id, isNot(premier.id));
+      expect(await brouillons.lister(), hasLength(2));
+    });
+
+    test('brouillonId : la photo s\'ajoute à la fin, quelle que soit sa '
+        'date', () async {
       final premier = await brouillons.ajouterPhoto(
         octets: octets(1),
         priseLe: midi,
@@ -233,7 +308,8 @@ void main() {
 
       final suite = await brouillons.ajouterPhoto(
         octets: octets(2),
-        priseLe: midi.add(const Duration(hours: 2, minutes: 59)),
+        priseLe: midi.add(const Duration(days: 2)),
+        brouillonId: premier.id,
       );
 
       expect(suite.id, premier.id);
@@ -241,39 +317,7 @@ void main() {
       expect(await brouillons.lister(), hasLength(1));
     });
 
-    test('3 h pile ou plus : nouveau brouillon', () async {
-      final premier = await brouillons.ajouterPhoto(
-        octets: octets(1),
-        priseLe: midi,
-      );
-
-      final suite = await brouillons.ajouterPhoto(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(hours: 3)),
-      );
-
-      expect(suite.id, isNot(premier.id));
-      expect(suite.photos, hasLength(1));
-      expect(await brouillons.lister(), hasLength(2));
-    });
-
-    test('se compare à la dernière photo, pas à la première', () async {
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      await brouillons.ajouterPhoto(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(hours: 2)),
-      );
-
-      final suite = await brouillons.ajouterPhoto(
-        octets: octets(3),
-        priseLe: midi.add(const Duration(hours: 4)),
-      );
-
-      expect(suite.photos, hasLength(3));
-      expect(await brouillons.lister(), hasLength(1));
-    });
-
-    test('une photo plus ancienne, à moins de 3 h, rejoint aussi', () async {
+    test('une photo plus ancienne avance l\'heure du repas', () async {
       final premier = await brouillons.ajouterPhoto(
         octets: octets(1),
         priseLe: midi,
@@ -282,113 +326,39 @@ void main() {
       final suite = await brouillons.ajouterPhoto(
         octets: octets(2),
         priseLe: midi.subtract(const Duration(hours: 1)),
-      );
-
-      expect(suite.id, premier.id);
-      expect(suite.priseLe, midi.subtract(const Duration(hours: 1)));
-    });
-
-    test('seul le brouillon actif accueille une photo', () async {
-      final ancien = await brouillons.ajouterPhoto(
-        octets: octets(1),
-        priseLe: midi,
-      );
-      maintenant = maintenant.add(const Duration(hours: 1));
-      final actif = await brouillons.ajouterPhoto(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(hours: 5)),
-      );
-
-      final suite = await brouillons.ajouterPhoto(
-        octets: octets(3),
-        priseLe: midi.add(const Duration(hours: 1)),
-      );
-
-      expect(suite.id, isNot(ancien.id));
-      expect(suite.id, isNot(actif.id));
-    });
-
-    test('nouveauRepas force un nouveau brouillon', () async {
-      final premier = await brouillons.ajouterPhoto(
-        octets: octets(1),
-        priseLe: midi,
-      );
-
-      final suite = await brouillons.ajouterPhoto(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(minutes: 10)),
-        nouveauRepas: true,
-      );
-
-      expect(suite.id, isNot(premier.id));
-    });
-
-    test('brouillonId choisit le brouillon, même à 3 h ou plus', () async {
-      final premier = await brouillons.ajouterPhoto(
-        octets: octets(1),
-        priseLe: midi,
-      );
-
-      final suite = await brouillons.ajouterPhoto(
-        octets: octets(2),
-        priseLe: midi.add(const Duration(hours: 6)),
         brouillonId: premier.id,
       );
 
-      expect(suite.id, premier.id);
-      expect(suite.photos, hasLength(2));
+      expect(suite.priseLe, midi.subtract(const Duration(hours: 1)));
+      expect(suite.photos.last.priseLe, suite.priseLe);
     });
 
-    test('brouillonPourRegrouper annonce la suite sans rien écrire', () async {
-      expect(await brouillons.brouillonPourRegrouper(midi), isNull);
-      final premier = await brouillons.ajouterPhoto(
-        octets: octets(1),
-        priseLe: midi,
-      );
-
-      expect(
-        (await brouillons.brouillonPourRegrouper(
-          midi.add(const Duration(hours: 1)),
-        ))!.id,
-        premier.id,
-      );
-      expect(
-        await brouillons.brouillonPourRegrouper(
-          midi.add(const Duration(hours: 3)),
-        ),
-        isNull,
-      );
-      expect((await brouillons.charger(premier.id))!.photos, hasLength(1));
-    });
-
-    test('un brouillon sans photo se compare à son heure', () async {
-      final vide = await brouillons.creer(priseLe: midi);
-
-      expect(
-        (await brouillons.brouillonPourRegrouper(
-          midi.add(const Duration(hours: 2)),
-        ))!.id,
-        vide.id,
-      );
-      expect(
-        await brouillons.brouillonPourRegrouper(
-          midi.add(const Duration(hours: 3)),
-        ),
-        isNull,
-      );
-    });
+    test(
+      'un brouillonId qui n\'existe plus : un nouveau, avec cet id',
+      () async {
+        final b = await brouillons.ajouterPhoto(
+          octets: octets(1),
+          priseLe: midi,
+          brouillonId: 'disparu',
+        );
+        expect(b.id, 'disparu');
+        expect(b.photos, hasLength(1));
+      },
+    );
 
     test('la position du brouillon est celle de la première prise', () async {
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
+      final b = await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
       await brouillons.ajouterPhoto(
         octets: octets(2),
         priseLe: midi.add(const Duration(minutes: 5)),
         position: (latitude: 50.6, longitude: 5.5),
+        brouillonId: b.id,
       );
       final suite = await brouillons.ajouterPhoto(
         octets: octets(3),
         priseLe: midi.add(const Duration(minutes: 9)),
         position: (latitude: 1, longitude: 2),
+        brouillonId: b.id,
       );
 
       expect(suite.position, (latitude: 50.6, longitude: 5.5));
@@ -398,8 +368,16 @@ void main() {
   group('ordre des photos', () {
     test('reordonnerPhotos change l\'ordre, gardé à la relecture', () async {
       var b = await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      b = await brouillons.ajouterPhoto(octets: octets(2), priseLe: midi);
-      b = await brouillons.ajouterPhoto(octets: octets(3), priseLe: midi);
+      b = await brouillons.ajouterPhoto(
+        octets: octets(2),
+        priseLe: midi,
+        brouillonId: b.id,
+      );
+      b = await brouillons.ajouterPhoto(
+        octets: octets(3),
+        priseLe: midi,
+        brouillonId: b.id,
+      );
       final ids = b.photos.map((p) => p.id).toList();
 
       await brouillons.reordonnerPhotos(b.id, [ids[2], ids[0], ids[1]]);
@@ -418,65 +396,21 @@ void main() {
     });
   });
 
-  group('photos retirées de la publication', () {
-    late Brouillon trois;
-
-    setUp(() async {
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      await brouillons.ajouterPhoto(octets: octets(2), priseLe: midi);
-      trois = await brouillons.ajouterPhoto(octets: octets(3), priseLe: midi);
-    });
-
-    test(
-      'elles restent dans le brouillon mais pas dans la publication',
-      () async {
-        final retiree = trois.photos[0].id;
-        await brouillons.mettreAJour(
-          trois.id,
-          (b) => b.copieAvec(horsPublicationIds: {retiree}),
-        );
-
-        final relu = (await ouvrir().charger(trois.id))!;
-        expect(relu.photos, hasLength(3));
-        expect(relu.horsPublicationIds, {retiree});
-        expect(relu.photosAPublier.map((p) => p.id), [
-          trois.photos[1].id,
-          trois.photos[2].id,
-        ]);
-      },
-    );
-
-    test('la couverture est la première photo à publier', () async {
-      await brouillons.mettreAJour(
-        trois.id,
-        (b) => b.copieAvec(horsPublicationIds: {trois.photos[0].id}),
-      );
-
-      final relu = (await brouillons.charger(trois.id))!;
-      expect(relu.photosAPublier.first.id, trois.photos[1].id);
-    });
-
-    test('supprimer une photo retirée l\'oublie aussi', () async {
-      final retiree = trois.photos[1].id;
-      await brouillons.mettreAJour(
-        trois.id,
-        (b) => b.copieAvec(horsPublicationIds: {retiree}),
-      );
-
-      await brouillons.supprimerPhoto(trois.id, retiree);
-
-      final relu = (await brouillons.charger(trois.id))!;
-      expect(relu.horsPublicationIds, isEmpty);
-    });
-  });
-
   group('corbeille', () {
     late Brouillon trois;
 
     setUp(() async {
-      await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      await brouillons.ajouterPhoto(octets: octets(2), priseLe: midi);
-      trois = await brouillons.ajouterPhoto(octets: octets(3), priseLe: midi);
+      final b = await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
+      await brouillons.ajouterPhoto(
+        octets: octets(2),
+        priseLe: midi,
+        brouillonId: b.id,
+      );
+      trois = await brouillons.ajouterPhoto(
+        octets: octets(3),
+        priseLe: midi,
+        brouillonId: b.id,
+      );
     });
 
     test(
@@ -582,7 +516,11 @@ void main() {
 
     test('n\'efface que les photos échues', () async {
       var b = await brouillons.ajouterPhoto(octets: octets(1), priseLe: midi);
-      b = await brouillons.ajouterPhoto(octets: octets(2), priseLe: midi);
+      b = await brouillons.ajouterPhoto(
+        octets: octets(2),
+        priseLe: midi,
+        brouillonId: b.id,
+      );
       await brouillons.supprimerPhoto(b.id, b.photos[0].id);
       maintenant = maintenant.add(const Duration(days: 20));
       await brouillons.supprimerPhoto(b.id, b.photos[1].id);

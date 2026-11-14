@@ -481,7 +481,7 @@ class _FeuilleQuandState extends State<_FeuilleQuand> {
               spacing: TablTokens.espaceS,
               alignment: WrapAlignment.center,
               children: [
-                for (final m in const ['midi', 'soir'])
+                for (final m in momentsRepas)
                   TablPuceSelection(
                     libelle: libelleMomentRepas(m)!,
                     selectionnee: _moment == m,

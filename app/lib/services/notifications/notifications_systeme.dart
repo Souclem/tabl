@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../souvenirs/rappels_brouillons.dart';
+
 /// Les notifications du téléphone, sur l'écran verrouillé : l'autorisation,
 /// cet appareil enregistré pour le compte connecté, et les notifications
 /// touchées. L'envoi vit côté serveur (fonction `notifier`, voir
@@ -76,6 +78,42 @@ class NotificationsSystemeSupabase implements NotificationsSysteme {
 }
 
 const _cleJeton = 'notifications_jeton_appareil';
+
+/// Les rappels de brouillon, en notifications locales de l'iPhone, par le
+/// même canal `tabl/notifications` ; ailleurs, rien pour l'instant.
+/// L'autorisation est celle des notifications ([NotificationsSysteme.activer]).
+class RappelsSystemeIos implements RappelsSysteme {
+  static const _canal = MethodChannel('tabl/notifications');
+
+  @override
+  Future<void> remplacer(List<RappelBrouillon> rappels) =>
+      _appeler('remplacerRappels', [
+        for (final r in rappels)
+          {
+            'id': r.identifiant,
+            'brouillonId': r.brouillonId,
+            'secondes': r.dans.inSeconds,
+            'titre': r.titre,
+            'corps': r.corps,
+          },
+      ]);
+
+  @override
+  Future<void> annuler(String brouillonId) =>
+      _appeler('annulerRappels', identifiantsRappels(brouillonId));
+
+  Future<void> _appeler(String methode, Object arguments) async {
+    if (kIsWeb || !Platform.isIOS) return;
+    try {
+      await _canal.invokeMethod<void>(methode, arguments);
+    } on PlatformException catch (e) {
+      debugPrint('RappelsSysteme: $methode : $e');
+    } on MissingPluginException catch (e) {
+      // Une app construite avant ces commandes natives : pas de rappels.
+      debugPrint('RappelsSysteme: $methode : $e');
+    }
+  }
+}
 
 /// Retire cet appareil du compte connecté, juste avant la déconnexion :
 /// ses notifications ne suivent ni le compte parti, ni le suivant avant

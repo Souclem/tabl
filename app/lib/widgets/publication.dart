@@ -56,6 +56,9 @@ class TablPublication extends StatelessWidget {
     this.auteurPhotoUrl,
     required this.restaurantNom,
     required this.ville,
+    this.lieuPrive = false,
+    this.hotePseudo,
+    this.hotePhotoUrl,
     required this.jaiReagi,
     required this.libelleReactions,
     this.bullesReactions = const [],
@@ -93,6 +96,13 @@ class TablPublication extends StatelessWidget {
   final List<String> autresPhotosUrls;
   final String restaurantNom;
   final String ville;
+
+  /// Pas un restaurant (« Chez Léa ») : la maison, jamais l'épingle.
+  final bool lieuPrive;
+
+  /// Chez une personne de Tabl : sa photo à la place de la maison.
+  final String? hotePseudo;
+  final String? hotePhotoUrl;
   final String? emojiEmotion;
   final String? legende;
   final List<String> impressions;
@@ -160,6 +170,9 @@ class TablPublication extends StatelessWidget {
             photoUrls: [?photoUrl, ...autresPhotosUrls],
             restaurantNom: restaurantNom,
             ville: ville,
+            lieuPrive: lieuPrive,
+            hotePseudo: hotePseudo,
+            hotePhotoUrl: hotePhotoUrl,
             emojiEmotion: emojiEmotion,
             onOuvrirLieu: onOuvrirLieu,
           ),
@@ -332,6 +345,9 @@ class _Photo extends StatefulWidget {
     required this.photoUrls,
     required this.restaurantNom,
     required this.ville,
+    required this.lieuPrive,
+    required this.hotePseudo,
+    required this.hotePhotoUrl,
     required this.emojiEmotion,
     required this.onOuvrirLieu,
   });
@@ -340,6 +356,9 @@ class _Photo extends StatefulWidget {
   final List<String> photoUrls;
   final String restaurantNom;
   final String ville;
+  final bool lieuPrive;
+  final String? hotePseudo;
+  final String? hotePhotoUrl;
   final String? emojiEmotion;
   final VoidCallback onOuvrirLieu;
 
@@ -434,11 +453,25 @@ class _PhotoState extends State<_Photo> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: 15,
-                                color: c.primaire,
-                              ),
+                              // L'épingle veut dire « sur la carte » : hors
+                              // restaurant, la maison ou la photo de l'hôte.
+                              if (widget.hotePseudo case final hote?)
+                                SizedBox.square(
+                                  dimension: 18,
+                                  child: TablAvatar(
+                                    pseudo: hote,
+                                    photoUrl: widget.hotePhotoUrl,
+                                    rayon: 9,
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  widget.lieuPrive
+                                      ? Icons.home_outlined
+                                      : Icons.location_on_outlined,
+                                  size: 15,
+                                  color: c.primaire,
+                                ),
                               const SizedBox(width: 7),
                               Flexible(
                                 child: Text(
@@ -453,16 +486,17 @@ class _PhotoState extends State<_Photo> {
                               ),
                             ],
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 22, top: 1),
-                            child: Text(
-                              ville,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: Colors.white.withValues(alpha: 0.64),
+                          if (ville.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 22, top: 1),
+                              child: Text(
+                                ville,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.white.withValues(alpha: 0.64),
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),

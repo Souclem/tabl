@@ -58,7 +58,8 @@ void main() {
 
   tearDown(() => racine.deleteSync(recursive: true));
 
-  /// Le Fil, d'où part le parcours. Rouvrir le parcours : toucher « Fil ».
+  /// Le Fil, d'où part le parcours. Rouvrir le parcours : toucher « Fil »
+  /// (et reprendre le brouillon en cours, s'il y en a un).
   Future<void> ouvrirParcours(
     WidgetTester tester,
     EnvoiPublications envois,
@@ -97,6 +98,25 @@ void main() {
       ),
     );
     await tester.tap(find.text('Fil'));
+    // Avec un brouillon en cours, « + » propose d'abord de le reprendre.
+    await attendreJusque(
+      tester,
+      () =>
+          find.byType(EcranCamera).evaluate().isNotEmpty ||
+          find.text('Brouillons').evaluate().isNotEmpty,
+      attendu: 'la caméra ou « Brouillons »',
+    );
+    if (find.text('Brouillons').evaluate().isNotEmpty) {
+      // Le plus récent, en haut de la liste.
+      final premier = find
+          .descendant(
+            of: find.byType(TablListeBrouillons),
+            matching: find.byType(InkWell),
+          )
+          .first;
+      await attendreAffichage(tester, premier);
+      await tester.tap(premier);
+    }
     await attendreAffichage(tester, find.byType(EcranCamera));
   }
 

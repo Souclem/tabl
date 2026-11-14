@@ -8,6 +8,9 @@ import 'package:app/ecrans/ecran_profil_autre.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<List<String>> ajouterSouvenir(NouveauSouvenir souvenir) =>
       throw UnimplementedError();
   _FauxSouvenirService(this.publications);

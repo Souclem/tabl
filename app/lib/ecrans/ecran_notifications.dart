@@ -194,6 +194,10 @@ class _EcranNotificationsState extends State<EcranNotifications>
         onReagir: basculerReaction,
         onOuvrirLieu: ouvrirRestaurant,
         onOuvrirPersonne: (p) => ouvrirProfilDe(p.id, p.pseudo),
+        // « X a publié un moment chez vous » : de quoi retirer son nom.
+        onOptions: souvenir.estAMoi || souvenir.jeSuisLHote
+            ? optionsPublication
+            : null,
       );
     } catch (e) {
       debugPrint('EcranNotifications: moment : $e');

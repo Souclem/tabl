@@ -169,7 +169,7 @@ async function lire(
       const r = await une(
         admin
           .from("reactions")
-          .select("cree_le, souvenirs(auteur_id, restaurants(nom))")
+          .select("cree_le, souvenirs(auteur_id, restaurants(nom, genre))")
           .eq("souvenir_id", e.souvenir)
           .eq("profil_id", moi)
           .maybeSingle(),
@@ -182,7 +182,7 @@ async function lire(
         cle: `reaction:${e.souvenir}:${moi}`,
         destinataire: souvenir.auteur_id,
         type: "reaction",
-        texte: `${pseudo} a aimé votre moment${chez(souvenir.restaurants?.nom)}.`,
+        texte: `${pseudo} a aimé votre moment${chez(souvenir.restaurants)}.`,
       }];
     }
     // J'ai commenté un moment, ou répondu à un commentaire. L'auteur du
@@ -194,7 +194,7 @@ async function lire(
         admin
           .from("commentaires")
           .select(
-            "texte, cree_le, parent_id, souvenirs(auteur_id, restaurants(nom))",
+            "texte, cree_le, parent_id, souvenirs(auteur_id, restaurants(nom, genre))",
           )
           .eq("id", e.commentaire)
           .eq("auteur_id", moi)
@@ -225,7 +225,7 @@ async function lire(
           cle: `commentaire:${e.commentaire}`,
           destinataire: souvenir.auteur_id,
           type: "commentaire",
-          texte: `${pseudo} a commenté votre moment${chez(souvenir.restaurants?.nom)}` +
+          texte: `${pseudo} a commenté votre moment${chez(souvenir.restaurants)}` +
             ` : « ${court(c.texte)} »`,
         });
       }
@@ -259,7 +259,7 @@ async function lire(
       if (ids.length === 0) return [];
       const { data, error } = await admin
         .from("demandes_avis")
-        .select("id, destinataire_id, message, cree_le, restaurants(nom)")
+        .select("id, destinataire_id, message, cree_le, restaurants(nom, genre)")
         .in("id", ids)
         .eq("demandeur_id", moi)
         .is("reponse", null);
@@ -271,7 +271,7 @@ async function lire(
           cle: `demande_avis:${d.id}`,
           destinataire: d.destinataire_id,
           type: "demande_avis",
-          texte: `${pseudo} vous demande votre avis${chez(d.restaurants?.nom)}` +
+          texte: `${pseudo} vous demande votre avis${chez(d.restaurants)}` +
             ` : « ${court(d.message)} »`,
         }));
     }
@@ -281,7 +281,7 @@ async function lire(
       const d = await une(
         admin
           .from("demandes_avis")
-          .select("demandeur_id, reponse, mot, repondu_le, restaurants(nom)")
+          .select("demandeur_id, reponse, mot, repondu_le, restaurants(nom, genre)")
           .eq("id", e.demande)
           .eq("destinataire_id", moi)
           .not("reponse", "is", null)
@@ -293,7 +293,7 @@ async function lire(
         cle: `avis_recu:${e.demande}`,
         destinataire: d.demandeur_id,
         type: "avis_recu",
-        texte: `${pseudo} a répondu${chez(d.restaurants?.nom)} : ` +
+        texte: `${pseudo} a répondu${chez(d.restaurants)} : ` +
           `${REPONSES[d.reponse] ?? "Réponse"}` +
           (mot ? ` — « ${court(mot)} »` : ""),
       }];
@@ -412,9 +412,19 @@ function recente(date: string): boolean {
   return Date.now() - new Date(date).getTime() < RECENTE_MS;
 }
 
-/** " chez Osteria Bella", ou rien sans restaurant. */
-function chez(nom?: string | null): string {
-  return nom ? ` chez ${nom}` : "";
+/**
+ * " chez Osteria Bella", " chez vous" (mon moment chez moi), " chez Mamie"
+ * (le nom dit déjà « Chez Mamie »), ou rien : sans lieu, ou un pique-nique.
+ * Comme `chezDansUnePhrase` dans l'app.
+ */
+function chez(
+  lieu?: { nom?: string | null; genre?: string | null } | null,
+): string {
+  const nom = lieu?.nom?.trim();
+  if (!nom) return "";
+  if (lieu?.genre === "domicile") return " chez vous";
+  if (lieu?.genre === "ailleurs") return "";
+  return ` chez ${nom.replace(/^chez\s+/i, "")}`;
 }
 
 /** Un texte assez court pour une notification. */

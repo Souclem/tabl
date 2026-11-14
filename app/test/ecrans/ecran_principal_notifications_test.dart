@@ -67,6 +67,9 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<List<SouvenirFeed>> feed() async => [];
 
   @override
@@ -105,5 +108,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(EcranNotifications), findsOneWidget);
     expect(find.textContaining('souhaite vous suivre'), findsOneWidget);
+  });
+
+  testWidgets('un rappel de brouillon touché ouvre « + », pas la cloche', (
+    tester,
+  ) async {
+    final systeme = _FauxNotificationsSysteme();
+    var parcoursOuverts = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EcranPrincipal(
+          authService: _FauxAuthService(),
+          abonnementService: _FauxAbonnementService(),
+          souvenirService: _FauxSouvenirService(),
+          utilisateur: const Utilisateur(
+            id: 'moi',
+            email: 'moi@exemple.com',
+            pseudo: 'moi',
+          ),
+          notificationService: _FauxNotificationService(),
+          notificationsSysteme: systeme,
+          avisService: _FauxAvisService(),
+          ouvrirParcours: (_) async {
+            parcoursOuverts++;
+            return null;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    systeme.toucher(typeNotificationBrouillon);
+    await tester.pumpAndSettle();
+    expect(parcoursOuverts, 1);
+    expect(find.byType(EcranNotifications), findsNothing);
   });
 }

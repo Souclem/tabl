@@ -22,6 +22,18 @@ class _DepotLent extends DepotPublicationSimule {
   }
 }
 
+class _FauxRappels implements RappelsSysteme {
+  List<RappelBrouillon>? programmes;
+  final annules = <String>[];
+
+  @override
+  Future<void> remplacer(List<RappelBrouillon> rappels) async =>
+      programmes = rappels;
+
+  @override
+  Future<void> annuler(String brouillonId) async => annules.add(brouillonId);
+}
+
 void main() {
   late Directory racine;
   late DateTime maintenant;
@@ -34,7 +46,7 @@ void main() {
   /// L'app qui s'ouvre : tout est relu depuis le dossier du téléphone, comme
   /// après une fermeture.
   ({BrouillonsLocaux brouillons, FileEnvoi file, EnvoiPublications envois})
-  ouvrirApp([DepotPublicationSimule? serveur]) {
+  ouvrirApp([DepotPublicationSimule? serveur, RappelsSysteme? rappels]) {
     final brouillons = BrouillonsLocaux(
       racine,
       maintenant: () => maintenant,
@@ -49,6 +61,7 @@ void main() {
         brouillons,
         file,
         maintenant: () => maintenant,
+        rappels: rappels,
       ),
     );
   }
@@ -328,34 +341,37 @@ void main() {
     // statut == null avec commit lancé est ambigu (orpheline nettoyée par un
     // autre téléphone, ou moment publié puis supprimé ailleurs) : dans les deux
     // cas, on garde le brouillon local, l'auteur peut le jeter.
-    test('app fermée, commit lancé, ligne serveur disparue : brouillon local gardé', () async {
-      var app = ouvrirApp();
-      final brouillon = await brouillonPret(app.brouillons);
-      await preparerSurServeur(brouillon, app.brouillons);
-      // Simule l'envoi interrompu après le commit
-      await laisserEnvoi(
-        app.file,
-        brouillon.id,
-        EtatEnvoi.enCours,
-        commitLance: true,
-      );
-      // Le serveur a nettoyé l'orpheline après 24h : statut=null
-      depot.lignes.remove(brouillon.id);
-      depot.fichiers.removeWhere((k, _) => k.startsWith(brouillon.id));
-      depot.appels.clear();
+    test(
+      'app fermée, commit lancé, ligne serveur disparue : brouillon local gardé',
+      () async {
+        var app = ouvrirApp();
+        final brouillon = await brouillonPret(app.brouillons);
+        await preparerSurServeur(brouillon, app.brouillons);
+        // Simule l'envoi interrompu après le commit
+        await laisserEnvoi(
+          app.file,
+          brouillon.id,
+          EtatEnvoi.enCours,
+          commitLance: true,
+        );
+        // Le serveur a nettoyé l'orpheline après 24h : statut=null
+        depot.lignes.remove(brouillon.id);
+        depot.fichiers.removeWhere((k, _) => k.startsWith(brouillon.id));
+        depot.appels.clear();
 
-      app = ouvrirApp();
-      final resultats = await app.envois.reprendre(auLancement: true);
+        app = ouvrirApp();
+        final resultats = await app.envois.reprendre(auLancement: true);
 
-      // Pas de message à l'auteur
-      expect(resultats, isEmpty);
-      // Le brouillon local est gardé
-      expect(await app.brouillons.charger(brouillon.id), isNotNull);
-      // La ligne de la file est retirée
-      expect(await app.file.lister(), isEmpty);
-      // Rien n'a été envoyé au serveur
-      expect(depot.appels, isEmpty);
-    });
+        // Pas de message à l'auteur
+        expect(resultats, isEmpty);
+        // Le brouillon local est gardé
+        expect(await app.brouillons.charger(brouillon.id), isNotNull);
+        // La ligne de la file est retirée
+        expect(await app.file.lister(), isEmpty);
+        // Rien n'a été envoyé au serveur
+        expect(depot.appels, isEmpty);
+      },
+    );
   });
 
   group('reprise après fermeture', () {
@@ -475,25 +491,28 @@ void main() {
       expect(depot.lignes[brouillon.id]!['statut'], statutPublie);
     });
 
-    test('envoi en attente, commit lancé, ligne serveur disparue : brouillon local gardé', () async {
-      var app = ouvrirApp();
-      final brouillon = await brouillonPret(app.brouillons);
-      await laisserEnvoi(
-        app.file,
-        brouillon.id,
-        EtatEnvoi.enAttente,
-        commitLance: true,
-      );
+    test(
+      'envoi en attente, commit lancé, ligne serveur disparue : brouillon local gardé',
+      () async {
+        var app = ouvrirApp();
+        final brouillon = await brouillonPret(app.brouillons);
+        await laisserEnvoi(
+          app.file,
+          brouillon.id,
+          EtatEnvoi.enAttente,
+          commitLance: true,
+        );
 
-      app = ouvrirApp();
-      final resultats = await app.envois.reprendre();
+        app = ouvrirApp();
+        final resultats = await app.envois.reprendre();
 
-      expect(resultats, isEmpty);
-      expect(await app.brouillons.charger(brouillon.id), isNotNull);
-      expect(await app.file.lister(), isEmpty);
-      expect(depot.lignes, isEmpty);
-      expect(depot.appels, isEmpty);
-    });
+        expect(resultats, isEmpty);
+        expect(await app.brouillons.charger(brouillon.id), isNotNull);
+        expect(await app.file.lister(), isEmpty);
+        expect(depot.lignes, isEmpty);
+        expect(depot.appels, isEmpty);
+      },
+    );
 
     test(
       'envoi en attente, commit passé mais réponse perdue : sans doublon',
@@ -923,14 +942,79 @@ void main() {
     test('un fichier illisible est ignoré', () async {
       final file = FileEnvoi(racine);
       await laisserEnvoi(file, 'ok', EtatEnvoi.enAttente);
-      File('${racine.path}/envois/casse.json')
-          .writeAsStringSync('{pas du json');
+      File(
+        '${racine.path}/envois/casse.json',
+      ).writeAsStringSync('{pas du json');
 
       expect((await file.lister()).map((e) => e.brouillonId), ['ok']);
     });
   });
 
+  group('rappels de brouillon', () {
+    test('en arrière-plan : les brouillons à reprendre, pas ceux confiés à '
+        'la file', () async {
+      final rappels = _FauxRappels();
+      final app = ouvrirApp(null, rappels);
+      final libre = await brouillonPret(app.brouillons);
+      final confie = await brouillonPret(app.brouillons);
+      await app.envois.mettreEnAttente(confie.id);
+
+      await app.envois.programmerRappels();
+      expect(rappels.annules, [confie.id]);
+      expect({for (final r in rappels.programmes!) r.brouillonId}, {libre.id});
+      expect(rappels.programmes, hasLength(2));
+
+      await app.envois.retirerRappels();
+      expect(rappels.programmes, isEmpty);
+    });
+
+    test('publié : ses rappels sont retirés', () async {
+      final rappels = _FauxRappels();
+      final app = ouvrirApp(null, rappels);
+      final brouillon = await brouillonPret(app.brouillons);
+
+      final resultat = await app.envois.envoyer(brouillon.id);
+      expect(resultat.estPublie, isTrue);
+
+      // Les ordres de rappels passent dans l'ordre : celui-ci suit les
+      // annulations (au départ de l'envoi, puis une fois publié).
+      await app.envois.programmerRappels();
+      expect(rappels.annules, [brouillon.id, brouillon.id]);
+      expect(rappels.programmes, isEmpty);
+    });
+  });
+
   group('ReprisePublications', () {
+    testWidgets('programme les rappels en partant, les retire au retour', (
+      tester,
+    ) async {
+      final rappels = _FauxRappels();
+      final app = await tester.runAsync(() async {
+        final app = ouvrirApp(null, rappels);
+        await brouillonPret(app.brouillons);
+        return app;
+      });
+      final reprise = ReprisePublications(app!.envois);
+      addTearDown(reprise.arreter);
+
+      Future<void> passer(AppLifecycleState etat) => tester.runAsync(() async {
+        TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(etat);
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+
+      await tester.runAsync(() async {
+        reprise.demarrer();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+      expect(rappels.programmes, isEmpty);
+
+      await passer(AppLifecycleState.inactive);
+      expect(rappels.programmes, hasLength(2));
+
+      await passer(AppLifecycleState.resumed);
+      expect(rappels.programmes, isEmpty);
+    });
+
     testWidgets('relance la file à l\'ouverture et à chaque reprise', (
       tester,
     ) async {

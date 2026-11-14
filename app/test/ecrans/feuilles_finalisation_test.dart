@@ -1,11 +1,6 @@
-import 'dart:io';
-import 'dart:typed_data';
-
 import 'package:app/ecrans/feuille_avec_qui.dart';
 import 'package:app/ecrans/feuille_ou_et_quand.dart';
-import 'package:app/ecrans/feuille_photos_moment.dart';
 import 'package:app/services/services.dart';
-import 'package:app/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,45 +40,65 @@ void main() {
   const chezZoe = LieuRestaurant(nom: 'Chez Zoé', ville: 'Liège');
 
   group('Où et quand', () {
+    const emma = ProfilPublic(
+      id: 'emma',
+      pseudo: 'emma',
+      statut: StatutAbonnement.abonne,
+    );
+    const martin = ProfilPublic(
+      id: 'martin',
+      pseudo: 'martin',
+      statut: StatutAbonnement.abonne,
+    );
+
     Future<void> ouvrir(
       WidgetTester tester, {
       required LieuRestaurant? lieu,
-      bool confirme = false,
       String? moment = 'midi',
       List<List<LieuRestaurant>> proches = const [],
+      List<ProfilPublic> suivis = const [],
+      RechercheLieuService? recherche,
       void Function(ResultatOuEtQuand?)? surResultat,
     }) async {
       await _poser(tester, (context) {
         ouvrirFeuilleOuEtQuand(
           context,
           lieu: lieu,
-          lieuConfirme: confirme,
           moment: moment,
           endroits: const [(latitude: 50.6, longitude: 5.5)],
           prochesParEndroit: proches,
           repere: RepereDistance.photo,
-          rechercheLieuService: null,
+          rechercheLieuService: recherche,
           positionService: null,
+          personnesSuivies: Future.value(suivis),
         ).then((r) => surResultat?.call(r));
         return const SizedBox();
       });
       await _ouvrir(tester);
     }
 
-    testWidgets('« Oui » confirme le lieu proposé', (tester) async {
-      ResultatOuEtQuand? resultat;
-      await ouvrir(tester, lieu: comptoir, surResultat: (r) => resultat = r);
+    void coche(WidgetTester tester, String titre, bool attendu) => expect(
+      tester.getSemantics(find.bySemanticsLabel(titre)),
+      isSemantics(isChecked: attendu),
+    );
 
-      expect(find.text('Étiez-vous chez Le Comptoir ?'), findsOneWidget);
-      await tester.tap(find.text('Oui'));
+    Future<void> toucher(WidgetTester tester, String texte) async {
+      await tester.tap(find.text(texte));
       await tester.pumpAndSettle();
+    }
 
-      expect(resultat!.lieu, comptoir);
-      expect(resultat!.lieuConfirme, isTrue);
-      expect(resultat!.moment, 'midi');
-    });
+    Future<void> versLaMaison(WidgetTester tester) async {
+      await tester.tap(find.bySemanticsLabel('Pas au restaurant'));
+      await tester.pumpAndSettle();
+    }
 
-    testWidgets('« Non » efface la proposition et laisse choisir', (
+    Future<void> chercher(WidgetTester tester, String texte) async {
+      await tester.enterText(find.byType(TextField).first, texte);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('le restaurant proposé est déjà coché : « OK » le garde', (
       tester,
     ) async {
       ResultatOuEtQuand? resultat;
@@ -91,57 +106,365 @@ void main() {
         tester,
         lieu: comptoir,
         proches: [
-          [chezZoe],
+          [comptoir, chezZoe],
         ],
         surResultat: (r) => resultat = r,
       );
 
-      await tester.tap(find.text('Non'));
-      await tester.pumpAndSettle();
-      expect(find.text('Étiez-vous chez Le Comptoir ?'), findsNothing);
+      // Pas de question à répondre.
+      expect(find.textContaining('Étiez-vous'), findsNothing);
+      coche(tester, 'Le Comptoir', true);
+      coche(tester, 'Chez Zoé', false);
 
-      await tester.tap(find.text('Chez Zoé'));
-      await tester.pumpAndSettle();
-      expect(resultat!.lieu, chezZoe);
-      expect(resultat!.lieuConfirme, isTrue);
+      await toucher(tester, 'OK');
+      expect(resultat!.lieu, comptoir);
+      expect(resultat!.moment, 'midi');
     });
 
-    testWidgets('Midi / Soir se choisit puis se valide', (tester) async {
+    testWidgets('toucher une autre ligne la coche, sans fermer', (
+      tester,
+    ) async {
       ResultatOuEtQuand? resultat;
       await ouvrir(
         tester,
         lieu: comptoir,
-        confirme: true,
+        proches: [
+          [comptoir, chezZoe],
+        ],
         surResultat: (r) => resultat = r,
       );
 
-      await tester.tap(find.text('Soir'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Valider'));
-      await tester.pumpAndSettle();
+      await toucher(tester, 'Chez Zoé');
+      expect(resultat, isNull);
+      coche(tester, 'Chez Zoé', true);
+      // La liste se replie sur le choix…
+      expect(find.text('Le Comptoir'), findsNothing);
+      expect(find.text('VOTRE CHOIX'), findsOneWidget);
 
-      expect(resultat!.moment, 'soir');
-      expect(resultat!.lieu, comptoir);
-      expect(resultat!.lieuConfirme, isTrue);
+      // … et se rouvre à la demande, le choix toujours coché.
+      await toucher(tester, 'Voir les autres restaurants');
+      coche(tester, 'Chez Zoé', true);
+      coche(tester, 'Le Comptoir', false);
+
+      await toucher(tester, 'OK');
+      expect(resultat!.lieu, chezZoe);
     });
 
-    testWidgets('un moment publié n\'offre pas « Quand »', (tester) async {
-      await ouvrir(tester, lieu: comptoir, confirme: true, moment: null);
+    testWidgets('retoucher le choix replié rouvre la liste', (tester) async {
+      await ouvrir(
+        tester,
+        lieu: comptoir,
+        proches: [
+          [comptoir, chezZoe],
+        ],
+      );
 
-      expect(find.text('QUAND'), findsNothing);
-      expect(find.text('Midi'), findsNothing);
+      await toucher(tester, 'Le Comptoir');
+      expect(find.text('Chez Zoé'), findsNothing);
+      await toucher(tester, 'Le Comptoir');
+      expect(find.text('Chez Zoé'), findsOneWidget);
     });
 
-    testWidgets('« Créer un lieu personnel » ouvre la saisie du nom', (
+    testWidgets('beaucoup de restaurants : la liste défile, le repas reste', (
       tester,
     ) async {
-      await ouvrir(tester, lieu: null);
+      await ouvrir(
+        tester,
+        lieu: null,
+        proches: [
+          [
+            for (var i = 0; i < 20; i++)
+              LieuRestaurant(
+                nom: 'Resto $i',
+                ville: 'Liège',
+                restaurantId: 'r$i',
+              ),
+          ],
+        ],
+      );
 
-      await tester.tap(find.text('Créer un lieu personnel'));
+      final ecran = tester.view.physicalSize / tester.view.devicePixelRatio;
+      // Le dernier est plus bas, à atteindre en faisant défiler…
+      expect(find.text('Resto 19', skipOffstage: false), findsOneWidget);
+      // … pendant que le moment du repas et « OK » restent à l'écran.
+      for (final texte in ['Dîner', 'OK']) {
+        expect(
+          tester.getRect(find.text(texte)).bottom,
+          lessThanOrEqualTo(ecran.height),
+          reason: texte,
+        );
+      }
+      final avant = tester.getRect(find.text('Dîner'));
+      await tester.drag(find.text('Resto 3'), const Offset(0, -400));
       await tester.pumpAndSettle();
+      expect(tester.getRect(find.text('Dîner')), avant);
+    });
 
-      expect(find.text('Chez Zoé'), findsNothing);
-      expect(find.byType(TextField), findsWidgets);
+    testWidgets('Déjeuner / Dîner / Petit-déjeuner se choisissent', (
+      tester,
+    ) async {
+      ResultatOuEtQuand? resultat;
+      await ouvrir(tester, lieu: comptoir, surResultat: (r) => resultat = r);
+
+      await toucher(tester, 'Dîner');
+      await toucher(tester, 'Petit-déjeuner');
+      await toucher(tester, 'OK');
+
+      expect(resultat!.moment, 'matin');
+      expect(resultat!.lieu, comptoir);
+    });
+
+    testWidgets('un moment publié n\'offre pas le moment du repas', (
+      tester,
+    ) async {
+      await ouvrir(tester, lieu: comptoir, moment: null);
+
+      expect(find.text('MOMENT DU REPAS'), findsNothing);
+      expect(find.text('Déjeuner'), findsNothing);
+    });
+
+    testWidgets('la recherche cherche dans la feuille, au fil de la frappe', (
+      tester,
+    ) async {
+      ResultatOuEtQuand? resultat;
+      await ouvrir(
+        tester,
+        lieu: comptoir,
+        recherche: _FausseRecherche([chezZoe]),
+        surResultat: (r) => resultat = r,
+      );
+
+      await chercher(tester, 'zoé');
+
+      // Pas d'autre feuille : on reste dans « Où et quand ».
+      expect(find.text('Quel restaurant ?'), findsNothing);
+      expect(find.text('Où et quand'), findsOneWidget);
+      await toucher(tester, 'Chez Zoé');
+      coche(tester, 'Chez Zoé', true);
+      await toucher(tester, 'OK');
+      expect(resultat!.lieu, chezZoe);
+    });
+
+    testWidgets('« Pas dans Tabl ? » : écrit sur place, sans position', (
+      tester,
+    ) async {
+      ResultatOuEtQuand? resultat;
+      await ouvrir(
+        tester,
+        lieu: null,
+        recherche: _FausseRecherche(const []),
+        surResultat: (r) => resultat = r,
+      );
+
+      await chercher(tester, 'Le Truck');
+      expect(find.text('Aucun restaurant trouvé.'), findsOneWidget);
+      await toucher(tester, 'Pas dans Tabl ?');
+
+      // Le nom cherché est déjà écrit ; l'épingle reste à placer soi-même.
+      expect(find.text('Quel restaurant ?'), findsNothing);
+      expect(find.text('Placer sur la carte'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Ville'), 'Gand');
+      await toucher(tester, 'Ajouter');
+      await toucher(tester, 'OK');
+
+      final lieu = resultat!.lieu!;
+      expect(lieu.nom, 'Le Truck');
+      expect(lieu.ville, 'Gand');
+      expect(lieu.estManuel, isTrue);
+      expect(lieu.latitude, isNull);
+      expect(lieu.longitude, isNull);
+    });
+
+    testWidgets('« Pas dans Tabl ? » sans ville : un mot la demande', (
+      tester,
+    ) async {
+      ResultatOuEtQuand? resultat;
+      await ouvrir(tester, lieu: null, surResultat: (r) => resultat = r);
+
+      await toucher(tester, 'Pas dans Tabl ?');
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Nom du restaurant'),
+        'Le Truck',
+      );
+      await toucher(tester, 'OK');
+
+      expect(find.text('Entrez la ville.'), findsOneWidget);
+      expect(resultat, isNull);
+    });
+
+    group('la maison', () {
+      testWidgets('bascule la feuille hors des restaurants, et revient', (
+        tester,
+      ) async {
+        await ouvrir(
+          tester,
+          lieu: comptoir,
+          proches: [
+            [comptoir],
+          ],
+        );
+        expect(find.text('CHEZ PERSONNE'), findsNothing);
+
+        await versLaMaison(tester);
+        expect(find.text('CHEZ PERSONNE'), findsOneWidget);
+        expect(find.text('Chez moi'), findsOneWidget);
+        expect(find.text('Le Comptoir'), findsNothing);
+
+        await versLaMaison(tester);
+        expect(find.text('Le Comptoir'), findsOneWidget);
+      });
+
+      testWidgets('« Chez moi » : aucune adresse ni position', (tester) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(tester, lieu: comptoir, surResultat: (r) => resultat = r);
+
+        await versLaMaison(tester);
+        await toucher(tester, 'Chez moi');
+        await toucher(tester, 'OK');
+
+        final lieu = resultat!.lieu!;
+        expect(lieu.genre, GenreLieu.domicile);
+        expect(lieu.latitude, isNull);
+        expect(lieu.longitude, isNull);
+        expect(lieu.adresse, isNull);
+        expect(lieu.libelle, 'Chez vous');
+      });
+
+      testWidgets('un lieu personnel ouvre la feuille côté maison, coché', (
+        tester,
+      ) async {
+        await ouvrir(tester, lieu: const LieuRestaurant.domicile());
+
+        expect(find.text('CHEZ PERSONNE'), findsOneWidget);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('Chez moi')),
+          isSemantics(isSelected: true),
+        );
+      });
+
+      testWidgets('chez une personne suivie : liée par son profil', (
+        tester,
+      ) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(
+          tester,
+          lieu: null,
+          suivis: [martin, emma],
+          surResultat: (r) => resultat = r,
+        );
+
+        await versLaMaison(tester);
+        await tester.tap(find.bySemanticsLabel('Chez emma'));
+        await tester.pumpAndSettle();
+        await toucher(tester, 'OK');
+
+        final lieu = resultat!.lieu!;
+        expect(lieu.genre, GenreLieu.chez);
+        expect(lieu.hoteId, 'emma');
+        expect(lieu.libelle, 'Chez emma');
+        expect(lieu.latitude, isNull);
+      });
+
+      testWidgets('la recherche trouve une personne', (tester) async {
+        await ouvrir(tester, lieu: null, suivis: [martin, emma]);
+
+        await versLaMaison(tester);
+        await tester.enterText(find.byType(TextField), 'em');
+        await tester.pumpAndSettle();
+
+        expect(find.bySemanticsLabel('Chez emma'), findsOneWidget);
+        expect(find.bySemanticsLabel('Chez martin'), findsNothing);
+        expect(find.text('Chez moi'), findsNothing);
+      });
+
+      testWidgets('beaucoup de personnes : tout reste visible', (tester) async {
+        await ouvrir(
+          tester,
+          lieu: null,
+          suivis: [
+            for (var i = 0; i < 40; i++)
+              ProfilPublic(
+                id: 'p$i',
+                pseudo: 'personne$i',
+                statut: StatutAbonnement.abonne,
+              ),
+          ],
+        );
+        await versLaMaison(tester);
+
+        // La rangée défile de côté : « Chez personne », le moment du repas
+        // et « OK » restent à l'écran sans faire défiler la feuille.
+        final ecran = tester.view.physicalSize / tester.view.devicePixelRatio;
+        for (final texte in ['Pique-nique', 'Autre', 'Dîner', 'OK']) {
+          expect(
+            tester.getRect(find.text(texte)).bottom,
+            lessThanOrEqualTo(ecran.height),
+            reason: texte,
+          );
+        }
+        expect(find.text('Chez moi'), findsOneWidget);
+      });
+
+      testWidgets('« Chez… » : quelqu\'un hors Tabl, juste un nom', (
+        tester,
+      ) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(tester, lieu: null, surResultat: (r) => resultat = r);
+
+        await versLaMaison(tester);
+        await toucher(tester, 'Chez…');
+        await tester.enterText(find.byType(TextField).last, 'Mamie');
+        // « OK » de la feuille : le nom écrit n'est pas perdu.
+        await toucher(tester, 'OK');
+
+        final lieu = resultat!.lieu!;
+        expect(lieu.nom, 'Chez Mamie');
+        expect(lieu.genre, GenreLieu.chez);
+        expect(lieu.hoteId, isNull);
+      });
+
+      testWidgets('« Chez… » sans nom : un mot le demande', (tester) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(tester, lieu: null, surResultat: (r) => resultat = r);
+
+        await versLaMaison(tester);
+        await toucher(tester, 'Chez…');
+        await tester.enterText(find.byType(TextField).last, 'chez ');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Donnez-lui un nom.'), findsOneWidget);
+        expect(resultat, isNull);
+      });
+
+      testWidgets('« Chez personne » : pique-nique, ou un autre mot', (
+        tester,
+      ) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(tester, lieu: null, surResultat: (r) => resultat = r);
+
+        await versLaMaison(tester);
+        await toucher(tester, 'Pique-nique');
+        await toucher(tester, 'OK');
+
+        expect(resultat!.lieu!.genre, GenreLieu.ailleurs);
+        expect(resultat!.lieu!.nom, 'Pique-nique');
+      });
+
+      testWidgets('« Autre » : un lieu sans hôte ni adresse', (tester) async {
+        ResultatOuEtQuand? resultat;
+        await ouvrir(tester, lieu: null, surResultat: (r) => resultat = r);
+
+        await versLaMaison(tester);
+        await toucher(tester, 'Autre');
+        await tester.enterText(find.byType(TextField).last, 'Au bord du lac');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        await toucher(tester, 'OK');
+
+        expect(resultat!.lieu!.genre, GenreLieu.ailleurs);
+        expect(resultat!.lieu!.nom, 'Au bord du lac');
+      });
     });
 
     testWidgets('fermée sans rien choisir : null', (tester) async {
@@ -200,7 +523,10 @@ void main() {
       await tester.tap(find.text('Clément'));
       await tester.pump();
       expect(recus.last, {'p1', 'p2'});
-      expect(find.text('Valider · 2'), findsOneWidget);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Clément')),
+        isSemantics(isChecked: true),
+      );
 
       await tester.tap(find.text('Zoé'));
       await tester.pump();
@@ -263,184 +589,34 @@ void main() {
       expect(find.textContaining('suivez des gens'), findsOneWidget);
     });
   });
+}
 
-  group('Photos du moment', () {
-    late Directory racine;
-    late BrouillonsLocaux brouillons;
-    late Brouillon brouillon;
+class _FausseRecherche implements RechercheLieuService {
+  _FausseRecherche(this.lieux);
 
-    Future<void> creer(WidgetTester tester, int nombre) async {
-      await tester.runAsync(() async {
-        racine = Directory.systemTemp.createTempSync('feuille_photos_test');
-        var n = 0;
-        brouillons = BrouillonsLocaux(racine, genererId: () => 'id${++n}');
-        for (var i = 0; i < nombre; i++) {
-          brouillon = await brouillons.ajouterPhoto(
-            octets: Uint8List.fromList([i, i + 1]),
-            priseLe: DateTime(2026, 11, 8, 12, 30),
-          );
-        }
-      });
-      addTearDown(() => racine.deleteSync(recursive: true));
-    }
+  final List<LieuRestaurant> lieux;
 
-    Future<bool?> ouvrir(WidgetTester tester, {bool reprise = true}) async {
-      bool? reprendre;
-      await _poser(tester, (context) {
-        ouvrirFeuillePhotos(
-          context,
-          brouillons: brouillons,
-          brouillon: brouillon,
-          peutReprendre: reprise,
-        ).then((r) => reprendre = r);
-        return const SizedBox();
-      });
-      await _ouvrir(tester);
-      return reprendre;
-    }
+  @override
+  Future<List<LieuRestaurant>> rechercher(
+    String texte, {
+    double? latitude,
+    double? longitude,
+  }) async => [
+    for (final l in lieux)
+      if (normaliserPourRecherche(
+        l.nom,
+      ).contains(normaliserPourRecherche(texte)))
+        l,
+  ];
 
-    /// Touche [cible], puis laisse la vraie entrée-sortie (fichiers du
-    /// brouillon) se terminer jusqu'à ce que [jusqua] soit à l'écran : sa
-    /// durée dépend de la charge de la machine.
-    Future<void> geste(
-      WidgetTester tester,
-      Finder cible, {
-      required Finder jusqua,
-    }) async {
-      await tester.tap(cible);
-      for (var i = 0; i < 400 && jusqua.evaluate().isEmpty; i++) {
-        await tester.runAsync(
-          () => Future<void>.delayed(const Duration(milliseconds: 25)),
-        );
-        await tester.pump();
-      }
-      expect(jusqua, findsOneWidget, reason: 'jamais affiché après le geste');
-    }
+  @override
+  Future<List<LieuRestaurant>> lieuxProches({
+    required double latitude,
+    required double longitude,
+    double rayonM = 250,
+    int limite = 8,
+  }) async => const [];
 
-    testWidgets('la première photo est la couverture', (tester) async {
-      await creer(tester, 3);
-      await ouvrir(tester);
-
-      expect(find.text('Couverture'), findsOneWidget);
-      expect(find.text('Photo 2'), findsOneWidget);
-      expect(find.text('Photo 3'), findsOneWidget);
-      expect(find.text('3 / 10 à publier'), findsOneWidget);
-    });
-
-    testWidgets('retirer de la publication garde la photo et l\'écrit', (
-      tester,
-    ) async {
-      await creer(tester, 3);
-      await ouvrir(tester);
-
-      await geste(
-        tester,
-        find.byTooltip('Retirer de la publication').at(1),
-        jusqua: find.text('2 / 10 à publier'),
-      );
-
-      expect(find.text('Pas dans la publication'), findsOneWidget);
-      final relu = await tester.runAsync(
-        () => brouillons.charger(brouillon.id),
-      );
-      expect(relu!.photos, hasLength(3));
-      expect(relu.horsPublicationIds, {brouillon.photos[1].id});
-
-      await geste(
-        tester,
-        find.byTooltip('Remettre dans la publication'),
-        jusqua: find.text('3 / 10 à publier'),
-      );
-    });
-
-    testWidgets('supprimer propose d\'annuler', (tester) async {
-      await creer(tester, 3);
-      await ouvrir(tester);
-
-      await geste(
-        tester,
-        find.byTooltip('Supprimer la photo').first,
-        jusqua: find.text('Photo supprimée · récupérable 30 jours'),
-      );
-      expect(find.text('2 / 10 à publier'), findsOneWidget);
-
-      await geste(
-        tester,
-        find.text('Annuler'),
-        jusqua: find.text('3 / 10 à publier'),
-      );
-      expect(find.text('Photo supprimée · récupérable 30 jours'), findsNothing);
-      await tester.pump(const Duration(seconds: 7));
-    });
-
-    testWidgets('plus de dix photos : il faut en retirer pour valider', (
-      tester,
-    ) async {
-      await creer(tester, 12);
-      await ouvrir(tester);
-      await tester.pump();
-
-      expect(
-        find.text(
-          'Un moment garde 10 photos au plus : retirez-en 2 de la publication.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<TablBouton>(find.widgetWithText(TablBouton, 'Valider'))
-            .onPresse,
-        isNull,
-      );
-
-      await geste(
-        tester,
-        find.byTooltip('Retirer de la publication').first,
-        jusqua: find.text('11 / 10 à publier'),
-      );
-      await geste(
-        tester,
-        find.byTooltip('Retirer de la publication').first,
-        jusqua: find.text('10 / 10 à publier'),
-      );
-
-      expect(
-        tester
-            .widget<TablBouton>(find.widgetWithText(TablBouton, 'Valider'))
-            .onPresse,
-        isNotNull,
-      );
-    });
-
-    testWidgets('« Reprendre des photos » ferme la feuille avec true', (
-      tester,
-    ) async {
-      await creer(tester, 2);
-      bool? reprendre;
-      await _poser(tester, (context) {
-        ouvrirFeuillePhotos(
-          context,
-          brouillons: brouillons,
-          brouillon: brouillon,
-          peutReprendre: true,
-        ).then((r) => reprendre = r);
-        return const SizedBox();
-      });
-      await _ouvrir(tester);
-
-      await tester.tap(find.text('Reprendre des photos'));
-      await tester.pumpAndSettle();
-
-      expect(reprendre, isTrue);
-    });
-
-    testWidgets('sans reprise possible, le bouton n\'est pas proposé', (
-      tester,
-    ) async {
-      await creer(tester, 2);
-      await ouvrir(tester, reprise: false);
-
-      expect(find.text('Reprendre des photos'), findsNothing);
-    });
-  });
+  @override
+  Future<List<LieuRestaurant>> mesLieuxPersonnels() async => const [];
 }

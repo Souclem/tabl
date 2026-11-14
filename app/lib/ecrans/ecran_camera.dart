@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,23 +9,23 @@ import 'package:app/widgets/widgets.dart';
 import 'creation_moment.dart';
 
 /// La caméra de la création d'un moment : plein écran, toujours sombre
-/// (quelle que soit l'apparence de l'app). Chaque photo est gardée sur le
-/// téléphone dans un brouillon dès qu'elle est prise ; fermer l'écran ne
-/// perd rien.
+/// (quelle que soit l'apparence de l'app). Elle travaille sur un seul
+/// brouillon — [brouillon], choisi dans « Brouillons », ou un nouveau —
+/// et chaque photo prise ou importée s'y ajoute à la suite, dès qu'elle est
+/// prise ; fermer l'écran ne perd rien.
 ///
-/// Toucher la pile déploie l'éventail des photos : agrandir une photo, la
-/// retirer (×, ou en la glissant vers la corbeille). Une photo retirée reste
-/// 30 jours dans la corbeille du téléphone ; « Annuler » la remet aussitôt.
-///
-/// Une photo prise moins de 3 h après la précédente rejoint le brouillon
-/// actif ; au-delà, c'est un nouveau repas. Revenir après 10 min ou plus sur
-/// un brouillon propose de le reprendre.
+/// Toucher la pile déploie l'éventail des photos, dans l'ordre de
+/// publication : agrandir une photo, la retirer (×, ou en la glissant vers
+/// la corbeille), ou la déplacer (appui long, puis la glisser à sa nouvelle
+/// place). Une photo retirée reste 30 jours dans la corbeille du téléphone ;
+/// « Annuler » la remet aussitôt.
 class EcranCamera extends StatefulWidget {
   const EcranCamera({
     super.key,
     required this.camera,
     required this.brouillons,
     required this.surContinuer,
+    this.brouillon,
     this.positionService,
     this.choisirPhotos = photosDuTelephone,
     this.maintenant,
@@ -34,7 +35,11 @@ class EcranCamera extends StatefulWidget {
   final CameraService camera;
   final BrouillonsLocaux brouillons;
 
-  /// « Continuer » ou « Finaliser » : le brouillon est prêt à être complété.
+  /// Le brouillon repris ; `null` : un nouveau moment, créé à la première
+  /// photo.
+  final Brouillon? brouillon;
+
+  /// « Continuer » : le brouillon est prêt à être complété.
   final void Function(Brouillon brouillon) surContinuer;
 
   /// Pour dater et situer les photos prises ; sans lui, elles n'ont pas de
@@ -71,6 +76,7 @@ class _EcranCameraState extends State<EcranCamera>
     with SingleTickerProviderStateMixin {
   late final SessionCamera _session = SessionCamera(
     widget.brouillons,
+    actif: widget.brouillon,
     positionService: widget.positionService,
     maintenant: widget.maintenant,
   );
@@ -83,8 +89,6 @@ class _EcranCameraState extends State<EcranCamera>
   final _enAttente = <_PhotoEnAttente>[];
   Timer? _delaiCompteur;
   var _compteurVisible = false;
-  var _reprise = false;
-  var _bandeauMasque = false;
   var _importEnCours = false;
   var _eventailOuvert = false;
   var _indiceEventailVu = false;
@@ -95,7 +99,7 @@ class _EcranCameraState extends State<EcranCamera>
   void initState() {
     super.initState();
     unawaited(widget.camera.demarrer());
-    unawaited(_ouvrir());
+    unawaited(_session.actualiserPosition());
   }
 
   @override
@@ -106,12 +110,6 @@ class _EcranCameraState extends State<EcranCamera>
     super.dispose();
   }
 
-  Future<void> _ouvrir() async {
-    final ouverture = await _session.ouvrir();
-    if (!mounted) return;
-    setState(() => _reprise = ouverture.reprise);
-  }
-
   Future<void> _declencher() async {
     HapticFeedback.lightImpact();
     _eclair.forward(from: 0);
@@ -119,11 +117,7 @@ class _EcranCameraState extends State<EcranCamera>
     if (photo == null || !mounted) return;
     final attente = _PhotoEnAttente(photo.octets);
     if (MediaQuery.disableAnimationsOf(context)) attente.enVol = false;
-    setState(() {
-      _enAttente.add(attente);
-      _reprise = false;
-      _bandeauMasque = true;
-    });
+    setState(() => _enAttente.add(attente));
     if (!attente.enVol) _afficherCompteur();
     try {
       final brouillon = await _session.ajouter(
@@ -172,10 +166,6 @@ class _EcranCameraState extends State<EcranCamera>
       final photos = await lirePhotos(octets);
       await _session.ajouterImportees(photos);
       if (!mounted) return;
-      setState(() {
-        _reprise = false;
-        _bandeauMasque = true;
-      });
       _afficherCompteur();
     } catch (_) {
       if (mounted) _message("Les photos n'ont pas pu être importées.");
@@ -221,13 +211,32 @@ class _EcranCameraState extends State<EcranCamera>
     });
     final id = retiree.photo.id;
     _message(
-      'Photo supprimée · récupérable 30 jours',
+      'Photo supprimée',
       action: SnackBarAction(
         label: 'Annuler',
         textColor: TablCouleurs.sombre.primaire,
         onPressed: () => _restaurerPhoto(id),
       ),
     );
+  }
+
+  /// L'éventail rend l'ordre de [visibles] (les dernières photos) : les
+  /// autres gardent leur place, devant.
+  Future<void> _reordonner(List<String> visibles) async {
+    final photos = _session.actif?.photos ?? const <PhotoBrouillon>[];
+    final avant = [
+      for (final p in photos)
+        if (!visibles.contains(p.id)) p.id,
+    ];
+    Brouillon? range;
+    try {
+      range = await _session.reordonner([...avant, ...visibles]);
+    } catch (_) {
+      range = null;
+    }
+    if (!mounted) return;
+    setState(() {});
+    if (range == null) _message("Les photos n'ont pas pu être déplacées.");
   }
 
   Future<void> _restaurerPhoto(String photoId) async {
@@ -253,7 +262,15 @@ class _EcranCameraState extends State<EcranCamera>
     if (mounted) _message('Flash ${_libelleFlash(suivant)}');
   }
 
-  Future<void> _continuer() async {
+  /// « Continuer » refusé : le bouton tremble.
+  var _refusContinuer = 0;
+
+  Future<void> _continuer(int total) async {
+    if (!peutContinuerCamera(total)) {
+      setState(() => _refusContinuer++);
+      _message(libelleTropDePhotos(total));
+      return;
+    }
     final brouillon = await _session.terminer();
     if (brouillon == null || !mounted) return;
     widget.surContinuer(brouillon);
@@ -266,36 +283,6 @@ class _EcranCameraState extends State<EcranCamera>
       afficherMessage(context, 'Brouillon gardé · retrouvez-le avec « + »');
     }
     Navigator.of(context).maybePop();
-  }
-
-  void _autreRepas() {
-    setState(() {
-      _session.autreRepas();
-      _bandeauMasque = true;
-    });
-    HapticFeedback.selectionClick();
-    _message('Les prochaines photos commencent un nouveau repas');
-  }
-
-  void _rejoindreRepas() {
-    final repas = _session.aRejoindre;
-    setState(() {
-      _session.rejoindre();
-      _bandeauMasque = true;
-    });
-    if (repas != null) {
-      _message(
-        'Les photos rejoignent votre repas de ${heureLisible(repas.priseLe)}',
-      );
-    }
-  }
-
-  void _nouveauMoment() {
-    setState(() {
-      _session.autreRepas();
-      _reprise = false;
-    });
-    _message("Nouveau moment · l'autre reste dans vos brouillons");
   }
 
   void _message(String texte, {SnackBarAction? action}) {
@@ -439,25 +426,6 @@ class _EcranCameraState extends State<EcranCamera>
                     ),
                   ),
                   Positioned(
-                    left: 14,
-                    right: 14,
-                    top: marges.top + 56,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      transitionBuilder: (enfant, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween(
-                            begin: const Offset(0, -0.15),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: enfant,
-                        ),
-                      ),
-                      child: _haut(actif),
-                    ),
-                  ),
-                  Positioned(
                     left: 16,
                     bottom: centreBas + 52,
                     child: CompteurPhotosCamera(
@@ -514,7 +482,9 @@ class _EcranCameraState extends State<EcranCamera>
                                 ? const SizedBox.shrink()
                                 : BoutonContinuerCamera(
                                     libelle: libelleContinuer(total),
-                                    onPresse: _continuer,
+                                    grise: !peutContinuerCamera(total),
+                                    refus: _refusContinuer,
+                                    onPresse: () => _continuer(total),
                                   ),
                           ),
                         ),
@@ -533,9 +503,12 @@ class _EcranCameraState extends State<EcranCamera>
                   if (_eventailOuvert && photosEventail.isNotEmpty)
                     Positioned.fill(
                       child: EventailPhotosCamera(
-                        vignettes: [
-                          ...photosEventail.reversed.take(nombreMaxEventail),
-                        ],
+                        vignettes: photosEventail.sublist(
+                          math.max(
+                            0,
+                            photosEventail.length - nombreMaxEventail,
+                          ),
+                        ),
                         ancre: Offset(56, taille.height - centreBas),
                         bas: centreBas,
                         libelleImporter: 'Importer',
@@ -543,13 +516,14 @@ class _EcranCameraState extends State<EcranCamera>
                         libelleCorbeille: 'Supprimer',
                         indice: _indiceEventailVu
                             ? null
-                            : 'Touchez × ou glissez une photo vers la corbeille',
+                            : 'Glissez pour déplacer · × pour supprimer',
                         onOuvrir: (id) => setState(
                           () => _visionneuse = photosEventail.indexWhere(
                             (v) => v.id == id,
                           ),
                         ),
                         onSupprimer: _retirerPhoto,
+                        onReordonner: _reordonner,
                         onImporter: _importerDepuisEventail,
                         onFermer: _fermerEventail,
                       ),
@@ -599,54 +573,6 @@ class _EcranCameraState extends State<EcranCamera>
       ),
     );
   }
-
-  /// Sous la barre du haut : la carte de reprise, ou le bandeau « Suite du
-  /// repas » — jamais les deux.
-  Widget _haut(Brouillon? actif) {
-    if (actif != null && actif.photos.isNotEmpty && _reprise) {
-      return CarteRepriseBrouillon(
-        key: const ValueKey('reprise'),
-        image: FileImage(
-          widget.brouillons.fichierPhoto(actif.id, actif.photos.last.id),
-        ),
-        titre: titreReprise(actif),
-        detail: detailReprise(actif),
-        invitation: 'Photographiez pour le compléter.',
-        libelleFinaliser: 'Finaliser',
-        libelleNouveau: 'Nouveau moment',
-        libelleMasquer: 'Masquer',
-        onFinaliser: () => widget.surContinuer(actif),
-        onNouveau: _nouveauMoment,
-        onMasquer: () => setState(() => _reprise = false),
-      );
-    }
-    if (!_bandeauMasque) {
-      if (actif != null && actif.photos.isNotEmpty) {
-        return Align(
-          key: const ValueKey('suite'),
-          alignment: Alignment.topCenter,
-          child: BandeauSuiteRepas(
-            titre: libelleSuiteDuRepas(actif),
-            libelleAction: 'Autre repas',
-            onAction: _autreRepas,
-          ),
-        );
-      }
-      final ancien = _session.aRejoindre;
-      if (actif == null && ancien != null) {
-        return Align(
-          key: const ValueKey('ancien'),
-          alignment: Alignment.topCenter,
-          child: BandeauSuiteRepas(
-            titre: 'Nouveau repas',
-            libelleAction: libelleRepasARejoindre(ancien),
-            onAction: _rejoindreRepas,
-          ),
-        );
-      }
-    }
-    return const SizedBox.shrink(key: ValueKey('rien'));
-  }
 }
 
 const _textesVisionneuse = TextesVisionneusePhotos(
@@ -656,8 +582,7 @@ const _textesVisionneuse = TextesVisionneusePhotos(
   ok: 'OK',
   titreConfirmation: 'Supprimer cette photo ?',
   detailConfirmation:
-      'Elle disparaît de ce moment. Vous pourrez la récupérer pendant '
-      '30 jours.',
+      'Elle disparaît de ce moment. « Annuler » la remet juste après.',
   confirmer: 'Supprimer la photo',
   annuler: 'Annuler',
 );

@@ -109,7 +109,14 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
   /// réaction ont pu changer).
   Future<void> ouvrirRestaurant(SouvenirFeed souvenir) async {
     // Un lieu personnel n'a pas de page : ni adresse, ni avis à lire.
-    if (souvenir.lieuPersonnel) return;
+    // Chez quelqu'un de Tabl, on ouvre son profil.
+    if (souvenir.lieuPersonnel) {
+      final hoteId = souvenir.hoteId;
+      if (hoteId != null && !souvenir.jeSuisLHote) {
+        await ouvrirProfilDe(hoteId, souvenir.hotePseudo ?? '');
+      }
+      return;
+    }
     await ouvrirFeuilleRestaurant(
       context,
       nom: souvenir.restaurantNom,
@@ -191,8 +198,9 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
     );
   }
 
-  /// Le menu « ⋯ » de l'une de mes publications : la modifier (un
-  /// moment), choisir qui la voit, la supprimer.
+  /// Le menu « ⋯ » d'une publication : l'une des miennes (la modifier,
+  /// choisir qui la voit, la supprimer), ou un moment publié chez moi (en
+  /// retirer mon nom).
   void optionsPublication(SouvenirFeed souvenir) {
     showModalBottomSheet<void>(
       context: context,
@@ -208,24 +216,32 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Un souvenir se range par sa date : il a son propre écran,
-              // pas encore modifiable.
-              if (!souvenir.estSouvenir)
+              if (souvenir.jeSuisLHote)
                 ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: const Text('Modifier'),
-                  onTap: () => choisir(modifierPublication),
+                  leading: const Icon(Icons.home_outlined),
+                  title: const Text('Retirer mon nom de ce lieu'),
+                  onTap: () => choisir(retirerMonNom),
                 ),
-              ListTile(
-                leading: const Icon(Icons.visibility_outlined),
-                title: const Text('Qui peut voir'),
-                onTap: () => choisir(modifierAudience),
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_outline_rounded, color: erreur),
-                title: Text('Supprimer', style: TextStyle(color: erreur)),
-                onTap: () => choisir(supprimerPublication),
-              ),
+              if (souvenir.estAMoi) ...[
+                // Un souvenir se range par sa date : il a son propre
+                // écran, pas encore modifiable.
+                if (!souvenir.estSouvenir)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Modifier'),
+                    onTap: () => choisir(modifierPublication),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.visibility_outlined),
+                  title: const Text('Qui peut voir'),
+                  onTap: () => choisir(modifierAudience),
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: erreur),
+                  title: Text('Supprimer', style: TextStyle(color: erreur)),
+                  onTap: () => choisir(supprimerPublication),
+                ),
+              ],
             ],
           ),
         );
@@ -299,6 +315,48 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       if (!mounted) return;
       afficherMessage(context, messageErreurGenerique);
     }
+  }
+
+  /// Un moment publié chez moi : après confirmation, le lieu devient
+  /// « Chez quelqu'un » (pour tous les moments qui y sont).
+  Future<void> retirerMonNom(SouvenirFeed souvenir) async {
+    final restaurantId = souvenir.restaurantId;
+    if (restaurantId == null) return;
+    final c = TablCouleurs.of(context);
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (contexteDialogue) => AlertDialog(
+        backgroundColor: c.surface,
+        title: const Text('Retirer votre nom ?'),
+        content: Text(
+          'Le lieu ne dira plus « Chez ${souvenir.hotePseudo ?? 'vous'} » '
+          'mais « Chez quelqu\'un », sur ce moment et sur ceux publiés au '
+          'même endroit. Aucune adresse n\'est jamais enregistrée.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(contexteDialogue).pop(true),
+            child: const Text('Retirer'),
+          ),
+        ],
+      ),
+    );
+    if (confirme != true || !mounted) return;
+    try {
+      await souvenirService.retirerMonNomDuLieu(restaurantId);
+    } catch (e) {
+      debugPrint('ActionsPublications: retirer mon nom : $e');
+      if (mounted) afficherMessage(context, messageErreurGenerique);
+      return;
+    }
+    if (!mounted) return;
+    _revenirIci();
+    recharger();
+    afficherMessage(context, 'Votre nom est retiré de ce lieu.');
   }
 
   /// Après confirmation : c'est définitif.
@@ -384,6 +442,9 @@ mixin ActionsPublications<T extends StatefulWidget> on State<T> {
       autresPhotosUrls: souvenir.autresPhotosUrls,
       restaurantNom: souvenir.restaurantNom,
       ville: souvenir.ville,
+      lieuPrive: souvenir.lieuPersonnel,
+      hotePseudo: souvenir.hotePseudo,
+      hotePhotoUrl: souvenir.hotePhotoUrl,
       emojiEmotion: souvenir.emotion?.emoji,
       legende: legendeAffichee(souvenir.legende),
       impressions: souvenir.impressions,

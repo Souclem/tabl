@@ -3,10 +3,10 @@ import 'package:app/services/services.dart';
 import 'package:app/widgets/widgets.dart';
 
 /// « Avec qui ? » : qui était à table. Une recherche, ceux avec qui l'on a
-/// été [recentsIds] récemment en tête (leurs têtes, sur une rangée), puis
-/// les [personnes] suivies ou qui suivent, une par ligne. Chaque personne
-/// touchée est cochée ou décochée aussitôt : [onChange] reçoit la sélection
-/// entière à chaque geste, rien d'autre à valider.
+/// été [recentsIds] récemment en tête, puis les [personnes] suivies ou qui
+/// suivent, une par ligne, avec leur photo et une case ronde. Chaque
+/// personne touchée est cochée ou décochée aussitôt : [onChange] reçoit la
+/// sélection entière à chaque geste, « OK » ne fait que fermer.
 Future<void> ouvrirFeuilleAvecQui(
   BuildContext context, {
   required List<ProfilPublic> personnes,
@@ -14,12 +14,11 @@ Future<void> ouvrirFeuilleAvecQui(
   required ValueChanged<Set<String>> onChange,
   List<String> recentsIds = const [],
 }) {
-  final c = TablCouleurs.of(context);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: c.surface,
-    showDragHandle: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: voileFeuilleCreation,
     builder: (_) => _FeuilleAvecQui(
       personnes: personnes,
       selection: Set.of(selection),
@@ -62,161 +61,64 @@ class _FeuilleAvecQuiState extends State<_FeuilleAvecQui> {
     widget.onChange(Set.of(widget.selection));
   }
 
-  Widget _rubrique(TablCouleurs c, String texte) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      TablTokens.espaceL - 4,
-      TablTokens.espaceM,
-      TablTokens.espaceL - 4,
-      TablTokens.espaceXs,
-    ),
-    child: Text(
-      texte.toUpperCase(),
-      style: c.legende.copyWith(
-        fontSize: 11,
-        letterSpacing: 1.6,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
+  Widget _option(ProfilPublic p) => TablOptionCreation(
+    titre: p.pseudo,
+    avatar: TablAvatar(pseudo: p.pseudo, photoUrl: p.photoUrl, rayon: 18),
+    coche: widget.selection.contains(p.id),
+    onPresse: () => _basculer(p.id),
   );
 
   @override
   Widget build(BuildContext context) {
-    final c = TablCouleurs.of(context);
+    const c = TablCouleurs.sombre;
     final personnes = widget.personnes;
     final cherche = _recherche.text.trim().isNotEmpty;
     final trouvees = filtrerPersonnes(personnes, _recherche.text);
     final parId = {for (final p in personnes) p.id: p};
     final recents = [for (final id in widget.recentsIds) ?parId[id]];
+    final legende = TablTokens.policeCreation.copyWith(
+      fontSize: 13,
+      fontWeight: FontWeight.w400,
+      color: c.texte.withValues(alpha: 0.6),
+    );
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: TablTokens.espaceL - 4,
-                ),
-                child: Text(
-                  'Avec qui ?',
-                  style: c.titreAffichage.copyWith(fontSize: 26),
-                ),
+    return TablCadreFeuilleCreation(
+      titre: 'Avec qui',
+      libelleAction: 'OK',
+      onAction: () => Navigator.of(context).pop(),
+      contenu: personnes.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Personne à taguer pour l\'instant : suivez des gens '
+                'pour les retrouver ici.',
+                style: legende,
               ),
-              if (personnes.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(TablTokens.espaceL - 4),
-                  child: Text(
-                    'Personne à taguer pour l\'instant : suivez des gens '
-                    'pour les retrouver ici.',
-                    style: c.legende,
-                  ),
-                )
-              else ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    TablTokens.espaceL - 4,
-                    TablTokens.espaceM,
-                    TablTokens.espaceL - 4,
-                    0,
-                  ),
-                  child: TablChampTexte(
-                    libelle: '',
-                    controleur: _recherche,
-                    indication: 'Chercher une personne',
-                    iconePrefixe: Icons.search_rounded,
-                    onChanged: (_) => setState(() {}),
-                  ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TablRechercheCreation(
+                  controleur: _recherche,
+                  indication: 'Chercher une personne',
+                  onChanged: (_) => setState(() {}),
                 ),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    children: [
-                      if (!cherche && recents.isNotEmpty) ...[
-                        _rubrique(c, 'Récemment à table avec vous'),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: TablTokens.espaceL - 4,
-                          ),
-                          child: TablSelecteurPersonnes(
-                            personnes: [
-                              for (final p in recents)
-                                PersonneSelectionnable(
-                                  id: p.id,
-                                  pseudo: p.pseudo,
-                                  photoUrl: p.photoUrl,
-                                ),
-                            ],
-                            selection: widget.selection,
-                            onBascule: _basculer,
-                          ),
-                        ),
-                      ],
-                      _rubrique(
-                        c,
-                        cherche ? 'Résultats' : 'Vos abonnés et abonnements',
-                      ),
-                      if (trouvees.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: TablTokens.espaceL - 4,
-                            vertical: TablTokens.espaceS,
-                          ),
-                          child: Text(
-                            'Aucune personne trouvée.',
-                            style: c.legende,
-                          ),
-                        ),
-                      for (final p in trouvees)
-                        TablLignePersonne(
-                          pseudo: p.pseudo,
-                          photoUrl: p.photoUrl,
-                          onPresse: () => _basculer(p.id),
-                          actions: [
-                            Icon(
-                              widget.selection.contains(p.id)
-                                  ? Icons.check_circle_rounded
-                                  : Icons.circle_outlined,
-                              color: widget.selection.contains(p.id)
-                                  ? c.primaire
-                                  : c.bordure,
-                              semanticLabel: widget.selection.contains(p.id)
-                                  ? 'Avec vous'
-                                  : 'Pas avec vous',
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+                if (!cherche && recents.isNotEmpty) ...[
+                  const TablRubriqueCreation('Récemment à table avec vous'),
+                  for (final p in recents) _option(p),
+                ],
+                TablRubriqueCreation(
+                  cherche ? 'Résultats' : 'Vos abonnés et abonnements',
                 ),
+                if (trouvees.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Aucune personne trouvée.', style: legende),
+                  ),
+                for (final p in trouvees)
+                  if (cherche || !widget.recentsIds.contains(p.id)) _option(p),
               ],
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  TablTokens.espaceL - 4,
-                  TablTokens.espaceS,
-                  TablTokens.espaceL - 4,
-                  TablTokens.espaceM,
-                ),
-                child: TablBouton(
-                  libelle: widget.selection.isEmpty
-                      ? 'Valider'
-                      : 'Valider · ${widget.selection.length}',
-                  onPresse: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

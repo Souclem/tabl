@@ -1,8 +1,10 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import 'verre_camera.dart';
+
+/// Hauteur des pilules de verre (« Plus tard », l'audience).
+const _hauteurPilule = 40.0;
 
 /// Un bouton en verre qui porte un mot (« Plus tard »), posé sur la photo.
 class TablBoutonTexteVerre extends StatelessWidget {
@@ -17,29 +19,65 @@ class TablBoutonTexteVerre extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const c = TablCouleurs.sombre;
     return Semantics(
       button: true,
       label: libelle,
       excludeSemantics: true,
       child: GestureDetector(
         onTap: onPresse,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              height: 44,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(
-                horizontal: TablTokens.espaceM,
+        child: VerreCamera(
+          arrondi: _hauteurPilule / 2,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: SizedBox(
+            height: _hauteurPilule,
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                libelle,
+                maxLines: 1,
+                style: TablTokens.policeCreation.copyWith(fontSize: 14),
               ),
-              decoration: BoxDecoration(
-                color: c.fond.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-                border: Border.all(color: c.texte.withValues(alpha: 0.14)),
-              ),
-              child: Text(libelle, style: c.corps.copyWith(fontSize: 15)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un bouton rond en verre qui porte une icône (l'appareil photo qui
+/// ramène à la caméra), à la hauteur de « Plus tard ».
+class TablBoutonIconeVerre extends StatelessWidget {
+  const TablBoutonIconeVerre({
+    super.key,
+    required this.icone,
+    required this.libelle,
+    required this.onPresse,
+  });
+
+  final IconData icone;
+
+  /// Lu par les lecteurs d'écran, montré à l'appui long.
+  final String libelle;
+  final VoidCallback onPresse;
+
+  @override
+  Widget build(BuildContext context) {
+    const c = TablCouleurs.sombre;
+    return Tooltip(
+      message: libelle,
+      child: Semantics(
+        button: true,
+        label: libelle,
+        excludeSemantics: true,
+        child: GestureDetector(
+          onTap: onPresse,
+          child: VerreCamera(
+            arrondi: _hauteurPilule / 2,
+            padding: EdgeInsets.zero,
+            child: SizedBox.square(
+              dimension: _hauteurPilule,
+              child: Icon(icone, size: 19, color: c.texte),
             ),
           ),
         ),
@@ -71,21 +109,13 @@ class TablPiluleAudience extends StatelessWidget {
       excludeSemantics: true,
       child: GestureDetector(
         onTap: onPresse,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              height: TablTokens.hauteurControle,
-              constraints: const BoxConstraints(maxWidth: 190),
-              padding: const EdgeInsets.symmetric(
-                horizontal: TablTokens.espaceM,
-              ),
-              decoration: BoxDecoration(
-                color: c.fond.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-                border: Border.all(color: c.texte.withValues(alpha: 0.14)),
-              ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: VerreCamera(
+            arrondi: _hauteurPilule / 2,
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: SizedBox(
+              height: _hauteurPilule,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -93,22 +123,22 @@ class TablPiluleAudience extends StatelessWidget {
                     restreinte
                         ? Icons.lock_outline_rounded
                         : Icons.public_rounded,
-                    size: 18,
+                    size: 17,
                     color: restreinte ? c.primaire : c.texte,
                   ),
-                  const SizedBox(width: TablTokens.espaceS),
+                  const SizedBox(width: 7),
                   Flexible(
                     child: Text(
                       libelle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: c.corps.copyWith(fontSize: 14),
+                      style: TablTokens.policeCreation.copyWith(fontSize: 14),
                     ),
                   ),
-                  const SizedBox(width: TablTokens.espaceXs),
+                  const SizedBox(width: 7),
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    size: 18,
+                    size: 16,
                     color: c.texte,
                   ),
                 ],
@@ -122,12 +152,13 @@ class TablPiluleAudience extends StatelessWidget {
 }
 
 /// Le bouton principal de la finalisation, dont le libellé suit l'étape
-/// (« Choisir les photos », « Où étiez-vous ? », « Publier »).
+/// (« Publier », « Enregistrer ») : une
+/// pilule de 50 px, à sa largeur (128 px au moins).
 ///
 /// [grise] : l'action n'est pas encore permise (l'émotion manque) ; le
 /// bouton reste touchable — l'écran s'en sert pour rappeler ce qui manque —
-/// mais ne ressemble plus à un bouton prêt. [vitre] : une étape qui prépare
-/// la publication plutôt que la publier, en verre plutôt qu'en or.
+/// mais s'efface à moitié. [vitre] : une étape qui prépare la publication
+/// plutôt que la publier, en verre plutôt qu'en or.
 class TablBoutonPrincipalFinalisation extends StatelessWidget {
   const TablBoutonPrincipalFinalisation({
     super.key,
@@ -138,6 +169,8 @@ class TablBoutonPrincipalFinalisation extends StatelessWidget {
     this.enCours = false,
   });
 
+  static const double hauteur = 50;
+
   final String libelle;
   final VoidCallback? onPresse;
   final bool grise;
@@ -147,14 +180,41 @@ class TablBoutonPrincipalFinalisation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const c = TablCouleurs.sombre;
-    final fond = vitre
-        ? c.texte.withValues(alpha: 0.16)
-        : c.primaire.withValues(alpha: grise ? 0.35 : 1);
-    final texte = vitre
-        ? c.texte
-        : (grise
-              ? c.texteSurPrimaire.withValues(alpha: 0.6)
-              : c.texteSurPrimaire);
+    final texte = vitre ? c.texte : c.texteSurPrimaire;
+    final contenu = ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 128),
+      child: SizedBox(
+        height: hauteur,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: Center(
+            widthFactor: 1,
+            child: enCours
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: texte,
+                    ),
+                  )
+                : AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    child: Text(
+                      libelle,
+                      key: ValueKey(libelle),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TablTokens.policeCreation.copyWith(
+                        fontSize: 16,
+                        color: texte,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
     return Semantics(
       button: true,
       enabled: !grise && !enCours,
@@ -162,33 +222,24 @@ class TablBoutonPrincipalFinalisation extends StatelessWidget {
       excludeSemantics: true,
       child: GestureDetector(
         onTap: enCours ? null : onPresse,
-        child: AnimatedContainer(
+        child: AnimatedOpacity(
+          opacity: grise ? 0.4 : 1,
           duration: const Duration(milliseconds: 200),
-          height: TablTokens.hauteurControle,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: fond,
-            borderRadius: BorderRadius.circular(TablTokens.arrondiBouton),
-            border: vitre
-                ? Border.all(color: c.texte.withValues(alpha: 0.24))
-                : null,
-          ),
-          child: enCours
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: texte,
+          child: vitre
+              ? VerreCamera(arrondi: hauteur / 2, child: contenu)
+              : DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.primaire,
+                    borderRadius: BorderRadius.circular(hauteur / 2),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x40000000),
+                        blurRadius: 22,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
                   ),
-                )
-              : AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: Text(
-                    libelle,
-                    key: ValueKey(libelle),
-                    style: TablTokens.libelleBouton.copyWith(color: texte),
-                  ),
+                  child: contenu,
                 ),
         ),
       ),

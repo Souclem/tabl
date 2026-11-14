@@ -25,18 +25,24 @@ void main() {
     final racine = Directory.systemTemp.createTempSync('cam_visuel');
     var maintenant = DateTime.now();
     final brouillons = BrouillonsLocaux(racine, maintenant: () => maintenant);
-    final camera = FausseCamera(octetsPhoto: _png, maintenant: () => maintenant);
+    final camera = FausseCamera(
+      octetsPhoto: _png,
+      maintenant: () => maintenant,
+    );
 
-    Future<void> ouvrir() async {
-      await tester.pumpWidget(MaterialApp(
-        home: EcranCamera(
-          camera: camera,
-          brouillons: brouillons,
-          maintenant: () => maintenant,
-          choisirPhotos: (_) async => const [],
-          surContinuer: (_) {},
+    Future<void> ouvrir({Brouillon? brouillon}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EcranCamera(
+            camera: camera,
+            brouillons: brouillons,
+            brouillon: brouillon,
+            maintenant: () => maintenant,
+            choisirPhotos: (_) async => const [],
+            surContinuer: (_) {},
+          ),
         ),
-      ));
+      );
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump(const Duration(milliseconds: 500));
     }
@@ -44,21 +50,20 @@ void main() {
     await ouvrir();
     await _pause(tester, 'camera_vide');
 
-    await tester.runAsync(() async {
-      await brouillons.ajouterPhoto(octets: _png, priseLe: maintenant);
-      await brouillons.ajouterPhoto(octets: _png, priseLe: maintenant);
+    // Un brouillon repris dans « Brouillons » : ses photos sont là.
+    final repris = await tester.runAsync(() async {
+      final b = await brouillons.ajouterPhoto(
+        octets: _png,
+        priseLe: maintenant,
+      );
+      return brouillons.ajouterPhoto(
+        octets: _png,
+        priseLe: maintenant,
+        brouillonId: b.id,
+      );
     });
-    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpWidget(const SizedBox());
+    await ouvrir(brouillon: repris);
     await _pause(tester, 'camera_deux_photos');
-
-    await tester.pumpWidget(const SizedBox());
-    maintenant = maintenant.add(const Duration(minutes: 15));
-    await ouvrir();
-    await _pause(tester, 'camera_reprise');
-
-    await tester.pumpWidget(const SizedBox());
-    maintenant = maintenant.add(const Duration(hours: 4));
-    await ouvrir();
-    await _pause(tester, 'camera_vieux_brouillon');
   });
 }

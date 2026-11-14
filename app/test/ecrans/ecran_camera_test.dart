@@ -42,6 +42,7 @@ void main() {
 
   Future<void> ouvrir(
     WidgetTester tester, {
+    Brouillon? brouillon,
     ChoisirPhotos? choisirPhotos,
     bool animations = false,
   }) async {
@@ -52,6 +53,7 @@ void main() {
           child: EcranCamera(
             camera: camera,
             brouillons: brouillons,
+            brouillon: brouillon,
             maintenant: () => maintenant,
             choisirPhotos: choisirPhotos ?? (_) async => const [],
             surContinuer: continues.add,
@@ -62,10 +64,17 @@ void main() {
     await attendre(tester);
   }
 
-  Future<void> deposer(WidgetTester tester) async {
-    await tester.runAsync(() async {
-      await brouillons.ajouterPhoto(octets: _png, priseLe: maintenant);
-    });
+  /// Une photo gardée sur le téléphone, dans [dans] ou un nouveau
+  /// brouillon ; rend le brouillon.
+  Future<Brouillon> deposer(WidgetTester tester, {Brouillon? dans}) async {
+    final b = await tester.runAsync(
+      () => brouillons.ajouterPhoto(
+        octets: _png,
+        priseLe: maintenant,
+        brouillonId: dans?.id,
+      ),
+    );
+    return b!;
   }
 
   Future<void> terminer(WidgetTester tester) async {
@@ -83,7 +92,6 @@ void main() {
     expect(find.text('Importer'), findsOneWidget);
     expect(find.textContaining('Continuer'), findsNothing);
     expect(find.text('Sans photo'), findsNothing);
-    expect(find.text('Autre repas'), findsNothing);
     await terminer(tester);
   });
 
@@ -131,78 +139,66 @@ void main() {
     await terminer(tester);
   });
 
-  testWidgets('bandeau « Suite du repas » puis « Autre repas »', (
+  testWidgets('au-delà de dix photos, « Continuer » refuse et dit pourquoi', (
     tester,
   ) async {
-    await deposer(tester);
-    maintenant = maintenant.add(const Duration(minutes: 2));
-    await ouvrir(tester);
+    var repris = await deposer(tester);
+    for (var i = 1; i < 13; i++) {
+      repris = await deposer(tester, dans: repris);
+    }
+    await ouvrir(tester, brouillon: repris);
 
-    expect(find.text('Suite du repas de 12 h 30'), findsOneWidget);
-    expect(find.text('Autre repas'), findsOneWidget);
+    final bouton = tester.widget<BoutonContinuerCamera>(
+      find.byType(BoutonContinuerCamera),
+    );
+    expect(bouton.grise, isTrue);
+    await tester.tap(find.text('Continuer · 13'));
+    await tester.pump();
+
+    expect(continues, isEmpty);
+    expect(find.text(libelleTropDePhotos(13)), findsOneWidget);
+    expect(
+      tester
+          .widget<BoutonContinuerCamera>(find.byType(BoutonContinuerCamera))
+          .refus,
+      1,
+    );
+    await terminer(tester);
+  });
+
+  testWidgets('ouverte sur un brouillon : ses photos, les nouvelles '
+      's\'y ajoutent, même des heures plus tard', (tester) async {
+    final repris = await deposer(tester);
+    maintenant = maintenant.add(const Duration(hours: 5));
+    await ouvrir(tester, brouillon: repris);
+
     expect(find.text('Continuer · 1'), findsOneWidget);
+    expect(find.text('Importer'), findsNothing);
 
-    await tester.tap(find.text('Autre repas'));
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.byType(DeclencheurCamera));
-    await attendre(tester);
-
-    final liste = await gardes(tester, photos: 2);
-    expect(liste, hasLength(2));
-    await terminer(tester);
-  });
-
-  testWidgets('retour après 10 min : carte de reprise', (tester) async {
-    await deposer(tester);
-    maintenant = maintenant.add(const Duration(minutes: 12));
-    await ouvrir(tester);
-
-    expect(find.text('Repas en cours'), findsOneWidget);
-    expect(find.text('Finaliser'), findsOneWidget);
-    expect(find.text('Nouveau moment'), findsOneWidget);
-    expect(find.text('Suite du repas de 12 h 30'), findsNothing);
-
-    await tester.tap(find.text('Finaliser'));
-    await attendre(tester);
-    expect(continues, hasLength(1));
-    await terminer(tester);
-  });
-
-  testWidgets('« Nouveau moment » sur la carte de reprise : autre brouillon', (
-    tester,
-  ) async {
-    await deposer(tester);
-    maintenant = maintenant.add(const Duration(minutes: 12));
-    await ouvrir(tester);
-
-    await tester.tap(find.text('Nouveau moment'));
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.byType(DeclencheurCamera));
-    await attendre(tester);
-
-    final liste = await gardes(tester, photos: 2);
-    expect(liste, hasLength(2));
-    await terminer(tester);
-  });
-
-  testWidgets('brouillon de plus de 3 h : « Nouveau repas » proposé', (
-    tester,
-  ) async {
-    await deposer(tester);
-    maintenant = maintenant.add(const Duration(hours: 4));
-    await ouvrir(tester);
-
-    expect(find.text('Nouveau repas'), findsOneWidget);
-    expect(find.text("C'est la suite de 12 h 30"), findsOneWidget);
-
-    await tester.tap(find.text("C'est la suite de 12 h 30"));
-    await tester.pump(const Duration(seconds: 1));
     await tester.tap(find.byType(DeclencheurCamera));
     await attendre(tester);
 
     final liste = await gardes(tester, photos: 2);
     expect(liste, hasLength(1));
+    expect(liste.single.id, repris.id);
     expect(liste.single.photos, hasLength(2));
+    expect(find.text('Continuer · 2'), findsOneWidget);
+    await terminer(tester);
+  });
+
+  testWidgets('nouveau moment à côté d\'un brouillon : il reste à part', (
+    tester,
+  ) async {
+    final autre = await deposer(tester);
+    await ouvrir(tester);
+
+    expect(find.text('Importer'), findsOneWidget);
+    await tester.tap(find.byType(DeclencheurCamera));
+    await attendre(tester);
+
+    final liste = await gardes(tester, photos: 2);
+    expect(liste, hasLength(2));
+    expect(liste.firstWhere((b) => b.id == autre.id).photos, hasLength(1));
     await terminer(tester);
   });
 
@@ -226,6 +222,46 @@ void main() {
     expect(liste, hasLength(1));
     expect(liste.single.photos, hasLength(2));
     expect(find.text('Continuer · 2'), findsOneWidget);
+    await terminer(tester);
+  });
+
+  testWidgets('importer une deuxième fois : les photos se cumulent', (
+    tester,
+  ) async {
+    var appel = 0;
+    await ouvrir(
+      tester,
+      choisirPhotos: (restant) async {
+        appel++;
+        return appel == 1
+            ? [_png, Uint8List.fromList(_png), Uint8List.fromList(_png)]
+            : [Uint8List.fromList(_png)];
+      },
+    );
+
+    await tester.tap(find.text('Importer'));
+    await attendre(tester);
+    await gardes(tester, photos: 3);
+    expect(find.text('Continuer · 3'), findsOneWidget);
+
+    // Plus tard (une photo sans date prend l'heure de l'import) : avant,
+    // la quatrième partait dans un autre brouillon et les trois premières
+    // disparaissaient de la caméra.
+    maintenant = maintenant.add(const Duration(hours: 4));
+    await tester.tap(find.byType(PilePhotosCamera));
+    await attendre(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EventailPhotosCamera),
+        matching: find.text('Importer'),
+      ),
+    );
+    await attendre(tester);
+
+    final liste = await gardes(tester, photos: 4);
+    expect(liste, hasLength(1));
+    expect(liste.single.photos, hasLength(4));
+    expect(find.text('Continuer · 4'), findsOneWidget);
     await terminer(tester);
   });
 
@@ -253,9 +289,8 @@ void main() {
   testWidgets('éventail : × retire la photo, « Annuler » la remet', (
     tester,
   ) async {
-    await deposer(tester);
-    await deposer(tester);
-    await ouvrir(tester);
+    final b = await deposer(tester);
+    await ouvrir(tester, brouillon: await deposer(tester, dans: b));
 
     await tester.tap(find.byType(PilePhotosCamera));
     await attendre(tester);
@@ -270,12 +305,9 @@ void main() {
           )
           .first,
     );
-    await attendreQue(
-      tester,
-      find.text('Photo supprimée · récupérable 30 jours'),
-    );
+    await attendreQue(tester, find.text('Photo supprimée'));
 
-    expect(find.text('Photo supprimée · récupérable 30 jours'), findsOneWidget);
+    expect(find.text('Photo supprimée'), findsOneWidget);
     var liste = await gardes(tester, photos: 1);
     expect(liste.single.photos, hasLength(1));
 
@@ -284,6 +316,31 @@ void main() {
 
     liste = await gardes(tester, photos: 2);
     expect(liste.single.photos, hasLength(2));
+    await terminer(tester);
+  });
+
+  testWidgets('éventail : une photo glissée à une autre place change '
+      'l\'ordre du brouillon', (tester) async {
+    var b = await deposer(tester);
+    b = await deposer(tester, dans: b);
+    b = await deposer(tester, dans: b);
+    final ids = [for (final p in b.photos) p.id];
+    await ouvrir(tester, brouillon: b);
+
+    await tester.tap(find.byType(PilePhotosCamera));
+    await attendre(tester);
+    // Dans l'ordre de publication : la première en haut de l'arc.
+    final premiere = find.byKey(ValueKey(ids.first));
+    final derniere = tester.getCenter(find.byKey(ValueKey(ids.last)));
+    final geste = await tester.startGesture(tester.getCenter(premiere));
+    await tester.pump(delaiSaisieEventail + const Duration(milliseconds: 40));
+    await geste.moveTo(derniere);
+    await tester.pump(const Duration(milliseconds: 50));
+    await geste.up();
+    await attendre(tester);
+
+    final relu = await tester.runAsync(() => brouillons.charger(b.id));
+    expect([for (final p in relu!.photos) p.id], [ids[1], ids[2], ids[0]]);
     await terminer(tester);
   });
 

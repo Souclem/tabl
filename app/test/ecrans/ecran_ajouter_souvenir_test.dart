@@ -11,6 +11,9 @@ import 'package:app/ecrans/ecran_choix_souvenir.dart';
 
 /// Seul l'ajout d'un souvenir est exercé ici.
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   final List<NouveauSouvenir> ajoutes = [];
 
   @override

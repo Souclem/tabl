@@ -318,5 +318,23 @@ await test('les droits de table de souvenirs n’ont pas bougé (pas de grant pa
   assert.equal(col.rows.length, 1);
 });
 
+console.log('\nPetit-déjeuner et notes écrites');
+await test("moment : 'matin', 'midi' et 'soir' acceptés, autre chose refusé", async () => {
+  for (const [n, moment] of [[311, 'matin'], [312, 'midi'], [313, 'soir']]) {
+    reussit(await lu(AUTEUR, `insert into public.souvenirs (id, auteur_id, restaurant_id, moment) values ($1, $2, $3, $4)`, [id(n), AUTEUR, RESTO, moment]));
+  }
+  refuse(await lu(AUTEUR, `insert into public.souvenirs (id, auteur_id, restaurant_id, moment) values ($1, $2, $3, 'gouter')`, [id(314), AUTEUR, RESTO]), '23514');
+  reussit(await lu(AUTEUR, `update public.souvenirs set moment = 'matin' where id = $1`, [id(312)]));
+  await db.query(`delete from public.souvenirs where id in ($1, $2, $3)`, [id(311), id(312), id(313)]);
+});
+await test('notes : les plats écrits (une liste sous "plats") sont acceptés et relus', async () => {
+  const notes = { cuisine: 4, plats: [{ nom: 'Risotto', note: 5 }, { nom: 'Tiramisu', note: 3 }] };
+  reussit(await lu(AUTEUR, `insert into public.souvenirs (id, auteur_id, restaurant_id, notes) values ($1, $2, $3, $4)`, [id(315), AUTEUR, RESTO, JSON.stringify(notes)]));
+  const r = await lu(ABONNE, `select notes from public.souvenirs where id = $1`, [id(315)]);
+  reussit(r);
+  assert.deepEqual(r.rows[0].notes, notes);
+  await db.query(`delete from public.souvenirs where id = $1`, [id(315)]);
+});
+
 console.log(`\n${nbTests} tests passés${process.exitCode ? ' — AVEC ÉCHECS' : ''}.`);
 await db.close();

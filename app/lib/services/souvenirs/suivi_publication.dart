@@ -13,7 +13,8 @@ const delaiEnvoiSuspendu = Duration(seconds: 45);
 
 /// Où en est la publication que la cloche suit.
 enum PhaseCloche {
-  /// Les photos partent (0 → 90 %) : Modifier et Annuler sont possibles.
+  /// Les photos partent (0 → 90 %) : rien à toucher, la publication va
+  /// au bout.
   envoi,
 
   /// L'ordre de publier est parti (90 → 99 %) : plus d'action possible.
@@ -31,13 +32,7 @@ enum PhaseCloche {
 }
 
 /// Ce que l'auteur peut faire à un instant donné.
-enum GesteCloche {
-  modifier,
-  annuler,
-  garderEnBrouillon,
-  reessayer,
-  envoyerDesQuePossible,
-}
+enum GesteCloche { garderEnBrouillon, reessayer, envoyerDesQuePossible }
 
 /// Comment la cloche se referme : à l'appelant d'en tirer la suite
 /// (retour à la finalisation, au Fil, message).
@@ -50,10 +45,12 @@ enum IssueCloche {
   /// arrivée trop tard).
   dejaPublie,
 
-  /// « Modifier » : retour à la finalisation, rien n'a été envoyé.
+  /// Le brouillon était incomplet : retour à la finalisation, rien n'a été
+  /// envoyé.
   modifier,
 
-  /// « Annuler » : rien n'a été envoyé, le brouillon reste sur le téléphone.
+  /// Rien n'a été envoyé, le brouillon reste sur le téléphone (il avait
+  /// disparu, ou l'envoi a été défait).
   annule,
 
   /// « Garder en brouillon » après un échec.
@@ -130,8 +127,8 @@ class SuiviPublication extends ChangeNotifier {
   bool get dejaPublie => _dejaPublie;
   bool _dejaPublie = false;
 
-  /// Vrai quand « Annuler » ou « Modifier » est arrivé après le commit : le
-  /// moment est publié, pas annulé.
+  /// Vrai quand « Garder en brouillon » est arrivé après le commit : le
+  /// moment est publié, pas gardé.
   bool get annulationTropTard => _annulationTropTard;
   bool _annulationTropTard = false;
 
@@ -152,8 +149,10 @@ class SuiviPublication extends ChangeNotifier {
   List<GesteCloche> get gestes {
     if (_resultat != null) return const [];
     return switch (_phase) {
-      PhaseCloche.envoi => const [GesteCloche.modifier, GesteCloche.annuler],
-      PhaseCloche.validation || PhaseCloche.publie => const [],
+      // Une fois « Publier » touché, rien à toucher tant que tout va bien.
+      PhaseCloche.envoi ||
+      PhaseCloche.validation ||
+      PhaseCloche.publie => const [],
       PhaseCloche.horsLigne => const [
         GesteCloche.garderEnBrouillon,
         GesteCloche.envoyerDesQuePossible,
@@ -257,7 +256,7 @@ class SuiviPublication extends ChangeNotifier {
 
   /// Plus de progression depuis [delaiSuspendu] : l'envoi est lâché et la
   /// cloche passe à l'échec (sauf si l'auteur est déjà en train de quitter :
-  /// lâcher l'envoi libère alors son « Annuler »).
+  /// lâcher l'envoi libère alors son « Garder en brouillon »).
   Future<void> _suspendre() async {
     _suspendu = true;
     _essai++;
@@ -376,8 +375,8 @@ class SuiviPublication extends ChangeNotifier {
       if (!_arrete && essai == _essai) _echouer(e);
       return;
     }
-    // L'auteur a quitté (Modifier, Annuler) pendant l'envoi : c'est
-    // [_quitter] qui conclut.
+    // L'auteur a quitté (« Garder en brouillon ») pendant l'envoi : c'est
+    // [garderEnBrouillon] qui conclut.
     if (_quitte || _arrete || _resultat != null) return;
     // Un essai lâché qui aboutit quand même : seul son succès compte (le
     // moment est publié), le reste est déjà dépassé.
@@ -425,21 +424,13 @@ class SuiviPublication extends ChangeNotifier {
 
   // --- Gestes -------------------------------------------------------
 
-  Future<void> modifier() => _quitter(IssueCloche.modifier);
-  Future<void> annuler() => _quitter(IssueCloche.annule);
-  Future<void> garderEnBrouillon() => _quitter(IssueCloche.brouillonGarde);
-
-  /// Défait ce qui est parti (arrête l'envoi avant son commit) et garde le
-  /// brouillon sur le téléphone. Si le moment s'est publié entre-temps, la
-  /// cloche le dit au lieu de prétendre avoir annulé.
-  Future<void> _quitter(IssueCloche issue) async {
-    if (_occupe || _resultat != null) return;
-    if (!gestes.any(
-      (g) =>
-          g == GesteCloche.modifier ||
-          g == GesteCloche.annuler ||
-          g == GesteCloche.garderEnBrouillon,
-    )) {
+  /// « Garder en brouillon » après un échec : défait ce qui est parti et
+  /// garde le brouillon sur le téléphone. Si le moment s'est publié
+  /// entre-temps, la cloche le dit au lieu de prétendre l'avoir gardé.
+  Future<void> garderEnBrouillon() async {
+    if (_occupe ||
+        _resultat != null ||
+        !gestes.contains(GesteCloche.garderEnBrouillon)) {
       return;
     }
     _occupe = true;
@@ -449,7 +440,11 @@ class SuiviPublication extends ChangeNotifier {
       final defait = await _envois.garderEnBrouillon(brouillonId);
       _dejaPublie = !defait;
       _annulationTropTard = !defait;
-      _terminer(ResultatCloche(defait ? issue : IssueCloche.dejaPublie));
+      _terminer(
+        ResultatCloche(
+          defait ? IssueCloche.brouillonGarde : IssueCloche.dejaPublie,
+        ),
+      );
     } catch (e) {
       _quitte = false;
       _echouer(e);

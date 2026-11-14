@@ -20,7 +20,7 @@ class RegistreRestaurants {
     final dejaDansTabl = lieu.restaurantId;
     if (dejaDansTabl != null) return dejaDansTabl;
 
-    if (lieu.personnel) return _lieuPersonnel(lieu.nom.trim());
+    if (lieu.personnel) return _lieuPersonnel(lieu);
 
     final fsqId = lieu.fsqPlaceId;
     if (fsqId != null) {
@@ -52,17 +52,38 @@ class RegistreRestaurants {
     return _creer(lieu);
   }
 
-  /// Le sien, du même nom, ou un nouveau : jamais celui d'un autre.
-  Future<String> _lieuPersonnel(String nom) async {
-    final existant = await _client
+  /// Le sien, ou un nouveau : jamais celui d'un autre. « Chez moi » est
+  /// unique ; chez une personne de Tabl, une ligne par personne ; sinon,
+  /// même genre et même nom = même lieu. Jamais d'adresse ni de position
+  /// (la base le refuserait de toute façon).
+  Future<String> _lieuPersonnel(LieuRestaurant lieu) async {
+    final hote = lieu.hoteId;
+    final nom = switch (lieu.genre) {
+      GenreLieu.domicile => nomDomicile,
+      GenreLieu.chez when hote != null => nomChezQuelquun,
+      _ => lieu.nom.trim(),
+    };
+    var existant = _client
         .from('restaurants')
         .select('id')
         .eq('prive', true)
-        .eq('cree_par', _monId)
-        .ilike('nom', _echapperJokers(nom))
-        .limit(1)
-        .maybeSingle();
-    if (existant != null) return existant['id'] as String;
+        .eq('cree_par', _monId);
+    existant = switch (lieu.genre) {
+      GenreLieu.domicile => existant.eq('genre', 'domicile'),
+      GenreLieu.chez when hote != null => existant.eq('hote_id', hote),
+      // Les lieux personnels d'avant les genres sont « chez ».
+      GenreLieu.chez =>
+        existant
+            .or('genre.eq.chez,genre.is.null')
+            .isFilter('hote_id', null)
+            .ilike('nom', _echapperJokers(nom)),
+      _ =>
+        existant
+            .eq('genre', lieu.genre.name)
+            .ilike('nom', _echapperJokers(nom)),
+    };
+    final trouve = await existant.limit(1).maybeSingle();
+    if (trouve != null) return trouve['id'] as String;
     final cree = await _client
         .from('restaurants')
         .insert({
@@ -71,6 +92,8 @@ class RegistreRestaurants {
           'nom_recherche': normaliserPourRecherche(nom),
           'cree_par': _monId,
           'prive': true,
+          'genre': lieu.genre.enBase,
+          'hote_id': hote,
         })
         .select('id')
         .single();

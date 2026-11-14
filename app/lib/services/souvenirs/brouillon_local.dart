@@ -9,9 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../restaurants/lieu_restaurant.dart';
 import 'audience_souvenir.dart';
 import 'emotion.dart';
-
-/// Deux photos prises à moins de 3 h l'une de l'autre sont le même repas.
-const delaiRegroupementRepas = Duration(hours: 3);
+import 'presentation_finalisation.dart';
 
 /// Une photo supprimée reste récupérable aussi longtemps.
 const dureeCorbeilleBrouillon = Duration(days: 30);
@@ -52,7 +50,6 @@ class Brouillon {
     this.etoiles = const {},
     this.avecQuiIds = const {},
     this.audience = AudienceSouvenir.toutLeMonde,
-    this.horsPublicationIds = const {},
   });
 
   final String id;
@@ -80,30 +77,6 @@ class Brouillon {
   final Set<String> avecQuiIds;
   final AudienceSouvenir audience;
 
-  /// Les photos gardées dans le brouillon mais retirées de la publication.
-  final Set<String> horsPublicationIds;
-
-  /// Les photos qui seront publiées, dans l'ordre : la première est la
-  /// couverture.
-  List<PhotoBrouillon> get photosAPublier => [
-    for (final p in photos)
-      if (!horsPublicationIds.contains(p.id)) p,
-  ];
-
-  /// Le moment de la dernière photo : c'est lui qu'une nouvelle photo
-  /// compare à [delaiRegroupementRepas].
-  DateTime get derniereCaptureLe {
-    var plusRecente = priseLe;
-    for (final photo in photos) {
-      if (photo.priseLe.isAfter(plusRecente)) plusRecente = photo.priseLe;
-    }
-    return plusRecente;
-  }
-
-  /// Une photo prise à [priseLe] est-elle la suite de ce repas ?
-  bool accueille(DateTime priseLe) =>
-      priseLe.difference(derniereCaptureLe).abs() < delaiRegroupementRepas;
-
   /// Le même brouillon, avec les champs donnés. Un champ qui peut être vide
   /// se donne par une fonction (`lieu: () => null` pour l'effacer).
   Brouillon copieAvec({
@@ -117,7 +90,6 @@ class Brouillon {
     Map<String, int>? etoiles,
     Set<String>? avecQuiIds,
     AudienceSouvenir? audience,
-    Set<String>? horsPublicationIds,
   }) => Brouillon(
     id: id,
     creeLe: creeLe,
@@ -131,7 +103,6 @@ class Brouillon {
     etoiles: etoiles ?? this.etoiles,
     avecQuiIds: avecQuiIds ?? this.avecQuiIds,
     audience: audience ?? this.audience,
-    horsPublicationIds: horsPublicationIds ?? this.horsPublicationIds,
   );
 
   Map<String, Object?> versJson() => {
@@ -159,7 +130,6 @@ class Brouillon {
       'tableIds': audience.tableIds.toList()..sort(),
       'personneIds': audience.personneIds.toList()..sort(),
     },
-    'horsPublicationIds': horsPublicationIds.toList()..sort(),
   };
 
   /// Relit un brouillon écrit par [versJson]. Lève une erreur si le JSON
@@ -168,7 +138,9 @@ class Brouillon {
     final etoiles = <String, int>{};
     for (final e in ((json['etoiles'] as Map?) ?? const {}).entries) {
       final note = e.value;
-      if (note is int && note >= 1 && note <= 5) {
+      // Un plat écrit garde sa place même sans note (0).
+      final minimum = estClePlat(e.key as String) ? 0 : 1;
+      if (note is int && note >= minimum && note <= 5) {
         etoiles[e.key as String] = note;
       }
     }
@@ -208,9 +180,6 @@ class Brouillon {
                     .cast<String>(),
               },
             ),
-      horsPublicationIds: {
-        ...((json['horsPublicationIds'] as List?) ?? const []).cast<String>(),
-      },
     );
   }
 }
@@ -296,7 +265,7 @@ class BrouillonsLocaux {
     return resultat;
   }
 
-  /// Les brouillons, le plus récemment modifié (le brouillon actif) d'abord.
+  /// Les brouillons, le plus récemment modifié d'abord.
   /// Un brouillon illisible est ignoré.
   Future<List<Brouillon>> lister() => _enchainer(_lister);
 
@@ -316,27 +285,18 @@ class BrouillonsLocaux {
     return brouillon;
   });
 
-  /// Le brouillon actif, si une photo prise à [priseLe] en est la suite
-  /// (moins de 3 h après sa dernière) ; `null` à 3 h ou plus, ou sans
-  /// brouillon : c'est un nouveau repas.
-  Future<Brouillon?> brouillonPourRegrouper(DateTime priseLe) =>
-      _enchainer(() => _pourRegrouper(priseLe));
-
-  /// Garde une photo dans un brouillon : celui de [brouillonId] ; sinon,
-  /// le brouillon actif si la photo en est la suite ; sinon un nouveau.
-  /// [nouveauRepas] force un nouveau brouillon (« Nouveau repas »).
+  /// Garde une photo à la fin du brouillon [brouillonId] ; sans lui (ou
+  /// s'il n'existe plus), dans un nouveau brouillon. Les photos d'un
+  /// brouillon s'ajoutent toujours les unes aux autres, quelle que soit leur
+  /// date : c'est l'auteur qui choisit le brouillon (voir
+  /// `brouillonsAReprendre`).
   Future<Brouillon> ajouterPhoto({
     required Uint8List octets,
     required DateTime priseLe,
     PositionPrise? position,
     String? brouillonId,
-    bool nouveauRepas = false,
   }) => _enchainer(() async {
-    final cible = brouillonId != null
-        ? await _lire(brouillonId)
-        : nouveauRepas
-        ? null
-        : await _pourRegrouper(priseLe);
+    final cible = brouillonId == null ? null : await _lire(brouillonId);
     final maintenant = _maintenant();
     final base =
         cible ??
@@ -427,7 +387,6 @@ class BrouillonsLocaux {
           actuel.copieAvec(
             modifieLe: maintenant,
             photos: [...actuel.photos]..removeAt(rang),
-            horsPublicationIds: {...actuel.horsPublicationIds}..remove(photoId),
           ),
         );
         return entree;
@@ -486,11 +445,6 @@ class BrouillonsLocaux {
     final dossier = _dossier(id);
     if (await dossier.exists()) await dossier.delete(recursive: true);
   });
-
-  Future<Brouillon?> _pourRegrouper(DateTime priseLe) async {
-    final actif = (await _lister()).firstOrNull;
-    return actif != null && actif.accueille(priseLe) ? actif : null;
-  }
 
   Future<List<Brouillon>> _lister() async {
     if (!await _dossierBrouillons.exists()) return [];
@@ -606,17 +560,36 @@ Map<String, Object?> _lieuVersJson(LieuRestaurant l) => {
   'latitude': l.latitude,
   'longitude': l.longitude,
   'categories': l.categories,
-  'personnel': l.personnel,
+  'genre': l.genre.name,
+  'hoteId': l.hoteId,
+  'hotePseudo': l.hotePseudo,
+  'hotePhotoUrl': l.hotePhotoUrl,
 };
 
-LieuRestaurant _lieuDepuisJson(Map<String, dynamic> json) => LieuRestaurant(
-  nom: json['nom'] as String,
-  ville: json['ville'] as String,
-  restaurantId: json['restaurantId'] as String?,
-  fsqPlaceId: json['fsqPlaceId'] as String?,
-  adresse: json['adresse'] as String?,
-  latitude: (json['latitude'] as num?)?.toDouble(),
-  longitude: (json['longitude'] as num?)?.toDouble(),
-  categories: [...((json['categories'] as List?) ?? const []).cast<String>()],
-  personnel: json['personnel'] as bool? ?? false,
-);
+LieuRestaurant _lieuDepuisJson(Map<String, dynamic> json) {
+  // Avant les genres, un simple drapeau : un lieu personnel est « chez ».
+  final genre =
+      GenreLieu.values.where((g) => g.name == json['genre']).firstOrNull ??
+      (json['personnel'] == true ? GenreLieu.chez : GenreLieu.restaurant);
+  if (genre != GenreLieu.restaurant) {
+    // Jamais de position hors restaurant, même lue d'un vieux brouillon.
+    return LieuRestaurant.personnel(
+      nom: json['nom'] as String,
+      restaurantId: json['restaurantId'] as String?,
+      genre: genre,
+      hoteId: json['hoteId'] as String?,
+      hotePseudo: json['hotePseudo'] as String?,
+      hotePhotoUrl: json['hotePhotoUrl'] as String?,
+    );
+  }
+  return LieuRestaurant(
+    nom: json['nom'] as String,
+    ville: json['ville'] as String,
+    restaurantId: json['restaurantId'] as String?,
+    fsqPlaceId: json['fsqPlaceId'] as String?,
+    adresse: json['adresse'] as String?,
+    latitude: (json['latitude'] as num?)?.toDouble(),
+    longitude: (json['longitude'] as num?)?.toDouble(),
+    categories: [...((json['categories'] as List?) ?? const []).cast<String>()],
+  );
+}

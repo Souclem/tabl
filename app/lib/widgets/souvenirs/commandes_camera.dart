@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../tremblement.dart';
 import 'verre_camera.dart';
 
 /// « Importer », à gauche du déclencheur tant qu'aucune photo n'est prise :
@@ -39,10 +40,8 @@ class BoutonImporterCamera extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             libelle,
-            style: TextStyle(
-              color: c.texte,
+            style: TablTokens.policeCreation.copyWith(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
               shadows: const [Shadow(blurRadius: 6, color: Color(0x66000000))],
             ),
           ),
@@ -58,14 +57,35 @@ class BoutonContinuerCamera extends StatelessWidget {
     super.key,
     required this.libelle,
     required this.onPresse,
+    this.grise = false,
+    this.refus = 0,
   });
 
   final String libelle;
+
+  /// Toujours appelé, même grisé : l'écran dit alors ce qui manque.
   final VoidCallback onPresse;
+
+  /// Pas encore possible (trop de photos) : à moitié effacé.
+  final bool grise;
+
+  /// Augmenté par l'écran à chaque toucher refusé : le bouton tremble.
+  final int refus;
 
   @override
   Widget build(BuildContext context) {
     const c = TablCouleurs.sombre;
+    return TablTremblement(
+      refus: refus,
+      child: AnimatedOpacity(
+        opacity: grise ? 0.4 : 1,
+        duration: const Duration(milliseconds: 200),
+        child: _pilule(c),
+      ),
+    );
+  }
+
+  Widget _pilule(TablCouleurs c) {
     return Material(
       color: c.texte,
       borderRadius: BorderRadius.circular(22),
@@ -81,10 +101,9 @@ class BoutonContinuerCamera extends StatelessWidget {
               child: Text(
                 libelle,
                 maxLines: 1,
-                style: TextStyle(
+                style: TablTokens.policeCreation.copyWith(
                   color: c.fond,
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -111,7 +130,6 @@ class CompteurPhotosCamera extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const c = TablCouleurs.sombre;
     return IgnorePointer(
       child: AnimatedSlide(
         offset: visible ? Offset.zero : const Offset(0, 0.3),
@@ -130,10 +148,8 @@ class CompteurPhotosCamera extends StatelessWidget {
                 child: Text(
                   '$nombre $libelle',
                   maxLines: 1,
-                  style: TextStyle(
-                    color: c.texte,
+                  style: TablTokens.policeCreation.copyWith(
                     fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),

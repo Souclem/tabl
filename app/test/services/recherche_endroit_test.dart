@@ -37,4 +37,11 @@ void main() {
       expect(endroits.last.zone.contient(50.70, 5.57), isFalse);
     },
   );
+
+  test('on demande aussi les rues et les codes postaux, pas seulement les '
+      'villes et les adresses numérotées', () {
+    // Sans `street`, « rue Saint-Gilles » ne trouvait rien.
+    final types = RechercheEndroitMapbox.types.split(',');
+    expect(types, containsAll(['street', 'address', 'postcode', 'place']));
+  });
 }

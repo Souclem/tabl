@@ -10,10 +10,9 @@ import 'package:app/widgets/widgets.dart';
 /// [ResultatCloche] : à l'écran qui l'a ouverte d'en tirer la suite (retour
 /// à la finalisation, Fil, message).
 ///
-/// « Modifier » et « Annuler » restent possibles tant que le trait n'a pas
-/// atteint 90 % (avant l'ordre de publier) ; ensuite, plus rien à toucher.
-/// Sans réseau, ou après un échec, la publication s'arrête et l'auteur
-/// choisit : garder en brouillon, envoyer dès que possible, réessayer.
+/// Une fois « Publier » touché, rien à toucher : la publication va au bout.
+/// Sans réseau, ou après un échec, elle s'arrête et l'auteur choisit :
+/// garder en brouillon, envoyer dès que possible, réessayer.
 class EcranCloche extends StatefulWidget {
   const EcranCloche({
     super.key,
@@ -93,7 +92,7 @@ class _EcranClocheState extends State<EcranCloche>
 
   String? _note() {
     if (_suivi.annulationTropTard) {
-      return 'Ce moment était déjà publié : l\'annulation est arrivée trop tard.';
+      return 'Ce moment était déjà publié : il n\'a pas pu rester en brouillon.';
     }
     if (_suivi.dejaPublie) {
       return 'Ce moment était déjà publié : vos dernières modifications n\'ont pas été appliquées.';
@@ -118,14 +117,6 @@ class _EcranClocheState extends State<EcranCloche>
     VoidCallback? surAppui(Future<void> Function() action) =>
         libre ? () => unawaited(action()) : null;
     return switch (geste) {
-      GesteCloche.modifier => ActionCloche(
-        libelle: 'Modifier',
-        onPresse: surAppui(_suivi.modifier),
-      ),
-      GesteCloche.annuler => ActionCloche(
-        libelle: 'Annuler',
-        onPresse: surAppui(_suivi.annuler),
-      ),
       GesteCloche.garderEnBrouillon => ActionCloche(
         libelle: 'Garder en brouillon',
         onPresse: surAppui(_suivi.garderEnBrouillon),
@@ -145,8 +136,7 @@ class _EcranClocheState extends State<EcranCloche>
 
   @override
   Widget build(BuildContext context) {
-    // Pas de retour par geste : une publication en route ne s'abandonne
-    // qu'avec « Modifier » ou « Annuler ».
+    // Pas de retour par geste : une publication en route va au bout.
     return PopScope(
       canPop: false,
       child: Scaffold(

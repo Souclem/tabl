@@ -14,6 +14,9 @@ import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<SouvenirFeed?> souvenir(String souvenirId) =>
       throw UnimplementedError();
   @override

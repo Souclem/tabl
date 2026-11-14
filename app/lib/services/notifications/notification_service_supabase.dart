@@ -52,6 +52,7 @@ class NotificationServiceSupabase implements NotificationService {
               souvenirPhotoUrl: photos[l['souvenir_photo']],
               restaurantId: l['restaurant_id'] as String?,
               restaurantNom: l['restaurant_nom'] as String?,
+              restaurantGenre: l['restaurant_genre'] as String?,
               texte: l['texte'] as String?,
               reponse: ReponseAvis.depuisValeur(l['reponse'] as String?),
               demandeId: l['demande_id'] as String?,

@@ -27,6 +27,9 @@ class _FauxAuthService implements AuthService {
 /// Le Fil : ce que le serveur rend change quand [publie] passe à vrai, et
 /// [appelsFeed] compte les chargements.
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   int appelsFeed = 0;
   bool publie = false;
 

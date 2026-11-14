@@ -5,22 +5,36 @@ import 'audience_souvenir.dart';
 import 'emotion.dart';
 import 'presentation_finalisation.dart';
 
-/// `{"cuisine": 4}` pour `souvenirs.notes` ; `null` quand aucune catégorie
-/// n'est notée. Les autres clés et les notes hors de 1 à 5 sont écartées.
-Map<String, int>? notesPourBase(Map<String, int> etoiles) {
-  final notes = {
+/// `{"cuisine": 4, "plats": [{"nom": "Risotto", "note": 5}]}` pour
+/// `souvenirs.notes` ; `null` quand rien n'est noté. Les plats notés vont
+/// sous "plats", dans l'ordre où on les a écrits, cinq au plus ; les autres
+/// clés et les notes hors de 1 à 5 (un plat pas encore noté) sont écartées.
+Map<String, Object>? notesPourBase(Map<String, int> etoiles) {
+  bool valide(int? note) => note != null && note >= 1 && note <= 5;
+  final notes = <String, Object>{
     for (final categorie in categoriesEtoiles)
-      if (etoiles[categorie.cle] case final note? when note >= 1 && note <= 5)
+      if (etoiles[categorie.cle] case final note? when valide(note))
         categorie.cle: note,
   };
+  final plats = [
+    for (final cle in clesPlats(etoiles))
+      if (valide(etoiles[cle])) {'nom': nomPlat(cle), 'note': etoiles[cle]!},
+  ].take(nombreMaxPlats).toList();
+  if (plats.isNotEmpty) notes['plats'] = plats;
   return notes.isEmpty ? null : notes;
 }
 
-/// Les notes lues dans `souvenirs.notes` (jsonb, `null` si aucune).
+/// Les notes lues dans `souvenirs.notes` (jsonb, `null` si aucune) : les
+/// catégories, puis les plats sous leur clé `plat:<nom>`.
 Map<String, int> notesDepuisBase(Object? json) => {
-  if (json is Map)
+  if (json is Map) ...{
     for (final e in json.entries)
       if (e.key is String && e.value is int) e.key as String: e.value as int,
+    if (json['plats'] case final List plats)
+      for (final plat in plats)
+        if (plat case {'nom': final String nom, 'note': final int note})
+          clePlat(nom): note,
+  },
 };
 
 /// Tout ce qu'il faut pour publier un moment : le contenu de l'écran de

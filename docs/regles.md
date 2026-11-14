@@ -88,6 +88,13 @@ interdite aussi.
   `(storage.foldername(name))[1]` = l'auteur de la ligne (exception `demo/`).
 - **`peut_voir_souvenir()` est la source unique** de la visibilité d'un
   moment.
+- **Seul un lieu ouvert au public a une position.** Chez moi, chez
+  quelqu'un, ailleurs = lieu personnel (`restaurants.prive` + `genre`,
+  contrainte `lieu_personnel_sans_adresse`). Jamais la position du
+  téléphone enregistrée sur un lieu (elle ne sert qu'à trier) ; un
+  restaurant saisi à la main n'a de position que par l'épingle placée par
+  l'utilisateur (fuite réelle : un « chez moi » sur la carte). Lire l'hôte
+  par `profils!restaurants_hote_id_fkey` (deux liens vers `profils`).
 - **Vers l'extérieur** (Google Sheet, notifications…) : fonction Edge
   TypeScript appelée par l'app, jamais un webhook ni un trigger.
 - **Tester toute policy sur PGlite avant de la donner à pousser.**

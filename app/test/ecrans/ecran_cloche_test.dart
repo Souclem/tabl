@@ -141,9 +141,28 @@ void main() {
     await tester.pump();
   }
 
+  /// La publication est en route : aucun bouton, rien à toucher.
+  void rienAToucher() => expect(
+    find.descendant(
+      of: find.byType(EcranCloche),
+      matching: find.bySubtype<ButtonStyleButton>(),
+    ),
+    findsNothing,
+  );
+
+  Future<void> horsLigne(WidgetTester tester) async {
+    envois.essai.reponse.complete(
+      const ResultatEnvoi(
+        StatutEnvoi.echec,
+        erreur: SocketException('Network is unreachable'),
+      ),
+    );
+    await pomper(tester, 100);
+  }
+
   setUp(() => envois = _FauxEnvois());
 
-  testWidgets('au départ : « À table », 0 %, Modifier et Annuler', (
+  testWidgets('au départ : « À table », 0 %, ni Modifier ni Annuler', (
     tester,
   ) async {
     await ouvrir(tester);
@@ -151,9 +170,8 @@ void main() {
     expect(find.byType(EcranCloche), findsOneWidget);
     expect(find.text('À table'), findsOneWidget);
     expect(pourcentage(tester), 0);
-    expect(bouton('Modifier'), findsOneWidget);
-    expect(bouton('Annuler'), findsOneWidget);
-    expect(find.text('Réessayer'), findsNothing);
+    expect(find.text('Modifier'), findsNothing);
+    rienAToucher();
     expect(envois.essais, hasLength(1));
   });
 
@@ -173,8 +191,7 @@ void main() {
     envois.essai.surProgression!(2, 2);
     await pomper(tester, 4000);
     expect(pourcentage(tester), inInclusiveRange(90, 99));
-    expect(find.text('Modifier'), findsNothing);
-    expect(find.text('Annuler'), findsNothing);
+    rienAToucher();
 
     envois.essai.reponse.complete(const ResultatEnvoi(StatutEnvoi.publie));
     await pomper(tester, 800);
@@ -192,72 +209,51 @@ void main() {
 
     await pomper(tester, 1500);
     expect(find.text('Le réseau est lent…'), findsOneWidget);
-    expect(bouton('Annuler'), findsOneWidget);
+    rienAToucher();
     expect(pourcentage(tester), lessThanOrEqualTo(30));
   });
 
-  testWidgets('Annuler : l\'envoi est défait, la cloche se ferme', (
+  testWidgets('pendant « Garder en brouillon », les boutons sont grisés', (
     tester,
   ) async {
-    await ouvrir(tester);
-    envois.essai.surProgression!(0, 2);
-    await pomper(tester, 500);
-
-    await appuyer(tester, 'Annuler');
-    await pomper(tester, 100);
-
-    expect(envois.appelsGarder, ['b1']);
-    expect(ferme, isTrue);
-    expect(resultat!.issue, IssueCloche.annule);
-  });
-
-  testWidgets('Modifier : retour à la finalisation', (tester) async {
-    await ouvrir(tester);
-    await pomper(tester, 500);
-
-    await appuyer(tester, 'Modifier');
-    await pomper(tester, 100);
-
-    expect(resultat!.issue, IssueCloche.modifier);
-  });
-
-  testWidgets('pendant l\'annulation, les boutons sont grisés', (tester) async {
     envois.fermetureLente = Completer<void>();
     await ouvrir(tester);
-    await pomper(tester, 500);
+    await horsLigne(tester);
 
-    await appuyer(tester, 'Annuler');
+    await appuyer(tester, 'Garder en brouillon');
     await pomper(tester, 50);
 
     expect(
-      tester.widget<ButtonStyleButton>(bouton('Annuler')).enabled,
+      tester.widget<ButtonStyleButton>(bouton('Garder en brouillon')).enabled,
       isFalse,
     );
     expect(
-      tester.widget<ButtonStyleButton>(bouton('Modifier')).enabled,
+      tester
+          .widget<ButtonStyleButton>(bouton('Envoyer dès que possible'))
+          .enabled,
       isFalse,
     );
-    await tester.tap(bouton('Modifier'));
+    await tester.tap(bouton('Garder en brouillon'));
     expect(envois.appelsGarder, hasLength(1));
 
     envois.fermetureLente!.complete();
     await pomper(tester, 100);
-    expect(resultat!.issue, IssueCloche.annule);
+    expect(resultat!.issue, IssueCloche.brouillonGarde);
   });
 
-  testWidgets('annulation trop tardive : la cloche le dit puis se ferme', (
+  testWidgets('gardé trop tard : déjà publié, la cloche le dit puis se ferme', (
     tester,
   ) async {
     envois.annulationPossible = false;
     await ouvrir(tester);
-    await pomper(tester, 500);
+    await horsLigne(tester);
 
-    await appuyer(tester, 'Annuler');
+    await appuyer(tester, 'Garder en brouillon');
     await pomper(tester, 100);
 
     expect(
       find.text(
-        'Ce moment était déjà publié : l\'annulation est arrivée trop tard.',
+        'Ce moment était déjà publié : il n\'a pas pu rester en brouillon.',
       ),
       findsOneWidget,
     );
@@ -283,7 +279,6 @@ void main() {
     expect(find.textContaining('Pas de réseau'), findsOneWidget);
     expect(bouton('Garder en brouillon'), findsOneWidget);
     expect(bouton('Envoyer dès que possible'), findsOneWidget);
-    expect(find.text('Annuler'), findsNothing);
     expect(find.text('Réessayer'), findsNothing);
 
     await appuyer(tester, 'Envoyer dès que possible');
@@ -347,14 +342,13 @@ void main() {
     expect(find.textContaining('Pas de réseau'), findsNothing);
     expect(bouton('Garder en brouillon'), findsOneWidget);
     expect(bouton('Réessayer'), findsOneWidget);
-    expect(find.text('Annuler'), findsNothing);
 
     await appuyer(tester, 'Réessayer');
     await tester.pump();
     expect(envois.essais, hasLength(2));
     expect(pourcentage(tester), 0);
     expect(find.textContaining('n\'a pas abouti'), findsNothing);
-    expect(bouton('Annuler'), findsOneWidget);
+    rienAToucher();
 
     envois.essai.surProgression!(2, 2);
     envois.essai.reponse.complete(const ResultatEnvoi(StatutEnvoi.publie));
@@ -442,14 +436,13 @@ void main() {
       envois.essai.surProgression!(0, 2);
 
       await pomper(tester, 4500);
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
       expect(find.textContaining('n\'a pas abouti'), findsNothing);
 
       await pomper(tester, 1500);
       expect(find.textContaining('n\'a pas abouti'), findsOneWidget);
       expect(bouton('Garder en brouillon'), findsOneWidget);
       expect(bouton('Réessayer'), findsOneWidget);
-      expect(find.text('Annuler'), findsNothing);
       expect(envois.appelsDetacher, ['b1']);
       expect(ferme, isFalse);
     });
@@ -465,7 +458,7 @@ void main() {
       await pomper(tester, 4000);
 
       expect(envois.appelsDetacher, isEmpty);
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
 
       await pomper(tester, 2000);
       expect(envois.appelsDetacher, ['b1']);
@@ -479,7 +472,6 @@ void main() {
       envois.essai.surProgression!(2, 2);
       await pomper(tester, 3000);
       expect(find.byType(EcranCloche), findsOneWidget);
-      expect(find.text('Annuler'), findsNothing);
       expect(find.text('Réessayer'), findsNothing);
 
       await pomper(tester, 5000);
@@ -501,7 +493,7 @@ void main() {
       ancien.reponse.complete(const ResultatEnvoi(StatutEnvoi.annule));
       await pomper(tester, 500);
       expect(ferme, isFalse);
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
 
       envois.essai.surProgression!(2, 2);
       envois.essai.reponse.complete(const ResultatEnvoi(StatutEnvoi.publie));
@@ -558,7 +550,7 @@ void main() {
       expect(envois.appelsGarder, isEmpty);
       expect(envois.appelsAttente, isEmpty);
       expect(envois.appelsDetacher, isEmpty);
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
     });
 
     testWidgets('le temps passé dehors n\'est pas une suspension', (
@@ -575,7 +567,7 @@ void main() {
 
       expect(envois.appelsEtat, ['b1']);
       expect(envois.appelsDetacher, isEmpty);
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
 
       await pomper(tester, 5000);
       expect(envois.appelsDetacher, ['b1']);
@@ -595,7 +587,7 @@ void main() {
 
       expect(envois.appelsEtat, ['b1']);
       expect(pourcentage(tester), greaterThanOrEqualTo(avant));
-      expect(bouton('Annuler'), findsOneWidget);
+      rienAToucher();
       expect(ferme, isFalse);
     });
 

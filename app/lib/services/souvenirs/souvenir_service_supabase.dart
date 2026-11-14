@@ -30,6 +30,12 @@ import 'souvenir_service.dart';
 /// Nombre de souvenirs chargés d'un coup (Feed, page de profil).
 const nombreMaxSouvenirsCharges = 50;
 
+/// Ce qu'on lit d'un lieu avec un moment : le genre et l'hôte en plus,
+/// la clé de l'hôte toujours nommée (il y a deux liens vers `profils`).
+const colonnesLieu =
+    'nom, ville, categories, prive, genre, hote_id, '
+    'hote:profils!restaurants_hote_id_fkey(pseudo, photo_url)';
+
 class SouvenirServiceSupabase implements SouvenirService {
   SouvenirServiceSupabase(this._client)
     : _restaurants = RegistreRestaurants(_client);
@@ -243,7 +249,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           .from('souvenirs')
           .select(
             'legende, emotion, impressions, boisson_texte, notes, restaurant_id, '
-            'restaurants(nom, ville, categories, prive)',
+            'restaurants($colonnesLieu)',
           )
           .eq('id', souvenirId)
           .single(),
@@ -252,9 +258,24 @@ class SouvenirServiceSupabase implements SouvenirService {
     final restaurant = ligne['restaurants'] as Map<String, dynamic>?;
     final nom = restaurant?['nom'] as String? ?? '';
     final restaurantId = ligne['restaurant_id'] as String?;
+    final hote = restaurant?['hote'] as Map<String, dynamic>?;
     return MomentModifiable(
       lieu: restaurant?['prive'] == true
-          ? LieuRestaurant.personnel(nom: nom, restaurantId: restaurantId)
+          ? LieuRestaurant.personnel(
+              nom: nom,
+              restaurantId: restaurantId,
+              genre: GenreLieu.depuisBase(
+                restaurant?['genre'] as String?,
+                prive: true,
+              ),
+              hoteId: restaurant?['hote_id'] as String?,
+              hotePseudo: hote?['pseudo'] as String?,
+              hotePhotoUrl: urlPhotoProfil(
+                _client,
+                hote?['photo_url'] as String?,
+                miniature: true,
+              ),
+            )
           : LieuRestaurant(
               nom: nom,
               ville: restaurant?['ville'] as String? ?? '',
@@ -408,7 +429,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, est_souvenir, jour_connu, '
-          'restaurants(nom, ville, categories, prive), '
+          'restaurants($colonnesLieu), '
           'souvenirs_photos(rang, chemin), '
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)'
           '$presentsFiltres',
@@ -429,12 +450,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         conditionSouvenirsDuReseau(_monId, await futurSuivis),
       );
     }
-    // Les plus récents seulement : au-delà, les requêtes groupées qui
+    // Les derniers publiés seulement : au-delà, les requêtes groupées qui
     // suivent (réactions, commentaires...) dépasseraient la longueur
     // d'adresse acceptée par l'API. Le chargement au fil du défilement
-    // viendra prendre le relais.
+    // viendra prendre le relais. Par publication et non par date du
+    // repas : un moment qui vient d'être publié est toujours chargé (en
+    // haut du Fil), même fait de photos anciennes ; le profil le range
+    // ensuite au mois du repas.
     final lignes = await requete
-        .order('date_visite', ascending: false)
         .order('cree_le', ascending: false)
         .limit(nombreMaxSouvenirsCharges);
 
@@ -474,6 +497,8 @@ class SouvenirServiceSupabase implements SouvenirService {
     return lignes.map((l) {
       final restaurant = l['restaurants'] as Map<String, dynamic>?;
       final auteur = l['profils'] as Map<String, dynamic>?;
+      final hote = restaurant?['hote'] as Map<String, dynamic>?;
+      final hoteId = restaurant?['hote_id'] as String?;
       final chemin = l['photo_url'] as String?;
       final id = l['id'] as String;
       final donneesReactions =
@@ -483,7 +508,18 @@ class SouvenirServiceSupabase implements SouvenirService {
         id: id,
         photoUrl: chemin == null ? null : urlParChemin[chemin],
         legende: l['legende'] as String?,
-        restaurantNom: restaurant?['nom'] as String? ?? '',
+        // « Chez vous », « Chez Léa », « Chez Emma », « Bibo ».
+        restaurantNom: libelleLieu(
+          genre: GenreLieu.depuisBase(
+            restaurant?['genre'] as String?,
+            prive: restaurant?['prive'] == true,
+          ),
+          nom: restaurant?['nom'] as String? ?? '',
+          hotePseudo: hote?['pseudo'] as String?,
+          hoteEstMoi: hoteId != null && hoteId == _monId,
+          auteurPseudo: auteur?['pseudo'] as String?,
+          auteurEstMoi: l['auteur_id'] == _monId,
+        ),
         ville: restaurant?['ville'] as String? ?? '',
         moment: l['moment'] as String? ?? '',
         dateVisite: DateTime.parse(l['date_visite'] as String),
@@ -516,6 +552,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         estSouvenir: l['est_souvenir'] as bool? ?? false,
         jourConnu: l['jour_connu'] as bool? ?? true,
         lieuPersonnel: restaurant?['prive'] as bool? ?? false,
+        hoteId: hoteId,
+        hotePseudo: hote?['pseudo'] as String?,
+        jeSuisLHote: hoteId != null && hoteId == _monId,
+        hotePhotoUrl: urlPhotoProfil(
+          _client,
+          hote?['photo_url'] as String?,
+          miniature: true,
+        ),
       );
     }).toList();
   }
@@ -523,6 +567,15 @@ class SouvenirServiceSupabase implements SouvenirService {
   @override
   Future<void> basculerEnvie(String restaurantId, {required bool envie}) =>
       EnviesRestaurants(_client).basculer(restaurantId, envie: envie);
+
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {
+    await _client
+        .from('restaurants')
+        .update({'hote_id': null})
+        .eq('id', restaurantId)
+        .eq('hote_id', _monId);
+  }
 
   @override
   Future<void> supprimer(String souvenirId) async {
@@ -555,10 +608,9 @@ class SouvenirServiceSupabase implements SouvenirService {
       for (final p in (ligne['souvenirs_photos'] as List?) ?? const [])
         p['chemin'] as String?,
     ].where(aMoi).cast<String>().toList();
-    final medias = [for (final i in instants) i['media_url'] as String?]
-        .where(aMoi)
-        .cast<String>()
-        .toList();
+    final medias = [
+      for (final i in instants) i['media_url'] as String?,
+    ].where(aMoi).cast<String>().toList();
     try {
       await (
         photos.isEmpty

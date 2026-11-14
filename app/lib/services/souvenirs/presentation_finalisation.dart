@@ -21,6 +21,11 @@ class CategorieEtoiles {
   final String libelle;
 }
 
+/// Sous les étoiles de « Ce qui ressort ».
+const noteEtoiles =
+    'Touchez ou glissez sur les étoiles. Tout est facultatif ; rien n\'est '
+    'jamais moyenné ni montré sur la fiche du restaurant.';
+
 /// Les cinq catégories, dans l'ordre d'affichage.
 const categoriesEtoiles = [
   CategorieEtoiles('cuisine', 'La cuisine'),
@@ -30,8 +35,59 @@ const categoriesEtoiles = [
   CategorieEtoiles('qualite_prix', 'Qualité-prix'),
 ];
 
+// --- Les plats notés de « Ce qui ressort » --------------------------------
+//
+// En plus des cinq catégories, on peut écrire le nom d'un plat (ou d'un
+// vin…) et le noter : cinq au plus par moment. Dans le brouillon, ils
+// vivent avec les catégories, sous une clé `plat:<nom>`, dans l'ordre où
+// on les a écrits (note 0 tant qu'ils ne sont pas notés).
+
+/// Cinq plats notés au plus par moment.
+const nombreMaxPlats = 5;
+
+/// Le nom d'un plat : 40 caractères au plus.
+const longueurMaxPlat = 40;
+
+const _prefixePlat = 'plat:';
+
+/// La clé d'un plat dans les étoiles du brouillon.
+String clePlat(String nom) => '$_prefixePlat${nom.trim()}';
+
+bool estClePlat(String cle) => cle.startsWith(_prefixePlat);
+
+/// « Risotto » pour `plat:Risotto`.
+String nomPlat(String cle) => cle.substring(_prefixePlat.length);
+
+/// Les clés des plats écrits, dans l'ordre où on les a écrits.
+List<String> clesPlats(Map<String, int> etoiles) => [
+  for (final cle in etoiles.keys)
+    if (estClePlat(cle)) cle,
+];
+
+/// On peut encore écrire un plat.
+bool peutAjouterPlat(Map<String, int> etoiles) =>
+    clesPlats(etoiles).length < nombreMaxPlats;
+
+/// Pourquoi [nom] ne peut pas s'ajouter aux plats, `null` s'il le peut.
+String? validationPlat(String nom, Map<String, int> etoiles) {
+  final propre = nom.trim();
+  if (propre.isEmpty) return 'Écrivez le nom d\'un plat.';
+  if (propre.runes.length > longueurMaxPlat) {
+    return '$longueurMaxPlat caractères maximum.';
+  }
+  if (!peutAjouterPlat(etoiles)) return libelleLimitePlats;
+  final minuscule = propre.toLowerCase();
+  if (clesPlats(etoiles).any((c) => nomPlat(c).toLowerCase() == minuscule)) {
+    return 'Ce plat est déjà noté.';
+  }
+  return null;
+}
+
+/// Ce qui remplace le champ quand cinq plats sont écrits.
+const libelleLimitePlats = 'Cinq plats au maximum.';
+
 /// Petit-déjeuner, déjeuner, goûter ou dîner, d'après l'heure. Affichage
-/// seulement : le moment stocké reste midi ou soir.
+/// seulement : le moment stocké reste matin, midi ou soir.
 String repasDApresHeure(DateTime heure) {
   final h = heure.hour;
   if (h >= 5 && h < 10) return 'petit-déjeuner';
@@ -62,46 +118,34 @@ String dateLisibleBrouillon(DateTime priseLe, {DateTime? maintenant}) {
 }
 
 /// La date d'un moment déjà publié, qu'on modifie : « Hier · dîner ». Son
-/// heure exacte n'est pas gardée, seulement midi ou soir.
+/// heure exacte n'est pas gardée, seulement le moment du repas.
 String dateLisibleMomentPublie(
   DateTime dateVisite,
   String moment, {
   DateTime? maintenant,
 }) {
   final ref = maintenant ?? DateTime.now();
-  final repas = moment == 'midi' ? 'déjeuner' : 'dîner';
+  final repas = (libelleMomentRepas(moment) ?? 'Dîner').toLowerCase();
   return '${_jourLisible(dateVisite, ref)} · $repas';
 }
 
-/// Ce que le bouton principal de la finalisation propose, dans l'ordre :
-/// d'abord des photos, puis un lieu, puis publier (ou enregistrer).
+/// Ce que le bouton principal de la finalisation propose : publier (ou
+/// enregistrer). Les photos sont déjà choisies — la caméra ne laisse
+/// continuer qu'avec une à dix. Sans lieu, « Publier » demande d'abord où
+/// l'on était. Sans émotion, le bouton est grisé.
 enum EtapeFinalisation {
-  choisirPhotos('Choisir les photos'),
-  choisirLieu('Où étiez-vous ?'),
   publier('Publier'),
   enregistrer('Enregistrer');
 
   const EtapeFinalisation(this.libelle);
 
   final String libelle;
-
-  /// Publier et enregistrer exigent l'émotion : sans elle le bouton est
-  /// grisé.
-  bool get exigeEmotion => this == publier || this == enregistrer;
 }
 
 /// L'étape du bouton principal. En modification, les photos et le lieu
 /// sont déjà là : on enregistre.
-EtapeFinalisation etapeFinalisation({
-  required bool modification,
-  required bool aDesPhotos,
-  required bool aUnLieu,
-}) {
-  if (modification) return EtapeFinalisation.enregistrer;
-  if (!aDesPhotos) return EtapeFinalisation.choisirPhotos;
-  if (!aUnLieu) return EtapeFinalisation.choisirLieu;
-  return EtapeFinalisation.publier;
-}
+EtapeFinalisation etapeFinalisation({required bool modification}) =>
+    modification ? EtapeFinalisation.enregistrer : EtapeFinalisation.publier;
 
 /// La suite que l'appelant tire d'un [ResultatCloche] : faut-il montrer le
 /// Fil (rafraîchi, le nouveau moment en haut), et ce qu'il reste à dire.
@@ -143,4 +187,11 @@ SuiteCloche suiteApresCloche(ResultatCloche resultat) {
       message: 'Votre moment sera envoyé dès que possible.',
     ),
   };
+}
+
+/// « AT » pour « Atelier Sauvenière » : le rond d'un restaurant dans une
+/// liste, faute de photo.
+String initialesLieu(String nom) {
+  final lettres = nom.replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
+  return String.fromCharCodes(lettres.runes.take(2)).toUpperCase();
 }

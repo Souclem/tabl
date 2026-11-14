@@ -9,6 +9,9 @@ import 'package:app/ecrans/feuille_commentaires.dart';
 /// aimer un commentaire change vraiment ce que [commentaires] renvoie,
 /// comme le ferait le vrai service.
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   _FauxSouvenirService({
     List<Commentaire> commentaires = const [],
     this.erreurChargement = false,
