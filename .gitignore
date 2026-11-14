@@ -69,3 +69,6 @@ instruction/
 scripts/.venv/
 scripts/.cache_photos/
 scripts/.cache_nettoyage/
+
+# Captures du simulateur prises par les agents (vérification de fin de fonctionnalité)
+app/captures/

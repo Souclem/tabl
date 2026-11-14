@@ -116,6 +116,12 @@ class TablTokens {
   static TextStyle get titreAffichage =>
       GoogleFonts.playfairDisplay(color: texte, fontWeight: FontWeight.w500);
 
+  /// Les commandes de la création d'un moment (caméra, finalisation,
+  /// brouillons) : « Instrument Sans », celle du prototype « Tabl.
+  /// Création V5 ». Un getter, comme [titreAffichage].
+  static TextStyle get policeCreation =>
+      GoogleFonts.instrumentSans(color: texte, fontWeight: FontWeight.w600);
+
   /// Les noms et les titres de l'Explorer : une grotesque très grasse et
   /// serrée (Bricolage Grotesque, maquette de Martin), embarquée dans
   /// l'app (`assets/polices`).

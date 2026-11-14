@@ -7,6 +7,7 @@ import '../restaurants/envies_restaurants.dart';
 import '../restaurants/registre_restaurants.dart';
 import 'audience_souvenir.dart';
 import 'commentaire.dart';
+import 'depot_publication_supabase.dart';
 import '../social/photo_profil.dart';
 import '../stockage/liens_signes.dart';
 import '../stockage/sans_metadonnees.dart';
@@ -17,6 +18,7 @@ import 'nouveau_souvenir.dart';
 import 'personne_presente.dart';
 import 'personne_qui_aime.dart';
 import 'precompletion_souvenir.dart';
+import 'publication_service.dart';
 import 'souvenir_feed.dart';
 import 'souvenir_service.dart';
 
@@ -27,6 +29,12 @@ import 'souvenir_service.dart';
 /// `20260828000000_flux_moment_complet.sql`).
 /// Nombre de souvenirs chargés d'un coup (Feed, page de profil).
 const nombreMaxSouvenirsCharges = 50;
+
+/// Ce qu'on lit d'un lieu avec un moment : le genre et l'hôte en plus,
+/// la clé de l'hôte toujours nommée (il y a deux liens vers `profils`).
+const colonnesLieu =
+    'nom, ville, categories, prive, genre, hote_id, '
+    'hote:profils!restaurants_hote_id_fkey(pseudo, photo_url)';
 
 class SouvenirServiceSupabase implements SouvenirService {
   SouvenirServiceSupabase(this._client)
@@ -72,6 +80,7 @@ class SouvenirServiceSupabase implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> empreintes = const [],
   }) async {
@@ -86,6 +95,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         'legende': legende,
         'emotion': emotion.emoji,
         'impressions': impressions,
+        'notes': notesPourBase(notes),
         // Rien demandé à l'utilisateur pour le moment/la date : on
         // capture l'instant, on ne le fait pas remplir un formulaire
         // pour redire ce que l'horloge sait déjà.
@@ -238,8 +248,8 @@ class SouvenirServiceSupabase implements SouvenirService {
       _client
           .from('souvenirs')
           .select(
-            'legende, emotion, impressions, boisson_texte, restaurant_id, '
-            'restaurants(nom, ville, categories, prive)',
+            'legende, emotion, impressions, boisson_texte, notes, restaurant_id, '
+            'restaurants($colonnesLieu)',
           )
           .eq('id', souvenirId)
           .single(),
@@ -248,9 +258,24 @@ class SouvenirServiceSupabase implements SouvenirService {
     final restaurant = ligne['restaurants'] as Map<String, dynamic>?;
     final nom = restaurant?['nom'] as String? ?? '';
     final restaurantId = ligne['restaurant_id'] as String?;
+    final hote = restaurant?['hote'] as Map<String, dynamic>?;
     return MomentModifiable(
       lieu: restaurant?['prive'] == true
-          ? LieuRestaurant.personnel(nom: nom, restaurantId: restaurantId)
+          ? LieuRestaurant.personnel(
+              nom: nom,
+              restaurantId: restaurantId,
+              genre: GenreLieu.depuisBase(
+                restaurant?['genre'] as String?,
+                prive: true,
+              ),
+              hoteId: restaurant?['hote_id'] as String?,
+              hotePseudo: hote?['pseudo'] as String?,
+              hotePhotoUrl: urlPhotoProfil(
+                _client,
+                hote?['photo_url'] as String?,
+                miniature: true,
+              ),
+            )
           : LieuRestaurant(
               nom: nom,
               ville: restaurant?['ville'] as String? ?? '',
@@ -264,6 +289,7 @@ class SouvenirServiceSupabase implements SouvenirService {
       amisTaguesIds: actuelle.amisTaguesIds,
       impressions: (ligne['impressions'] as List?)?.cast<String>() ?? const [],
       boissonTexte: ligne['boisson_texte'] as String?,
+      notes: notesDepuisBase(ligne['notes']),
       audience: actuelle.audience,
     );
   }
@@ -282,6 +308,7 @@ class SouvenirServiceSupabase implements SouvenirService {
           'legende': moment.legende,
           'impressions': moment.impressions,
           'boisson_texte': moment.boissonTexte,
+          if (moment.notes case final notes?) 'notes': notesPourBase(notes),
         })
         .eq('id', souvenirId);
 
@@ -351,53 +378,15 @@ class SouvenirServiceSupabase implements SouvenirService {
     );
   }
 
-  /// Remplace la liste des personnes choisies (autorisées ou exclues
-  /// selon le mode) par [personneIds].
   Future<void> _ecrirePersonnesAudience(
     String souvenirId,
     Set<String> personneIds,
-  ) async {
-    await _client
-        .from('souvenirs_audience')
-        .delete()
-        .eq('souvenir_id', souvenirId);
-    if (personneIds.isEmpty) return;
-    await _client.from('souvenirs_audience').insert([
-      for (final profilId in personneIds)
-        {'souvenir_id': souvenirId, 'profil_id': profilId},
-    ]);
-  }
+  ) => ecrirePersonnesAudience(_client, souvenirId, personneIds);
 
-  /// Associe [souvenirId] à chaque Table de [tableIds] (règle 26-28,
-  /// 39) — un insert par Table plutôt qu'une transaction unique
-  /// (l'architecture cliente Supabase ne permet pas de transaction
-  /// multi-lignes explicite ici, voir plan Bloc 5). Best-effort
-  /// délibéré : le souvenir existe déjà à ce stade, un échec partiel ne
-  /// doit jamais faire disparaître les Tables qui ont réussi
-  /// (règle 51). Retourne les identifiants de Table qui ont échoué —
-  /// jamais d'exception silencieuse.
   Future<List<String>> _associerTables(
     String souvenirId,
     List<String> tableIds,
-  ) async {
-    final echecs = <String>[];
-    for (final tableId in tableIds) {
-      try {
-        await _client.from('associations_experience_table').insert({
-          'souvenir_id': souvenirId,
-          'table_id': tableId,
-          'ajoute_par': _monId,
-        });
-      } on PostgrestException catch (e) {
-        // Déjà associée (double tap, règle 55) : l'état voulu est déjà
-        // atteint, pas une vraie erreur. Sinon (membership perdue entre
-        // la sélection et l'envoi, Table supprimée...) : on continue les
-        // autres Tables plutôt que de tout annuler (règle 51).
-        if (e.code != '23505') echecs.add(tableId);
-      }
-    }
-    return echecs;
-  }
+  ) => associerTablesAuMoment(_client, souvenirId, tableIds);
 
   @override
   Future<List<SouvenirFeed>> feed() => _souvenirsPublies(sansSouvenirs: true);
@@ -440,7 +429,7 @@ class SouvenirServiceSupabase implements SouvenirService {
         .select(
           'id, auteur_id, photo_url, legende, emotion, moment, date_visite, '
           'impressions, visibilite, restaurant_id, est_souvenir, jour_connu, '
-          'restaurants(nom, ville, categories, prive), '
+          'restaurants($colonnesLieu), '
           'souvenirs_photos(rang, chemin), '
           'profils!souvenirs_auteur_id_fkey(pseudo, photo_url)'
           '$presentsFiltres',
@@ -461,12 +450,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         conditionSouvenirsDuReseau(_monId, await futurSuivis),
       );
     }
-    // Les plus récents seulement : au-delà, les requêtes groupées qui
+    // Les derniers publiés seulement : au-delà, les requêtes groupées qui
     // suivent (réactions, commentaires...) dépasseraient la longueur
     // d'adresse acceptée par l'API. Le chargement au fil du défilement
-    // viendra prendre le relais.
+    // viendra prendre le relais. Par publication et non par date du
+    // repas : un moment qui vient d'être publié est toujours chargé (en
+    // haut du Fil), même fait de photos anciennes ; le profil le range
+    // ensuite au mois du repas.
     final lignes = await requete
-        .order('date_visite', ascending: false)
         .order('cree_le', ascending: false)
         .limit(nombreMaxSouvenirsCharges);
 
@@ -506,6 +497,8 @@ class SouvenirServiceSupabase implements SouvenirService {
     return lignes.map((l) {
       final restaurant = l['restaurants'] as Map<String, dynamic>?;
       final auteur = l['profils'] as Map<String, dynamic>?;
+      final hote = restaurant?['hote'] as Map<String, dynamic>?;
+      final hoteId = restaurant?['hote_id'] as String?;
       final chemin = l['photo_url'] as String?;
       final id = l['id'] as String;
       final donneesReactions =
@@ -515,7 +508,18 @@ class SouvenirServiceSupabase implements SouvenirService {
         id: id,
         photoUrl: chemin == null ? null : urlParChemin[chemin],
         legende: l['legende'] as String?,
-        restaurantNom: restaurant?['nom'] as String? ?? '',
+        // « Chez vous », « Chez Léa », « Chez Emma », « Bibo ».
+        restaurantNom: libelleLieu(
+          genre: GenreLieu.depuisBase(
+            restaurant?['genre'] as String?,
+            prive: restaurant?['prive'] == true,
+          ),
+          nom: restaurant?['nom'] as String? ?? '',
+          hotePseudo: hote?['pseudo'] as String?,
+          hoteEstMoi: hoteId != null && hoteId == _monId,
+          auteurPseudo: auteur?['pseudo'] as String?,
+          auteurEstMoi: l['auteur_id'] == _monId,
+        ),
         ville: restaurant?['ville'] as String? ?? '',
         moment: l['moment'] as String? ?? '',
         dateVisite: DateTime.parse(l['date_visite'] as String),
@@ -548,6 +552,14 @@ class SouvenirServiceSupabase implements SouvenirService {
         estSouvenir: l['est_souvenir'] as bool? ?? false,
         jourConnu: l['jour_connu'] as bool? ?? true,
         lieuPersonnel: restaurant?['prive'] as bool? ?? false,
+        hoteId: hoteId,
+        hotePseudo: hote?['pseudo'] as String?,
+        jeSuisLHote: hoteId != null && hoteId == _monId,
+        hotePhotoUrl: urlPhotoProfil(
+          _client,
+          hote?['photo_url'] as String?,
+          miniature: true,
+        ),
       );
     }).toList();
   }
@@ -555,6 +567,15 @@ class SouvenirServiceSupabase implements SouvenirService {
   @override
   Future<void> basculerEnvie(String restaurantId, {required bool envie}) =>
       EnviesRestaurants(_client).basculer(restaurantId, envie: envie);
+
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {
+    await _client
+        .from('restaurants')
+        .update({'hote_id': null})
+        .eq('id', restaurantId)
+        .eq('hote_id', _monId);
+  }
 
   @override
   Future<void> supprimer(String souvenirId) async {

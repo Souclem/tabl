@@ -13,6 +13,7 @@ class MomentModifiable {
     this.amisTaguesIds = const {},
     this.impressions = const [],
     this.boissonTexte,
+    this.notes,
     this.audience = AudienceSouvenir.toutLeMonde,
   });
 
@@ -24,5 +25,10 @@ class MomentModifiable {
   final Set<String> amisTaguesIds;
   final List<String> impressions;
   final String? boissonTexte;
+
+  /// Les étoiles par catégorie (voir `categoriesEtoiles`). `null` : on n'y
+  /// touche pas à l'enregistrement, ce qui est le cas tant que l'écran de
+  /// modification ne les propose pas.
+  final Map<String, int>? notes;
   final AudienceSouvenir audience;
 }

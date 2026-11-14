@@ -295,12 +295,12 @@ List<VilleBilan> _villes(List<SouvenirFeed> souvenirs) {
   ];
 }
 
-/// `moment` vaut `'midi'` ou `'soir'` en base.
+/// `moment` vaut `'matin'`, `'midi'` ou `'soir'` en base.
 List<PartMoment> _moments(List<SouvenirFeed> souvenirs) {
   final total = souvenirs.length;
   if (total == 0) return const [];
   return [
-    for (final code in const ['soir', 'midi'])
+    for (final code in momentsRepas.reversed)
       if (souvenirs.where((s) => s.moment == code).length case final n
           when n > 0)
         PartMoment(

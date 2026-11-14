@@ -14,6 +14,9 @@ import 'package:app/ecrans/ecran_viewer_instants.dart';
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<SouvenirFeed?> souvenir(String souvenirId) =>
       throw UnimplementedError();
   @override
@@ -77,6 +80,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> impressions = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> empreintes = const [],
   }) => throw UnimplementedError();

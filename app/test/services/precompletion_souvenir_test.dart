@@ -93,7 +93,17 @@ void main() {
     expect(momentDApresHeure(DateTime(2023, 1, 1, 16, 59)), 'midi');
     expect(momentDApresHeure(DateTime(2023, 1, 1, 17)), 'soir');
     expect(momentDApresHeure(DateTime(2023, 1, 1, 1, 30)), 'soir');
-    expect(momentDApresHeure(DateTime(2023, 1, 1, 8)), isNull);
+    expect(momentDApresHeure(DateTime(2023, 1, 1, 8)), 'matin');
+    expect(momentDApresHeure(DateTime(2023, 1, 1, 9, 59)), 'matin');
+    expect(momentDApresHeure(DateTime(2023, 1, 1, 10)), 'midi');
+    expect(momentDApresHeure(DateTime(2023, 1, 1, 4)), isNull);
+  });
+
+  test('le moment d\'un repas pris maintenant : toujours l\'un des trois', () {
+    expect(momentDuJour(DateTime(2023, 1, 1, 7)), 'matin');
+    expect(momentDuJour(DateTime(2023, 1, 1, 12)), 'midi');
+    expect(momentDuJour(DateTime(2023, 1, 1, 20)), 'soir');
+    expect(momentDuJour(DateTime(2023, 1, 1, 2)), 'soir');
   });
 
   test('sous le nom : la distance à la photo, jamais celle du téléphone', () {

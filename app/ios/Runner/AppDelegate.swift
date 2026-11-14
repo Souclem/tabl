@@ -55,6 +55,41 @@ final class NotificationsTabl: NSObject, FlutterPlugin {
           result(accordee)
         }
       }
+    case "remplacerRappels":
+      // Les rappels de brouillon (« Votre moment vous attend ») : tous ceux
+      // programmés sont remplacés par la liste reçue, vide pour les retirer.
+      let rappels = call.arguments as? [[String: Any]] ?? []
+      let centre = UNUserNotificationCenter.current()
+      centre.getPendingNotificationRequests { demandes in
+        centre.removePendingNotificationRequests(
+          withIdentifiers: demandes.map(\.identifier).filter { $0.hasPrefix("brouillon-") })
+        for rappel in rappels {
+          guard let id = rappel["id"] as? String,
+            let secondes = (rappel["secondes"] as? NSNumber)?.doubleValue, secondes > 0
+          else { continue }
+          let contenu = UNMutableNotificationContent()
+          contenu.title = rappel["titre"] as? String ?? ""
+          contenu.body = rappel["corps"] as? String ?? ""
+          contenu.sound = .default
+          contenu.userInfo = [
+            "type": "brouillon",
+            "brouillon_id": rappel["brouillonId"] as? String ?? "",
+          ]
+          centre.add(
+            UNNotificationRequest(
+              identifier: id, content: contenu,
+              trigger: UNTimeIntervalNotificationTrigger(timeInterval: secondes, repeats: false)))
+        }
+        DispatchQueue.main.async { result(nil) }
+      }
+    case "annulerRappels":
+      // Un brouillon publié ou supprimé : ses rappels, à venir ou affichés,
+      // disparaissent.
+      let ids = call.arguments as? [String] ?? []
+      let centre = UNUserNotificationCenter.current()
+      centre.removePendingNotificationRequests(withIdentifiers: ids)
+      centre.removeDeliveredNotifications(withIdentifiers: ids)
+      result(nil)
     case "pret":
       dartPret = true
       if let enAttente = toucheeEnAttente {

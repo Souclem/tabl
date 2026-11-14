@@ -280,7 +280,7 @@ class _EcranAjouterSouvenirState extends State<EcranAjouterSouvenir>
                       Text('Comment c\'était ?', style: c.legende),
                       const SizedBox(height: TablTokens.espaceS),
                       TablSelecteurEmotion(
-                        emojis: [for (final e in Emotion.values) e.emoji],
+                        emojis: [for (final e in Emotion.proposees) e.emoji],
                         selection: _emotion?.emoji,
                         onSelection: (emoji) => setState(() {
                           final choisie = Emotion.depuisEmoji(emoji);
@@ -481,7 +481,7 @@ class _FeuilleQuandState extends State<_FeuilleQuand> {
               spacing: TablTokens.espaceS,
               alignment: WrapAlignment.center,
               children: [
-                for (final m in const ['midi', 'soir'])
+                for (final m in momentsRepas)
                   TablPuceSelection(
                     libelle: libelleMomentRepas(m)!,
                     selectionnee: _moment == m,

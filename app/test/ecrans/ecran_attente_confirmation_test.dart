@@ -127,6 +127,9 @@ class _FauxAbonnementService implements AbonnementService {
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<SouvenirFeed?> souvenir(String souvenirId) => throw UnimplementedError();
   @override
   Future<Set<String>> empreintesImportees() => throw UnimplementedError();
@@ -156,6 +159,7 @@ class _FauxSouvenirService implements SouvenirService {
     List<String> amisTaguesIds = const [],
     String? boissonTexte,
     Uint8List? boissonPhoto,
+    Map<String, int> notes = const {},
     AudienceSouvenir audience = AudienceSouvenir.toutLeMonde,
     List<String> impressions = const [],
     List<String> empreintes = const [],

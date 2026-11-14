@@ -291,3 +291,29 @@ class TablCarteChoixLieu extends StatelessWidget {
     );
   }
 }
+
+/// L'épingle fixe au centre d'une carte qu'on déplace dessous : sa pointe
+/// marque le centre (placer un restaurant qui n'est pas dans Tabl).
+class TablEpingleCentre extends StatelessWidget {
+  const TablEpingleCentre({super.key});
+
+  static const double _taille = 44;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = TablCouleurs.of(context);
+    return IgnorePointer(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: _taille),
+          child: Icon(
+            Icons.place_rounded,
+            size: _taille,
+            color: c.primaire,
+            shadows: const [Shadow(blurRadius: 8, color: Colors.black45)],
+          ),
+        ),
+      ),
+    );
+  }
+}

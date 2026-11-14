@@ -8,8 +8,8 @@ import 'ecran_carte.dart';
 import 'ecran_feed.dart';
 import 'ecran_notifications.dart';
 import 'ecran_profil.dart';
-import 'ecran_publier.dart';
 import 'ecran_tables.dart';
+import 'parcours_creation.dart';
 
 /// Coquille de l'app une fois connecté : barre de navigation en bas
 /// (Feed, Explorer, publier, Wishlist, Profil). Wishlist attend encore
@@ -29,6 +29,9 @@ class EcranPrincipal extends StatefulWidget {
     this.notificationsSysteme,
     this.rechercheLieuService,
     this.positionService,
+    this.camera,
+    this.envois,
+    this.ouvrirParcours,
   });
 
   final AuthService authService;
@@ -50,6 +53,15 @@ class EcranPrincipal extends StatefulWidget {
   final NotificationsSysteme? notificationsSysteme;
   final RechercheLieuService? rechercheLieuService;
   final PositionService? positionService;
+
+  /// La caméra et la file d'envoi de la création d'un moment : `null` en
+  /// production (la vraie caméra, `TablBackend.envois`), simulées en test.
+  final CameraService? camera;
+  final EnvoiPublications? envois;
+
+  /// Remplace le parcours de création (caméra, finalisation, cloche) : un
+  /// test rend directement le [ResultatCloche] dont il veut voir la suite.
+  final Future<ResultatCloche?> Function(BuildContext context)? ouvrirParcours;
 
   /// Route standard vers l'écran principal, une fois connecté. Centralisé
   /// ici (même principe que `EcranAccueil.route`) pour que tous les
@@ -106,7 +118,8 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   }
 
   /// Les notifications du téléphone : autorisées et enregistrées une
-  /// fois connecté ; une notification touchée ouvre la cloche.
+  /// fois connecté ; une notification touchée ouvre la cloche, un rappel de
+  /// brouillon ouvre « + » (qui propose les brouillons).
   StreamSubscription<String>? _touchees;
 
   @override
@@ -114,7 +127,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
     super.initState();
     final systeme = _notificationsSysteme;
     if (systeme != null) {
-      _touchees = systeme.touchees.listen((_) => _ouvrirNotifications());
+      _touchees = systeme.touchees.listen(
+        (type) => type == typeNotificationBrouillon
+            ? _reprendreBrouillon()
+            : _ouvrirNotifications(),
+      );
       // Après le premier affichage : la question d'iOS arrive sur l'app,
       // pas sur un écran blanc.
       WidgetsBinding.instance.addPostFrameCallback((_) => systeme.activer());
@@ -126,6 +143,15 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
     _reprise?.cancel();
     _touchees?.cancel();
     super.dispose();
+  }
+
+  /// Un rappel de brouillon touché : ce qui était ouvert se referme, puis
+  /// « + » propose de reprendre les brouillons.
+  Future<void> _reprendreBrouillon() async {
+    if (!mounted) return;
+    final ici = ModalRoute.of(context);
+    Navigator.of(context).popUntil((route) => ici == null || route == ici);
+    await _publier();
   }
 
   Future<void> _ouvrirNotifications() async {
@@ -165,6 +191,11 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   // backend injecté, un accès à `TablBackend.client` avant que Supabase
   // ne soit forcément initialisé) même pour qui ne les visite jamais —
   // et la carte Mapbox est lourde à démarrer.
+  // L'onglet Tables est en construction : il montre seulement une page
+  // d'attente. L'écran des Tables (EcranTables) reste tel quel, prêt :
+  // repasser à `false` pour le retrouver.
+  static const _tablesEnConstruction = true;
+
   final Set<TablOnglet> _ongletsConstruits = {
     TablOnglet.feed,
     TablOnglet.profil,
@@ -211,22 +242,28 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
   }
 
   Future<void> _publier() async {
-    final publie = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => EcranPublier(
-          souvenirService: widget.souvenirService,
-          abonnementService: widget.abonnementService,
-          tableService: _tableService,
-          rechercheLieuService: _rechercheLieuService,
-          positionService: _positionService,
-        ),
-      ),
-    );
-    if (publie != true || !mounted) return;
-    setState(() {
-      _versionFeed++;
-      _onglet = TablOnglet.feed;
-    });
+    final resultat =
+        await (widget.ouvrirParcours?.call(context) ??
+            ParcoursCreation.ouvrir(
+              context,
+              souvenirService: widget.souvenirService,
+              abonnementService: widget.abonnementService,
+              camera: widget.camera ?? CameraServiceAppareil(),
+              envois: widget.envois ?? TablBackend.envois,
+              tableService: _tableService,
+              rechercheLieuService: _rechercheLieuService,
+              positionService: _positionService,
+            ));
+    if (resultat == null || !mounted) return;
+    final suite = suiteApresCloche(resultat);
+    if (suite.montrerLeFil) {
+      setState(() {
+        _versionFeed++;
+        _onglet = TablOnglet.feed;
+      });
+    }
+    final message = suite.message;
+    if (message != null) afficherMessage(context, message);
   }
 
   @override
@@ -255,14 +292,21 @@ class _EcranPrincipalState extends State<EcranPrincipal> {
                   rechercheLieuService: widget.rechercheLieuService,
                   positionService: widget.positionService,
                 ),
-                _ongletsConstruits.contains(TablOnglet.tables)
-                    ? EcranTables(
+                !_ongletsConstruits.contains(TablOnglet.tables)
+                    ? const SizedBox.shrink()
+                    : _tablesEnConstruction
+                    ? const TablEnConstruction(
+                        titre: 'Vos Tables',
+                        message:
+                            'Cette page est en construction.\n'
+                            'Elle arrive bientôt.',
+                      )
+                    : EcranTables(
                         tableService: _tableService,
                         abonnementService: widget.abonnementService,
                         souvenirService: widget.souvenirService,
                         estOnglet: true,
-                      )
-                    : const SizedBox.shrink(),
+                      ),
                 _ongletsConstruits.contains(TablOnglet.carte)
                     // Hors de l'onglet, le ciel de la Constellation s'arrête.
                     ? TickerMode(

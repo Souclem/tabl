@@ -200,7 +200,10 @@ class _FeuilleAudienceState extends State<_FeuilleAudience> {
             ),
           ),
           const SizedBox(height: TablTokens.espaceM),
-          Text('Qui peut voir ce moment ?', style: c.titre),
+          Text(
+            'Qui peut voir ce moment ?',
+            style: c.titreAffichage.copyWith(fontSize: 26),
+          ),
           const SizedBox(height: TablTokens.espaceM),
           TablOptionAudience(
             titre: 'Tout le monde',

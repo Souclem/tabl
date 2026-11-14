@@ -8,6 +8,9 @@ import 'package:app/widgets/widgets.dart';
 import 'package:app/ecrans/feuille_restaurant.dart';
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   _FauxSouvenirService(this.moments);
 
   final List<SouvenirFeed> moments;

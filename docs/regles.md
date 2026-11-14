@@ -25,8 +25,8 @@ pourquoi) sont dans `docs/decisions.md`.
 
 ## Gestes réservés au propriétaire du projet
 
-Jamais de sa propre initiative ; on prépare, puis on signale ce qu'il faut
-lancer :
+Jamais de sa propre initiative, sauf geste délégué (voir plus bas) ; on
+prépare, puis on signale ce qu'il faut lancer :
 
 - `supabase db push`, `supabase functions deploy`, `supabase secrets set` —
   écrire la migration ou la fonction, puis écrire « à pousser : … ».
@@ -46,6 +46,19 @@ garde-fou dans l'app « Garde-fous Tabl » (source : `scripts/garde_fous_app/`,
 réglages dans `~/.config/tabl/garde_fous.json`). Un agent ne touche jamais à
 ces réglages et ne cherche pas à contourner un refus : il écrit dans sa tâche
 ce qui reste à lancer.
+
+**Geste délégué.** Un garde-fou décoché veut dire que le propriétaire délègue
+ce geste aux agents : l'agent le fait lui-même au lieu d'écrire « à pousser ».
+Inutile de lire les réglages : on essaie, et si le garde-fou refuse, on écrit
+ce qui reste à lancer. `supabase db push` est délégué tant que l'app n'est pas
+ouverte au public : seulement des migrations approuvées en relecture et
+testées sur PGlite, d'abord `--dry-run`, et on vérifie que la liste ne
+contient que les migrations attendues. Le lien vers le projet Supabase est
+copié dans chaque copie d'agent. Restent interdits même délégués, et le
+garde-fou les refuse toujours : `supabase config push`, `supabase db reset`
+sur la vraie base (`--linked`, `--db-url`), la suppression d'un projet ou d'une
+branche Supabase. Toute autre suppression de données de la vraie base reste
+interdite aussi.
 
 ## Base de données (Supabase)
 
@@ -75,6 +88,13 @@ ce qui reste à lancer.
   `(storage.foldername(name))[1]` = l'auteur de la ligne (exception `demo/`).
 - **`peut_voir_souvenir()` est la source unique** de la visibilité d'un
   moment.
+- **Seul un lieu ouvert au public a une position.** Chez moi, chez
+  quelqu'un, ailleurs = lieu personnel (`restaurants.prive` + `genre`,
+  contrainte `lieu_personnel_sans_adresse`). Jamais la position du
+  téléphone enregistrée sur un lieu (elle ne sert qu'à trier) ; un
+  restaurant saisi à la main n'a de position que par l'épingle placée par
+  l'utilisateur (fuite réelle : un « chez moi » sur la carte). Lire l'hôte
+  par `profils!restaurants_hote_id_fkey` (deux liens vers `profils`).
 - **Vers l'extérieur** (Google Sheet, notifications…) : fonction Edge
   TypeScript appelée par l'app, jamais un webhook ni un trigger.
 - **Tester toute policy sur PGlite avant de la donner à pousser.**

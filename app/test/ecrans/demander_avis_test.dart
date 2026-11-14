@@ -34,6 +34,9 @@ class _FauxAvisService implements AvisService {
 }
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   _FauxSouvenirService([this.moments = const []]);
 
   final List<SouvenirFeed> moments;

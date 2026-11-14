@@ -197,7 +197,7 @@ class _LigneCommentaire extends StatelessWidget {
               ],
             ),
           ),
-          // Les mêmes verres qui trinquent que sur un moment, en petit.
+          // La même cloche que sur un moment, en petit.
           TablBoutonReaction(actif: c.jaiAime, onPresse: c.onAimer, taille: 18),
         ],
       ),

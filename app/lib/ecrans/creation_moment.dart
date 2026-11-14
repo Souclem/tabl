@@ -188,7 +188,8 @@ mixin PropositionLieu<T extends StatefulWidget> on State<T> {
           service.lieuxProches(
             latitude: nouveaux[i].latitude,
             longitude: nouveaux[i].longitude,
-            limite: i == 0 ? 8 : 4,
+            // Assez pour faire défiler autour de l'endroit principal.
+            limite: i == 0 ? 20 : 4,
           ),
       ]);
       // D'autres endroits ont été demandés entre-temps.
@@ -219,13 +220,8 @@ mixin PropositionLieu<T extends StatefulWidget> on State<T> {
     );
     if (choisi == null || !mounted) return;
     setState(() {
-      lieu = choisi.estManuel ? completerLieuManuel(choisi) : choisi;
+      lieu = choisi;
       lieuChoisi = true;
     });
   }
-
-  /// Un restaurant saisi à la main, tel qu'il sera gardé. Sans position
-  /// par défaut : celle du téléphone le placerait au mauvais endroit sur
-  /// la carte, si l'on n'y est plus.
-  LieuRestaurant completerLieuManuel(LieuRestaurant lieu) => lieu;
 }

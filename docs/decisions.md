@@ -13,14 +13,20 @@ sont dans `docs/regles.md`.
   issues : couper « Confirm email » dans le dashboard (recommandé pour la
   bêta) ou un SMTP perso avec un domaine. Le code gère déjà les messages
   d'erreur (`messageErreurAuth`).
-- **Brouillons (« Plus tard »)** : écrits en base, mais aucun écran ne les
-  relit.
 - **Constellation** : globe 3D essayé dans un prototype seulement ; plan des
   villes (rues, eau, parcs) pas fait ; performance sur un vrai iPhone avec
   beaucoup de restos jamais mesurée.
 - **Explorer** : étapes 3 (fiche « Éventail ») et 4 (« Où explorer ») de la
   maquette pas encore faites (voir plus bas).
 - **Deep linking** (retour dans l'app depuis un e-mail) : pas fait.
+- **Onglet Tables : « en construction »** (2026-11-14). L'écran des Tables
+  (`EcranTables`) est gardé tel quel ; `_tablesEnConstruction` dans
+  `ecran_principal.dart` le rallume. Les autres accès aux Tables
+  (« On y va ? » sur une fiche, filtre « Une Table », audience d'un moment)
+  restent ouverts.
+- **À faire — « Où et quand » : chercher un restaurant sur la carte**, en
+  plus de la recherche par nom et des propositions (demandé, pas encore
+  fait).
 - Catégories Foursquare : traduites côté app par `libelleCategorie`
   (table de la taxonomie « Dining and Drinking » + adjectif de cuisine pour
   « X Restaurant »). Une catégorie inconnue reste en anglais : compléter la
@@ -43,13 +49,167 @@ sont dans `docs/regles.md`.
 
 ## Publier un moment
 
-- **Un seul écran** : photos en grand (jusqu'à 10, page d'ajout après la
-  dernière), restaurant proposé d'après les photos localisées sinon la
-  position du téléphone (« à 40 m de vous »), émotion obligatoire, options en
-  lignes (Avec qui ?, Ce qui ressort, Une boisson ?), « Qui peut voir »,
-  bouton « Garder ce moment. ».
-- **Modifier** (menu « ⋯ ») : rouvre le même écran prérempli ; photos et date
-  non modifiables ; les souvenirs ne sont pas encore modifiables.
+- **Un brouillon local, plusieurs photos** : chaque photo prise ou importée
+  s'ajoute, à la suite, au brouillon ouvert dans la caméra, quelle que soit
+  sa date (pas de regroupement automatique par heure : un deuxième import
+  ne remplace jamais les photos déjà là). On en retire une avec le ×.
+  « Continuer » mène à la finalisation, puis la publication passe par la
+  cloche. Parcours : caméra → finalisation → cloche (`ParcoursCreation`).
+  Chaque écran remplace le précédent : la caméra ne reste pas sous la
+  finalisation, et l'appareil photo en haut à droite de la finalisation
+  (« Reprendre des photos ») ramène à la caméra, sur le même brouillon.
+  Plus de feuille « Photos du moment » ni d'étape « Choisir les photos » :
+  le tri se fait dans la caméra (× sur une photo), qui ne laisse continuer
+  qu'avec une à dix photos ; toutes les photos du brouillon sont publiées.
+- **« + » et les brouillons** : sans brouillon en cours, « + » ouvre
+  directement la caméra. Sinon, la feuille « Brouillons » les liste (le
+  plus récent d'abord ; la corbeille d'une ligne le supprime après
+  confirmation), avec « Nouveau moment » en dernier. Reprendre un brouillon
+  ouvre la caméra avec ses photos. **Trois brouillons au maximum** : au-delà,
+  « Nouveau moment » est grisé et dit d'en publier ou d'en supprimer un ;
+  le toucher quand même ne crée rien : la ligne grossit, tremble et le
+  téléphone vibre. Si les brouillons ne peuvent pas être lus, « + » ne
+  crée rien non plus (un message d'erreur) : ce serait peut-être le
+  quatrième. Un
+  moment qui attend d'être envoyé (« Envoyer dès que possible ») n'est pas
+  proposé. S'il en reste davantage sur le téléphone (d'avant la limite), les
+  plus anciens sont effacés à l'ouverture de « + ».
+- **Dix photos au plus par moment** : la caméra laisse en prendre
+  davantage, mais « Continuer » est grisé au-delà de 10 ; le toucher fait
+  trembler le bouton (avec vibration) et dit combien en retirer. Le
+  compteur le dit aussi (« 13 photos · retirez-en 3 pour continuer »).
+- **Éventail de la caméra** : les photos dans l'ordre de publication (la
+  première en haut de l'arc ; au-delà de six, les six dernières). Toucher
+  une photo l'agrandit, le × la supprime ; la glisser (tout de suite, ou
+  après un appui long) la soulève : on la pose à une autre place (les
+  autres s'écartent) ou dans la corbeille.
+- **Finalisation** : photos en grand, restaurant proposé d'après les photos
+  localisées sinon la position du téléphone (« à 40 m de vous »), **émotion
+  à 5 visages obligatoire**, options en lignes (Avec qui ?, Où et quand,
+  Ajouter un mot), « Qui peut voir ». **Les étoiles sont facultatives** et ne
+  sont jamais agrégées (pas de moyenne, pas de note globale). **« Publier »
+  ne fait que publier** (2026-11-14) : il reste grisé tant qu'il manque le
+  lieu ou l'émotion, et le toucher fait respirer ce qui manque (la ligne du
+  lieu, la rangée d'émotions). Il n'ouvre jamais « Où et quand » : le lieu
+  se choisit en touchant son nom, en haut à gauche.
+- **Où l'on a mangé** (2026-11-14, « la maison discrète ») — décision née
+  d'une fuite : un « chez moi » saisi comme restaurant recevait la position
+  du téléphone et plaçait le domicile sur la carte des abonnés.
+  - **Seul un lieu ouvert au public a une position.** Chez moi, chez
+    quelqu'un, ailleurs : un lieu personnel (`restaurants.prive`, avec
+    `genre` `domicile` / `chez` / `ailleurs`), sans adresse ni position —
+    la contrainte `lieu_personnel_sans_adresse` le garantit en base.
+    Jamais la position du téléphone sur un lieu ; un restaurant pas dans
+    Tabl n'a de position que si l'on place soi-même son épingle sur une
+    carte (« Ce lieu sera visible sur la carte par vos abonnés »), qui part
+    de l'endroit des photos. Sans épingle, il n'est sur aucune carte.
+  - **La feuille « Où et quand »** : le restaurant d'abord, la majorité des
+    cas. Le plus probable (photos, sinon position du téléphone, qui ne sert
+    qu'à trier) est **déjà coché, sans question** (plus de « Étiez-vous
+    chez X ? » ni de pastille « à confirmer ») ; toucher une autre ligne la
+    coche et **replie la liste** sur ce choix (« Voir les autres
+    restaurants », ou retoucher le choix, la rouvre) ; « OK » ferme. La
+    liste va jusqu'à 20 restaurants autour des photos et défile, le moment
+    du repas restant fixe en bas. La maison s'anime (petit rebond, listes
+    en fondu). **Tout se passe dans la feuille** (2026-11-14) :
+    la recherche cherche au fil de la frappe sans ouvrir d'autre feuille,
+    et « Pas dans Tabl ? Ajoutez-le » s'écrit sur place (nom déjà repris
+    de la recherche, ville, « Placer sur la carte » pour l'épingle). À
+    droite de la recherche, **une maison** : touchée, le verre se
+    réchauffe et la maison devient dorée, sans texte d'explication. Une
+    **rangée de ronds qui défile de côté** : Chez moi, toutes les personnes
+    que l'on suit (photo et pseudo ; celles qui étaient à table d'abord),
+    mes « chez » et « Chez… » pour quelqu'un qui n'est pas sur Tabl
+    (« Mamie » → « Chez Mamie »). Puis « Chez personne » : Pique-nique, Au
+    travail, En voyage, Une fête, Autre. La feuille garde sa hauteur quel
+    que soit le nombre d'abonnements : « Chez personne », le moment du
+    repas (en pied, toujours visible) et « OK » restent à l'écran. Le
+    bureau est « ailleurs » exprès : un lieu de travail répété est aussi
+    sensible qu'un domicile.
+  - **Chez moi** se lit « Chez vous » pour soi, « Chez Léa » (le
+    pseudo de l'auteur) pour les autres.
+  - **Chez quelqu'un de Tabl** : lié à son profil, jamais à une adresse
+    (`restaurants.hote_id`, seulement quelqu'un qu'on suit). L'hôte est
+    coché d'office dans « Avec qui » (décochable ; comme un tag, ça
+    n'élargit pas l'audience), prévenu dans ses notifications (« X a publié
+    un moment chez vous », si le moment lui est visible) et peut **retirer
+    son nom** (menu « ⋯ ») : le lieu redevient « Chez quelqu'un ». Sur le
+    Fil, sa photo à la place de l'épingle ; toucher le lieu ouvre son
+    profil. Hors restaurant sans hôte : une maison, jamais l'épingle
+    (l'épingle veut dire « sur la carte »).
+  - En-tête de la finalisation : sans lieu, « Où étiez-vous ? » en
+    pointillé ; sinon le lieu (épingle, maison ou photo de l'hôte) et un
+    chevron.
+  - Pas encore (proposés, pas demandés) : « à emporter / livré » ; ne rien
+    cocher d'office quand aucun restaurant n'est à moins de 80 m ;
+    « Chez vous ? » retenu sur le téléphone ; demander « C'est chez
+    quelqu'un ? » quand un restaurant saisi à la main s'appelle « chez… »,
+    « maison »… ; la notification push de « chez vous » (seulement dans
+    l'écran des notifications pour l'instant).
+- **Rappels de brouillon** : un brouillon pas encore publié envoie une
+  notification 2 h puis 5 h après sa dernière modification (« Votre moment
+  chez … »). Programmés quand l'app passe en arrière-plan, retirés quand
+  elle revient : ils ne sonnent jamais app ouverte. Annulés dès que le
+  moment part (cloche, « Envoyer dès que possible ») ou est publié. Le
+  toucher ouvre « + ». Sans paquet : notifications locales iOS par le canal
+  natif `tabl/notifications` (`AppDelegate.swift`) — iPhone seulement,
+  comme les notifications push.
+- **Plats notés** (« Ce qui ressort ») : en plus des cinq catégories, on
+  écrit le nom d'un plat (ou d'un vin…) et on le note, **cinq au plus** par
+  moment, 40 caractères chacun. Un plat écrit sans toucher « Ajouter » est
+  gardé à la fermeture. En base : `souvenirs.notes` →
+  `{"cuisine": 4, "plats": [{"nom": "Risotto", "note": 5}]}` (seuls les
+  plats notés sont envoyés). Jamais agrégés non plus.
+- **Style des commandes de création** (caméra, finalisation, feuille
+  « Brouillons ») : celui du prototype « Création V5 ». Police Instrument
+  Sans ; rail en ronds de verre de 42 px (« Aa », étincelle, silhouettes) ;
+  émojis dans une capsule de verre ; « Plus tard » et l'audience en pilules
+  de verre de 40 px ; bouton principal en pilule de 50 px, à sa largeur. La
+  feuille « Brouillons » est toujours sombre, comme la caméra.
+- **En-tête et feuilles de la finalisation**, même prototype, sans les
+  traits de progression en haut (ça ferait « story » : on publie). En haut,
+  sous « Plus tard » : le lieu (voir « Où l'on a mangé »), le moment du
+  repas, puis le mot en italique — rien quand il n'y a pas de mot, le rail le propose. Les
+  feuilles « Où et quand », « Ce qui ressort » (« facultatif »), « Avec
+  qui » sont en verre sombre : titre court, rubriques en petites capitales,
+  lignes à case ronde, bouton en bas à droite (« OK » ; « Passer » ou
+  « Valider » pour les étoiles). Verre du prototype : flou 20, couleurs
+  saturées, teinte nuit à 36 % — la photo se voit à travers (teinte chaude
+  côté maison d'« Où et quand »). Le moment du repas : « Petit-déjeuner » (`matin`, 5 h –
+  10 h), « Déjeuner » (`midi`), « Dîner » (`soir`), comme l'en-tête ; pas
+  de goûter (non demandé). Le filtre « moment » d'Explorer ne propose
+  encore que déjeuner et dîner. « Ajouter un mot » est une barre posée sur le
+  clavier. Une photo supprimée dit seulement « Photo supprimée » avec
+  « Annuler » : aucune corbeille n'est montrée, on ne promet donc pas de la
+  récupérer plus tard.
+- **Ordre du Feed et du profil** : les moments arrivent du plus récemment
+  publié au plus ancien (`cree_le`), pas par date du repas : un repas
+  ancien (photos de 2009) publié aujourd'hui doit apparaître tout de suite.
+  Le journal du profil le range ensuite sous le mois du repas.
+- **Publication en deux temps** : le moment est d'abord envoyé invisible
+  (brouillon côté base), puis publié d'un coup (commit) une fois toutes les
+  photos arrivées. Un envoi interrompu ne montre jamais un moment à moitié.
+- **Reprise après fermeture** : fermer la caméra, « Plus tard » ou quitter
+  l'app garde le brouillon ; « + » le retrouve. Un envoi en attente repart
+  dès que possible.
+- **Pendant la cloche** (2026-11-14) : ni « Modifier » ni « Annuler ».
+  Une fois « Publier » touché, la publication va au bout ; les boutons
+  n'apparaissent qu'en cas d'échec ou sans réseau (Garder en brouillon,
+  Réessayer, Envoyer dès que possible).
+- **Après la cloche** (`suiteApresCloche`, câblé dans `EcranPrincipal`) :
+  publié ou déjà publié → retour au Fil, rechargé de zéro, le nouveau moment
+  en haut, sans message ; brouillon incomplet → on reste sur la
+  finalisation ;
+  annulé, gardé en brouillon, en attente → rien ne change (on reste sur
+  l'onglet d'où l'on est parti) et un message discret dit que le moment est
+  gardé sur le téléphone (il n'y a pas encore de bandeau de brouillon dans
+  le Fil). Si des Tables n'ont pas pu être associées, le moment est publié
+  et un message discret le dit. Pas encore : la puce « n-ième fois ici »
+  (rien ne la définit : ni texte, ni règle de comptage).
+- **Modifier** (menu « ⋯ ») : rouvre la finalisation prérempli, sans la
+  cloche ; **photos et date figées** ; les souvenirs ne sont pas encore
+  modifiables.
+- Pas encore : « Sans photo », import de photos de plus de 24 h.
 - **Qui peut voir ?** : une feuille, jamais une page. Trois choix : Tout le
   monde / Seulement… (Tables et/ou personnes) / Tout le monde sauf…
   (personnes). Une Table choisie inclut ses futurs membres. Taguer quelqu'un
@@ -74,13 +234,16 @@ sont dans `docs/regles.md`.
   l'image.
 - **Lieux personnels** (chez soi, chez un ami) : le nom se lit sur les
   souvenirs, jamais d'adresse ni de position ; absents des cartes et de la
-  recherche des autres, sans page restaurant.
+  recherche des autres, sans page restaurant. Mêmes règles que pour un
+  moment (voir « Où l'on a mangé ») ; l'ajout d'un souvenir passe encore
+  par « Quel restaurant ? » (« Créer un lieu personnel »), pas par la
+  maison.
 
 ## Feed
 
 - **Commentaires façon Instagram** : feuille par-dessus le Feed, réponses sur
   un seul niveau (répondre à une réponse = même fil + « @pseudo »), repliées
-  sous « Voir les N réponses ». J'aime un commentaire = les deux verres en
+  sous « Voir les N réponses ». J'aime un commentaire = la cloche en
   petit.
 - **« A aimé »** : les visages de tous ceux qui ont aimé, le mien d'abord
   quand j'aime, puis les personnes que je suis, 3 au plus.
@@ -94,8 +257,10 @@ sont dans `docs/regles.md`.
 - Onglets texte : **Bilan** d'abord (au « tu », pastilles par année), puis
   **Souvenirs** (grille serrée par mois). D'autres onglets viendront
   (`RubriqueProfil`).
-- J'aime = deux verres qui trinquent (choix par défaut, pas encore validé
-  explicitement).
+- **J'aime = la cloche de service** (2026-11-14, remplace les deux verres
+  qui trinquent) : au tap, le dôme se soulève, un cœur doré jaillit, puis
+  la cloche retombe et se remplit d'or, le cœur gravé dedans. Retaper la
+  vide, sans animation.
 
 ## Carte et Explorer
 
@@ -111,8 +276,14 @@ sont dans `docs/regles.md`.
   en clair), une ligne par filtre, une seule ouverte, compte en direct
   (« Voir N adresses »). Tri : menu « Trié par » avec descriptions.
 - **Recherche** : la pilule glisse vers le haut (jamais de téléportation) ;
-  on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox),
-  1er résultat = « Chercher les restaurants dont le nom est « … » ».
+  on cherche d'abord un **endroit** (villes connues puis géocodage Mapbox :
+  villes, quartiers, rues, adresses, codes postaux), 1er résultat =
+  « Chercher les restaurants dont le nom est « … » ». Un endroit choisi
+  où personne n'est allé : la carte recule, centrée sur lui, jusqu'aux 3
+  adresses les plus proches (à moins de 25 km ; au-delà, elle reste sur
+  l'endroit et dit « rien ici »). La barre flottante
+  (Rechercher, filtres, Carte | Grille) s'efface pendant qu'on déplace la
+  carte du doigt et revient quand elle s'arrête.
 - **Fiche « Éventail » (faite)** : bandeau nuit (photo, nom, retour,
   marque-page doré quand l'adresse est gardée, qui remplace « Garder »),
   puis les proches qui y sont allés en cartes en éventail (≤ 4 proches → 4

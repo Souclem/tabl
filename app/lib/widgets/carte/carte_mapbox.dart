@@ -198,8 +198,9 @@ const styleCarteTabl = 'mapbox://styles/clemlon/cmvfdwxja009q01pl6rox6613';
 /// blanc cerclé d'or, qu'on ne touche pas.
 ///
 /// Composant pur : reçoit les lieux déjà choisis (au format GeoJSON) et
-/// renvoie le tap sur un lieu ([onTapLieu], avec sa clé) et la zone
-/// visible après chaque déplacement ([onZoneVisible]).
+/// renvoie le tap sur un lieu ([onTapLieu], avec sa clé), la zone
+/// visible après chaque déplacement ([onZoneVisible]) et le début et la
+/// fin d'un déplacement au doigt ([onDeplacement]).
 class TablCarteMapbox extends StatefulWidget {
   const TablCarteMapbox({
     super.key,
@@ -210,6 +211,7 @@ class TablCarteMapbox extends StatefulWidget {
     required this.onTapLieu,
     required this.onZoneVisible,
     this.onTapCarte,
+    this.onDeplacement,
     this.controleur,
     this.margeBas = 0,
     this.avecMaPosition = true,
@@ -243,6 +245,11 @@ class TablCarteMapbox extends StatefulWidget {
 
   /// Tap sur la carte, hors des lieux (ferme ce qui est ouvert).
   final VoidCallback? onTapCarte;
+
+  /// `true` quand on se met à déplacer la carte du doigt, `false` quand
+  /// elle s'est arrêtée, élan compris. Les mouvements que l'app commande
+  /// (recentrer, aller vers une ville) ne comptent pas.
+  final ValueChanged<bool>? onDeplacement;
 
   /// Hauteur occupée en bas par ce qui flotte au-dessus de la carte (la
   /// barre de navigation) : le logo et la mention « i » de Mapbox, qui
@@ -317,6 +324,12 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   bool _styleCharge = false;
   Timer? _attenteCamera;
 
+  /// Les doigts posés sur la carte : la caméra qui bouge alors, c'est
+  /// qu'on la déplace (et non l'app qui la recentre).
+  int _doigts = 0;
+  bool _enDeplacement = false;
+  Timer? _finDeplacement;
+
   /// Position de départ, créée une seule fois : un nouvel objet à chaque
   /// reconstruction pourrait ramener la carte à son point de départ et
   /// annuler un zoom ou un recentrage.
@@ -330,6 +343,7 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   @override
   void dispose() {
     _attenteCamera?.cancel();
+    _finDeplacement?.cancel();
     super.dispose();
   }
 
@@ -340,6 +354,28 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
   void _cameraBouge() {
     _attenteCamera?.cancel();
     _attenteCamera = Timer(const Duration(milliseconds: 300), _signalerZone);
+    if (_doigts > 0 && !_enDeplacement) {
+      _enDeplacement = true;
+      widget.onDeplacement?.call(true);
+    }
+    if (_enDeplacement) _attendreFinDeplacement();
+  }
+
+  void _doigtLeve(PointerEvent _) {
+    if (_doigts > 0) _doigts--;
+    if (_enDeplacement) _attendreFinDeplacement();
+  }
+
+  /// Le déplacement est fini quand plus aucun doigt ne touche la carte et
+  /// que la caméra ne bouge plus depuis un court instant (l'élan d'un
+  /// balayage la fait encore glisser).
+  void _attendreFinDeplacement() {
+    _finDeplacement?.cancel();
+    _finDeplacement = Timer(const Duration(milliseconds: 450), () {
+      if (_doigts > 0 || !_enDeplacement) return;
+      _enDeplacement = false;
+      widget.onDeplacement?.call(false);
+    });
   }
 
   Future<void> _creee(MapboxMap carte) async {
@@ -726,16 +762,23 @@ class _TablCarteMapboxState extends State<TablCarteMapbox> {
 
   @override
   Widget build(BuildContext context) {
-    return MapWidget(
-      key: const ValueKey('tabl-carte'),
-      styleUri: _styleUri,
-      viewport: _vueInitiale,
-      onMapCreated: _creee,
-      onStyleLoadedListener: _styleChargeListener,
-      onCameraChangeListener: (_) => _cameraBouge(),
-      gestureRecognizers: widget.dansUneFeuille
-          ? {Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new)}
-          : null,
+    // Compter les doigts n'arrête aucun geste : la carte les reçoit
+    // toujours.
+    return Listener(
+      onPointerDown: (_) => _doigts++,
+      onPointerUp: _doigtLeve,
+      onPointerCancel: _doigtLeve,
+      child: MapWidget(
+        key: const ValueKey('tabl-carte'),
+        styleUri: _styleUri,
+        viewport: _vueInitiale,
+        onMapCreated: _creee,
+        onStyleLoadedListener: _styleChargeListener,
+        onCameraChangeListener: (_) => _cameraBouge(),
+        gestureRecognizers: widget.dansUneFeuille
+            ? {Factory<EagerGestureRecognizer>(EagerGestureRecognizer.new)}
+            : null,
+      ),
     );
   }
 }

@@ -84,6 +84,9 @@ final _sansRien = base64Decode(
 );
 
 class _FauxSouvenirService implements SouvenirService {
+  @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
   _FauxSouvenirService({this.empreintes = const {}});
 
   final Set<String> empreintes;

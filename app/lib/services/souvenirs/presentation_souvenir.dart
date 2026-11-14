@@ -24,9 +24,14 @@ String nomDuMois(int mois) => _moisAnnee[mois - 1];
 String pluriel(int nombre, String mot) =>
     '$nombre $mot${nombre > 1 ? 's' : ''}';
 
-/// "Déjeuner" ou "Dîner" pour la valeur stockée en base (`'midi'`,
-/// `'soir'`), `null` pour toute autre.
+/// Les moments du repas, tels que stockés en base (`souvenirs.moment`),
+/// dans l'ordre de la journée.
+const momentsRepas = ['matin', 'midi', 'soir'];
+
+/// "Petit-déjeuner", "Déjeuner" ou "Dîner" pour la valeur stockée en base
+/// (`'matin'`, `'midi'`, `'soir'`), `null` pour toute autre.
 String? libelleMomentRepas(String moment) => switch (moment) {
+  'matin' => 'Petit-déjeuner',
   'midi' => 'Déjeuner',
   'soir' => 'Dîner',
   _ => null,

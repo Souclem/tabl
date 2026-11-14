@@ -34,6 +34,10 @@ class SouvenirFeed {
     this.estSouvenir = false,
     this.jourConnu = true,
     this.lieuPersonnel = false,
+    this.hoteId,
+    this.hotePseudo,
+    this.hotePhotoUrl,
+    this.jeSuisLHote = false,
   });
 
   final String id;
@@ -49,7 +53,7 @@ class SouvenirFeed {
   final String restaurantNom;
   final String ville;
 
-  /// `'midi'` ou `'soir'`, tel qu'enregistré en base.
+  /// `'matin'`, `'midi'` ou `'soir'`, tel qu'enregistré en base.
   final String moment;
 
   final DateTime dateVisite;
@@ -120,6 +124,15 @@ class SouvenirFeed {
   /// page de restaurant.
   final bool lieuPersonnel;
 
+  /// Chez une personne de Tabl : son profil et sa photo ([restaurantNom]
+  /// dit déjà « Chez Emma »). Jamais d'adresse.
+  final String? hoteId;
+  final String? hotePseudo;
+  final String? hotePhotoUrl;
+
+  /// Le moment a été publié chez moi : je peux retirer mon nom du lieu.
+  final bool jeSuisLHote;
+
   /// Nouvelle instance avec certains champs remplacés — pour la mise à
   /// jour optimiste après une action (réagir, commenter), sans recharger
   /// tout le Feed.
@@ -158,6 +171,10 @@ class SouvenirFeed {
       estSouvenir: estSouvenir,
       jourConnu: jourConnu,
       lieuPersonnel: lieuPersonnel,
+      hoteId: hoteId,
+      hotePseudo: hotePseudo,
+      hotePhotoUrl: hotePhotoUrl,
+      jeSuisLHote: jeSuisLHote,
     );
   }
 }

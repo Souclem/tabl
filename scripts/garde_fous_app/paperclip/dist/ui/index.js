@@ -103,6 +103,7 @@ export function CompteClaude() {
   const donnees = compte.data;
   if (donnees && !donnees.installe) return null;
 
+  const surFree = (donnees && donnees.surFree) || [];
   const retours = donnees
     ? donnees.epuises.filter((e) => e.numero !== donnees.actif).map((e) => `le ${e.numero} revient à ${heure(e.jusqua)}`)
     : [];
@@ -116,9 +117,24 @@ export function CompteClaude() {
   } else if (donnees && donnees.actif) {
     pastille = String(donnees.actif);
     couleur = donnees.actif === 1 ? "text-emerald-500" : "text-amber-500";
-    titre = `Les agents utilisent le Compte Claude ${donnees.actif}.`;
+    titre = surFree.length
+      ? `Les autres agents utilisent le Compte Claude ${donnees.actif}.`
+      : `Les agents utilisent le Compte Claude ${donnees.actif}.`;
+  }
+  if (surFree.length) {
+    pastille = (donnees.tousEpuises ? "" : pastille + " + ") + "Free";
+    couleur = "text-blue-500";
+    titre = `Sur Free Claude Code (gratuit) : ${surFree.join(", ")}. ` + titre;
   }
   if (retours.length) titre += ` ${retours.join(", ").replace(/^l/, "L")}.`;
+  if (donnees && donnees.choix) titre += ` Choix dans Garde-fous Tabl : ${donnees.choix}.`;
+  if (donnees && donnees.detail && donnees.detail.length) {
+    titre += "\n\n" + donnees.detail.map((l) => `${l.nom} : ${l.source}${l.force ? " (forcé)" : ""}`).join("\n");
+  }
+  const sousTitre = [
+    surFree.length ? `${surFree.length} agent${surFree.length > 1 ? "s" : ""} sur Free Claude Code` : null,
+    ...retours,
+  ].filter(Boolean);
 
   return h(
     "div",
@@ -131,8 +147,8 @@ export function CompteClaude() {
       "span",
       { className: "flex min-w-0 flex-1 flex-col text-left" },
       h("span", { className: "truncate" }, "Compte Claude"),
-      retours.length
-        ? h("span", { className: "truncate text-[11px] font-normal text-muted-foreground" }, retours.join(", "))
+      sousTitre.length
+        ? h("span", { className: "truncate text-[11px] font-normal text-muted-foreground" }, sousTitre.join(" · "))
         : null,
     ),
     h("span", { className: "rounded px-1.5 text-[11px] tabular-nums " + couleur }, pastille),

@@ -79,14 +79,28 @@ class _FauxAbonnementService implements AbonnementService {
 
 /// Un restaurant où Emma est allée (à Liège, sauf [latitude] et
 /// [longitude] données).
-/// Le géocodage, sans réseau : « par… » trouve Paris.
+/// Le géocodage, sans réseau : « par… » trouve Paris, « rue… » une rue de
+/// Liège.
 class _FausseRechercheEndroit implements RechercheEndroitService {
   @override
   Future<List<EndroitTrouve>> chercher(
     String texte, {
     double? latitude,
     double? longitude,
-  }) async => normaliserPourRecherche(texte).startsWith('par')
+  }) async => normaliserPourRecherche(texte).startsWith('rue')
+      ? const [
+          EndroitTrouve(
+            nom: 'Rue Saint-Gilles',
+            detail: '4000 Liège, Belgique',
+            zone: ZoneCarte(
+              sud: 50.632,
+              ouest: 5.562,
+              nord: 50.648,
+              est: 5.578,
+            ),
+          ),
+        ]
+      : normaliserPourRecherche(texte).startsWith('par')
       ? const [
           EndroitTrouve(
             nom: 'Paris',
@@ -136,6 +150,9 @@ LieuCarte _lieu(
 
 class _FauxSouvenirService implements SouvenirService {
   @override
+  Future<void> retirerMonNomDuLieu(String restaurantId) async {}
+
+  @override
   Future<List<SouvenirFeed>> souvenirsDuRestaurant(String restaurantId) async =>
       const [];
 
@@ -173,11 +190,15 @@ Future<_FauxCarteService> _ouvrir(
 
 /// L'en-tête et la barre de l'Explorer se voient (et se touchent).
 bool _explorerVisible(WidgetTester tester) {
-  final fondu = find.ancestor(
+  // Tous les fondus au-dessus de la barre : celui de l'Explorer (derrière
+  // la Constellation) et le sien (le temps qu'on déplace la carte).
+  final fondus = find.ancestor(
     of: find.byType(TablBarreExplorer),
     matching: find.byType(AnimatedOpacity),
   );
-  return tester.widget<AnimatedOpacity>(fondu.first).opacity == 1;
+  return tester
+      .widgetList<AnimatedOpacity>(fondus)
+      .every((f) => f.opacity == 1);
 }
 
 /// Les noms des tuiles de la grille, dans l'ordre.
@@ -313,6 +334,25 @@ void main() {
     await tester.tap(find.text('Paris').first);
     await tester.pumpAndSettle();
     expect(_tuiles(tester), ['Le Comptoir Paris']);
+  });
+
+  testWidgets('« Rechercher » : une rue où personne n\'est allé recule '
+      'jusqu\'aux adresses les plus proches', (tester) async {
+    await _ouvrir(tester, [
+      _lieu('Bibo', latitude: 50.658, longitude: 5.57),
+      _lieu('Le Comptoir Paris', latitude: 48.86, longitude: 2.35),
+    ]);
+
+    await tester.tap(find.bySemanticsLabel('Rechercher'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'rue saint-gilles');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rue Saint-Gilles'));
+    await tester.pumpAndSettle();
+
+    // Rien dans la rue même : Bibo, à 2 km, se montre ; Paris, non.
+    expect(_tuiles(tester), ['Bibo']);
   });
 
   testWidgets('« Rechercher » : les restaurants de ce nom, sur demande', (

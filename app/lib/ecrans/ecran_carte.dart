@@ -99,6 +99,11 @@ class _EcranCarteState extends State<EcranCarte> {
 
   final _controleur = ControleurCarte();
 
+  /// On déplace la carte du doigt : la barre flottante s'efface le temps
+  /// du geste, pour laisser voir la carte. À part, pour que le geste ne
+  /// reconstruise que la barre.
+  final _carteBouge = ValueNotifier(false);
+
   /// Hauteur de l'en-tête posé sur la carte, mesurée à chaque image.
   final _cleEnTete = GlobalKey();
   double _hauteurEnTete = 190;
@@ -154,6 +159,7 @@ class _EcranCarteState extends State<EcranCarte> {
   @override
   void dispose() {
     _fermetureEnAttente?.cancel();
+    _carteBouge.dispose();
     super.dispose();
   }
 
@@ -414,8 +420,10 @@ class _EcranCarteState extends State<EcranCarte> {
     if (!mounted || choix == null) return;
     setState(() => _selection = null);
     switch (choix) {
+      // Personne n'est allé là : on recule un peu, jusqu'aux adresses les
+      // plus proches.
       case EndroitChoisi(:final zone):
-        await _allerVers(zone);
+        await _allerVers(zoneAvecDesLieux(zone, _lieux));
       case AutourDeMoiChoisi():
         if (p != null) {
           await _controleur.centrerSur(p.latitude, p.longitude, zoom: 13.5);
@@ -793,24 +801,46 @@ class _EcranCarteState extends State<EcranCarte> {
                       child: _enTete(nombre),
                     ),
                     if (!_enGrille) ..._surLaCarte(),
-                    // Cachée tant que l'aperçu d'un lieu est ouvert.
+                    // Cachée tant que l'aperçu d'un lieu est ouvert, et le
+                    // temps qu'on déplace la carte.
                     if (_selection == null)
                       Positioned(
                         left: 12,
                         right: 12,
                         bottom: _margeBarre + 12,
-                        child: TablBarreExplorer(
-                          onRechercher: _ouvrirRecherche,
-                          onFiltres: _ouvrirFiltres,
-                          filtresActifs: _filtres.nombreActifs,
-                          enGrille: _enGrille,
-                          onChoisirVue: (grille) {
-                            setState(() {
-                              _enGrille = grille;
-                              _selection = null;
-                            });
-                            if (grille) _demanderPhotos();
+                        child: ValueListenableBuilder(
+                          valueListenable: _carteBouge,
+                          builder: (context, bouge, barre) {
+                            final cachee = bouge && !_enGrille;
+                            return IgnorePointer(
+                              ignoring: cachee,
+                              child: AnimatedSlide(
+                                offset: cachee
+                                    ? const Offset(0, 0.6)
+                                    : Offset.zero,
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                                child: AnimatedOpacity(
+                                  opacity: cachee ? 0 : 1,
+                                  duration: const Duration(milliseconds: 200),
+                                  child: barre,
+                                ),
+                              ),
+                            );
                           },
+                          child: TablBarreExplorer(
+                            onRechercher: _ouvrirRecherche,
+                            onFiltres: _ouvrirFiltres,
+                            filtresActifs: _filtres.nombreActifs,
+                            enGrille: _enGrille,
+                            onChoisirVue: (grille) {
+                              setState(() {
+                                _enGrille = grille;
+                                _selection = null;
+                              });
+                              if (grille) _demanderPhotos();
+                            },
+                          ),
                         ),
                       ),
                   ],
@@ -1020,6 +1050,7 @@ class _EcranCarteState extends State<EcranCarte> {
       onTapLieu: _tapLieu,
       onZoneVisible: _zoneVisible,
       onTapCarte: _tapCarte,
+      onDeplacement: (bouge) => _carteBouge.value = bouge,
     );
   }
 
